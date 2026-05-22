@@ -618,6 +618,7 @@ function removeRosterRow(side, idx) {
 }
 
 async function handleOcr(input, side) {
+  async function handleOcr(input, side) {
   const file = input.files[0];
   if (!file) return;
   const progressEl = document.getElementById('ocr-progress-' + side);
@@ -640,27 +641,47 @@ async function handleOcr(input, side) {
         }
       }
     });
-    const lines = data.text.split('\n').map(l => l.trim()).filter(Boolean);
-    const players = [];
-    let teamName = null;
+    const rawLines = data.text.split('\n').map(l => l.trim()).filter(Boolean);
 
-    const lower = lines.map(l => l.toLowerCase());
-    const idxLnd = lower.findIndex(l => l.includes('lega nazionale') || l.includes('dilettanti'));
-    if (idxLnd >= 0 && idxLnd + 1 < lines.length) {
-      let candidate = lines[idxLnd + 1].replace(/^\d{4,7}\s+/, '').trim();
-      if (candidate.length > 2 && candidate.length < 50) teamName = candidate;
+    // === ESTRAZIONE NOME SQUADRA ===
+    let teamName = null;
+    const lower = rawLines.map(l => l.toLowerCase());
+    const idxLnd = lower.findIndex(l =>
+      l.includes('lega nazionale') || l.includes('dilettanti')
+    );
+    if (idxLnd >= 0 && idxLnd + 1 < rawLines.length) {
+      let candidate = rawLines[idxLnd + 1];
+      candidate = candidate.replace(/^\d{4,7}\s+/, '').trim();
+      if (candidate.length > 2 && candidate.length < 80) {
+        teamName = candidate;
+      }
     }
 
-    const rosterRegex = /^(\d{1,2})\s+([A-ZÀÁÈÉÌÒÓÙÜ][A-Za-zÀ-ÿ' ]{2,40})/;
-    for (const line of lines) {
+    // === ESTRAZIONE CALCIATRICI ===
+    // Pattern: [progressivo] [N°maglia] [data] [COGNOME NOME]
+    const rosterRegex = /^(\d{1,2})\s+(\d{1,2})\s+\d{1,2}[\/\-\.\s]\d{1,2}[\/\-\.\s]\d{2,4}\s+([A-ZÀÁÈÉÌÒÓÙÜ][A-ZÀ-Ü' ]{3,40})/;
+
+    const players = [];
+    const seenNums = new Set();
+
+    for (const line of rawLines) {
       const m = line.match(rosterRegex);
-      if (m) {
-        const num = parseInt(m[1]);
-        const name = m[2].trim().replace(/\s+/g, ' ');
-        if (num >= 1 && num <= 99 && name.length >= 3 && !players.some(p => p.num === num)) {
-          players.push({ num, name, role: '' });
-        }
-      }
+      if (!m) continue;
+
+      const maglia = parseInt(m[2]); // SECONDO numero = N° maglia
+      let name = m[3].trim().replace(/\s+/g, ' ');
+
+      name = name.split(' ')
+        .filter(w => w.length >= 2 && /^[A-ZÀ-Ü']+$/i.test(w))
+        .slice(0, 4)
+        .join(' ');
+
+      if (maglia < 1 || maglia > 99) continue;
+      if (name.length < 4) continue;
+      if (seenNums.has(maglia)) continue;
+
+      seenNums.add(maglia);
+      players.push({ num: maglia, name, role: '' });
     }
 
     if (teamName && !document.getElementById('team-' + side).value) {
@@ -669,13 +690,13 @@ async function handleOcr(input, side) {
 
     if (players.length === 0) {
       progressEl.textContent = '⚠️ Nessuna calciatrice riconosciuta. Inserisci manualmente.';
-      setTimeout(() => progressEl.classList.remove('active'), 3500);
+      setTimeout(() => progressEl.classList.remove('active'), 4000);
     } else {
       const existing = state.currentMatch[side].roster.filter(p => p.num || p.name);
       state.currentMatch[side].roster = [...existing, ...players];
       renderRoster(side);
-      progressEl.textContent = `✅ ${players.length} atlete riconosciute. Imposta i ruoli e verifica.`;
-      setTimeout(() => progressEl.classList.remove('active'), 4500);
+      progressEl.textContent = `✅ ${players.length} atlete riconosciute. Verifica numeri e cognomi.`;
+      setTimeout(() => progressEl.classList.remove('active'), 5000);
     }
   } catch (e) {
     progressEl.textContent = '❌ Errore: ' + (e.message || e);
@@ -683,7 +704,6 @@ async function handleOcr(input, side) {
   }
   input.value = '';
 }
-
 async function pdfToImage(file) {
   if (!window['pdfjsLib']) throw new Error('Libreria PDF non disponibile');
   const arrayBuffer = await file.arrayBuffer();
