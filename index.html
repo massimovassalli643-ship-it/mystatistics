@@ -269,6 +269,7 @@
       <button class="primary-btn" onclick="startNewMatch()">⚽ Nuova partita</button>
       <button class="secondary-btn" onclick="exportAllData()">📤 Backup completo</button>
       <button class="secondary-btn" onclick="importData()">📥 Importa</button>
+      <button class="secondary-btn" onclick="openSettingsModal()">⚙️ Impostazioni</button>
     </div>
     <h2 class="history-title">Storico</h2>
     <div class="history-list" id="history-list"></div>
@@ -454,7 +455,8 @@
       <button class="secondary-btn" onclick="goHome()">← Home</button>
       <button class="secondary-btn" onclick="exportCurrentMatch()">📤 JSON</button>
       <button class="secondary-btn" onclick="exportMatchXlsx()">📊 Excel</button>
-      <button class="primary-btn" onclick="exportMatchPdf()">📄 PDF</button>
+      <button class="secondary-btn" onclick="exportMatchPdf()">📄 PDF</button>
+      <button class="primary-btn" onclick="syncToSheets()">☁️ Sincronizza su Sheets</button>
     </div>
   </div>
 
@@ -498,7 +500,29 @@
     </div>
   </div>
 </div>
-<script>
+
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <div class="modal-title">⚙️ Impostazioni</div>
+    <div>
+      <div class="modal-field">
+        <label class="modal-label">URL Backend Google Sheets</label>
+        <input type="text" class="modal-input" id="settings-sheets-url" placeholder="https://script.google.com/macros/s/.../exec" style="font-size:11px;font-family:monospace;">
+        <div style="font-size:11px;color:#7a96b3;margin-top:6px;line-height:1.4;">Incolla l'URL del tuo Web App Apps Script. Verrà salvato solo sul tuo dispositivo.</div>
+      </div>
+      <div id="settings-test-result" style="font-size:12px;padding:8px;border-radius:6px;display:none;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="secondary-btn" onclick="testSheetsConnection()" style="flex:1;padding:10px;font-size:13px;">🔗 Testa connessione</button>
+        <button class="secondary-btn" onclick="clearSheetsUrl()" style="flex:1;padding:10px;font-size:13px;background:rgba(220,53,69,0.15);color:#ff6b7a;">🗑️ Rimuovi</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn cancel" onclick="closeModal('settings-modal')">Chiudi</button>
+      <button class="modal-btn confirm" onclick="saveSheetsUrl()">Salva</button>
+    </div>
+  </div>
+</div>
+  <script>
 const STORAGE_KEY = 'mystatistics_matches_v2';
 const ROLES = ['GK', 'DEF', 'MID', 'FWD', 'LM'];
 const ROLE_LABELS = { GK: 'Portiere', DEF: 'Difensore', MID: 'Centrale', FWD: 'Attaccante', LM: 'Tutta fascia' };
@@ -545,11 +569,12 @@ function renderHistory() {
   list.innerHTML = matches.map(m => {
     const d = new Date(m.createdAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
     const status = m.completed ? '✅ Completata' : '⏸ In corso';
+    const sync = m.syncedAt ? ' • ☁️ Sincronizzata' : '';
     return `
       <div class="match-card" onclick="openMatch('${m.id}')">
         <div class="match-card-info">
           <div class="match-card-teams">${escapeHtml(m.home.name || 'Casa')} vs ${escapeHtml(m.away.name || 'Ospiti')}</div>
-          <div class="match-card-meta">${d} • ${status}</div>
+          <div class="match-card-meta">${d} • ${status}${sync}</div>
         </div>
         <div class="match-card-score">${m.home.score}–${m.away.score}</div>
         <button class="match-card-delete" onclick="event.stopPropagation(); deleteMatch('${m.id}')">Elimina</button>
@@ -739,7 +764,7 @@ function showOcrDebug() {
   modal.innerHTML = `
     <div style="background:#1a3556;border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:24px;max-width:90%;width:700px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
       <h2 style="color:#ffb84d;margin:0 0 12px 0;font-size:18px;">🔍 Testo grezzo letto dall'OCR</h2>
-      <p style="color:#7a96b3;font-size:12px;margin:0 0 12px 0;">${lines.length} righe rilevate. Copia questo testo e invialo per analisi.</p>
+      <p style="color:#7a96b3;font-size:12px;margin:0 0 12px 0;">${lines.length} righe rilevate.</p>
       <textarea id="ocr-debug-text" readonly style="flex:1;background:#0a1929;color:#e8f0f7;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px;font-family:monospace;font-size:12px;line-height:1.5;resize:none;min-height:300px;">${text.replace(/</g,'&lt;')}</textarea>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
         <button onclick="copyOcrText(this)" style="background:#2ecc71;color:white;border:none;padding:10px 18px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">📋 Copia tutto</button>
@@ -1415,7 +1440,6 @@ function exportMatchXlsx() {
       dettaglioAgg = `Entra: ${e.playerIn.num ?? '?'} ${e.playerIn.name}`;
       note = e.subReason || '';
     }
-
     eventsRows.push([e.minute, periodName, tipoEvento, teamName, calciatrice, dettaglioAgg, note]);
   });
 
@@ -1543,6 +1567,139 @@ function closeModal(id) { document.getElementById(id).classList.remove('active')
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+const SHEETS_URL_KEY = 'mystatistics_sheets_url';
+
+function getSheetsUrl() {
+  return localStorage.getItem(SHEETS_URL_KEY) || '';
+}
+
+function openSettingsModal() {
+  document.getElementById('settings-sheets-url').value = getSheetsUrl();
+  document.getElementById('settings-test-result').style.display = 'none';
+  document.getElementById('settings-modal').classList.add('active');
+}
+
+function saveSheetsUrl() {
+  const url = document.getElementById('settings-sheets-url').value.trim();
+  if (url && !url.startsWith('https://script.google.com/')) {
+    alert('URL non valido. Deve iniziare con https://script.google.com/');
+    return;
+  }
+  localStorage.setItem(SHEETS_URL_KEY, url);
+  closeModal('settings-modal');
+  alert('Impostazioni salvate.');
+}
+
+function clearSheetsUrl() {
+  if (!confirm('Rimuovere l\'URL del backend? La sincronizzazione non sarà più disponibile.')) return;
+  localStorage.removeItem(SHEETS_URL_KEY);
+  document.getElementById('settings-sheets-url').value = '';
+  alert('URL rimosso.');
+}
+
+async function testSheetsConnection() {
+  const url = document.getElementById('settings-sheets-url').value.trim();
+  const resultEl = document.getElementById('settings-test-result');
+  resultEl.style.display = 'block';
+  resultEl.style.background = 'rgba(127,184,255,0.15)';
+  resultEl.style.color = '#7fb8ff';
+  resultEl.textContent = '⏳ Test in corso...';
+
+  if (!url) {
+    resultEl.style.background = 'rgba(220,53,69,0.15)';
+    resultEl.style.color = '#ff6b7a';
+    resultEl.textContent = '❌ Inserisci prima un URL';
+    return;
+  }
+
+  try {
+    const response = await fetch(url, { method: 'GET', redirect: 'follow' });
+    const data = await response.json();
+    if (data && data.ok) {
+      resultEl.style.background = 'rgba(46,204,113,0.15)';
+      resultEl.style.color = '#2ecc71';
+      resultEl.textContent = `✅ Connesso! ${data.message || 'Backend attivo'}`;
+    } else {
+      resultEl.style.background = 'rgba(220,53,69,0.15)';
+      resultEl.style.color = '#ff6b7a';
+      resultEl.textContent = '❌ Risposta inattesa: ' + JSON.stringify(data);
+    }
+  } catch (e) {
+    resultEl.style.background = 'rgba(220,53,69,0.15)';
+    resultEl.style.color = '#ff6b7a';
+    resultEl.textContent = '❌ Errore connessione: ' + e.message;
+  }
+}
+
+async function syncToSheets() {
+  if (!state.currentMatch) return;
+  const url = getSheetsUrl();
+  if (!url) {
+    if (confirm('Non hai ancora configurato l\'URL del backend Google Sheets.\nVuoi farlo ora?')) {
+      openSettingsModal();
+    }
+    return;
+  }
+
+  const m = state.currentMatch;
+  const btn = event.target.closest('button');
+  const originalText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+    btn.innerHTML = '⏳ Sincronizzazione...';
+  }
+
+  try {
+    const statsHome = computePlayerStats('home');
+    const statsAway = computePlayerStats('away');
+
+    const payload = {
+      match: m,
+      stats: { home: statsHome, away: statsAway },
+      periodLabel: PERIODS[Math.min(m.timer.periodIndex, PERIODS.length - 1)],
+      periodNames: PERIODS
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      mode: 'cors',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+
+    if (result.ok) {
+      state.currentMatch.syncedAt = Date.now();
+      persistCurrent();
+      if (btn) {
+        btn.innerHTML = '✅ Sincronizzato!';
+        btn.style.background = 'linear-gradient(135deg, #27ae60, #2ecc71)';
+      }
+      setTimeout(() => {
+        alert(`✅ Partita sincronizzata su Google Sheets!\n\n${result.home} vs ${result.away} (${result.score})\n${result.statsRows} righe statistiche\n${result.eventiRows} eventi\nSalvato il ${result.savedAt}`);
+        if (btn) {
+          btn.disabled = false;
+          btn.style.opacity = '1';
+          btn.innerHTML = originalText || '☁️ Sincronizza su Sheets';
+          btn.style.background = '';
+        }
+      }, 500);
+    } else {
+      throw new Error(result.error || 'Errore sconosciuto dal backend');
+    }
+  } catch (e) {
+    if (btn) {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.innerHTML = originalText || '☁️ Sincronizza su Sheets';
+    }
+    alert('❌ Errore sincronizzazione:\n' + e.message + '\n\nVerifica connessione internet e URL backend nelle Impostazioni.');
+  }
 }
 
 renderHistory();
