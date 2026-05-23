@@ -619,7 +619,7 @@ function removeRosterRow(side, idx) {
 }
 
 async function handleOcr(input, side) {
-  async function handleOcr(input, side) {
+ async function handleOcr(input, side) {
   const file = input.files[0];
   if (!file) return;
   const progressEl = document.getElementById('ocr-progress-' + side);
@@ -644,7 +644,6 @@ async function handleOcr(input, side) {
     });
     const rawLines = data.text.split('\n').map(l => l.trim()).filter(Boolean);
 
-    // DIAGNOSTICA: salvo il testo grezzo per analisi
     window.lastOcrText = data.text;
 
     let teamName = null;
