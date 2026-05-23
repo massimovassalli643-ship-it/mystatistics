@@ -619,6 +619,7 @@ function removeRosterRow(side, idx) {
 }
 
 async function handleOcr(input, side) {
+  async function handleOcr(input, side) {
   const file = input.files[0];
   if (!file) return;
   const progressEl = document.getElementById('ocr-progress-' + side);
@@ -642,6 +643,9 @@ async function handleOcr(input, side) {
       }
     });
     const rawLines = data.text.split('\n').map(l => l.trim()).filter(Boolean);
+
+    // DIAGNOSTICA: salvo il testo grezzo per analisi
+    window.lastOcrText = data.text;
 
     let teamName = null;
     const lower = rawLines.map(l => l.toLowerCase());
@@ -685,15 +689,16 @@ async function handleOcr(input, side) {
       document.getElementById('team-' + side).value = teamName;
     }
 
+    const debugBtn = `<button onclick="showOcrDebug()" style="margin-left:8px;background:#ffb84d;color:#000;border:none;padding:4px 10px;border-radius:4px;font-weight:700;font-size:11px;cursor:pointer;">🔍 Vedi testo OCR</button>`;
+
     if (players.length === 0) {
-      progressEl.textContent = '⚠️ Nessuna calciatrice riconosciuta. Inserisci manualmente.';
-      setTimeout(() => progressEl.classList.remove('active'), 4000);
+      progressEl.innerHTML = `⚠️ Nessuna calciatrice riconosciuta su ${rawLines.length} righe lette.${debugBtn}`;
     } else {
       const existing = state.currentMatch[side].roster.filter(p => p.num || p.name);
       state.currentMatch[side].roster = [...existing, ...players];
       renderRoster(side);
-      progressEl.textContent = `✅ ${players.length} atlete riconosciute. Verifica numeri e cognomi.`;
-      setTimeout(() => progressEl.classList.remove('active'), 5000);
+      progressEl.innerHTML = `✅ ${players.length} atlete riconosciute su ${rawLines.length} righe.${debugBtn}`;
+      setTimeout(() => progressEl.classList.remove('active'), 10000);
     }
   } catch (e) {
     progressEl.textContent = '❌ Errore: ' + (e.message || e);
@@ -702,6 +707,51 @@ async function handleOcr(input, side) {
   input.value = '';
 }
 
+function showOcrDebug() {
+  if (!window.lastOcrText) {
+    alert('Nessun testo OCR disponibile. Carica prima una distinta.');
+    return;
+  }
+  const text = window.lastOcrText;
+  const lines = text.split('\n').filter(l => l.trim());
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML = `
+    <div style="background:#1a3556;border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:24px;max-width:90%;width:700px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
+      <h2 style="color:#ffb84d;margin:0 0 12px 0;font-size:18px;">🔍 Testo grezzo letto dall'OCR</h2>
+      <p style="color:#7a96b3;font-size:12px;margin:0 0 12px 0;">${lines.length} righe rilevate. Copia questo testo e invialo per analisi.</p>
+      <textarea id="ocr-debug-text" readonly style="flex:1;background:#0a1929;color:#e8f0f7;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px;font-family:monospace;font-size:12px;line-height:1.5;resize:none;min-height:300px;">${text.replace(/</g,'&lt;')}</textarea>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+        <button onclick="copyOcrText(this)" style="background:#2ecc71;color:white;border:none;padding:10px 18px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">📋 Copia tutto</button>
+        <button onclick="this.parentElement.parentElement.parentElement.remove()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">Chiudi</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+function copyOcrText(btn) {
+  const ta = document.getElementById('ocr-debug-text');
+  if (!ta) return;
+  ta.select();
+  ta.setSelectionRange(0, 99999);
+  try {
+    document.execCommand('copy');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✅ Copiato!';
+    setTimeout(() => { btn.innerHTML = orig; }, 2000);
+  } catch (e) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(ta.value).then(() => {
+        btn.innerHTML = '✅ Copiato!';
+        setTimeout(() => { btn.innerHTML = '📋 Copia tutto'; }, 2000);
+      });
+    } else {
+      alert('Copia manuale: seleziona il testo e premi Ctrl+C');
+    }
+  }
+}
 async function pdfToImage(file) {
   if (!window['pdfjsLib']) throw new Error('Libreria PDF non disponibile');
   const arrayBuffer = await file.arrayBuffer();
