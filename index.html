@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="My Statistics">
 <meta name="theme-color" content="#0a1929">
@@ -495,7 +496,7 @@
     </div>
   </div>
 </div>
-<script>
+  <script>
 const STORAGE_KEY = 'mystatistics_matches_v2';
 const ROLES = ['GK', 'DEF', 'MID', 'FWD', 'LM'];
 const ROLE_LABELS = { GK: 'Portiere', DEF: 'Difensore', MID: 'Centrale', FWD: 'Attaccante', LM: 'Tutta fascia' };
@@ -618,7 +619,6 @@ function removeRosterRow(side, idx) {
 }
 
 async function handleOcr(input, side) {
-  async function handleOcr(input, side) {
   const file = input.files[0];
   if (!file) return;
   const progressEl = document.getElementById('ocr-progress-' + side);
@@ -643,7 +643,6 @@ async function handleOcr(input, side) {
     });
     const rawLines = data.text.split('\n').map(l => l.trim()).filter(Boolean);
 
-    // === ESTRAZIONE NOME SQUADRA ===
     let teamName = null;
     const lower = rawLines.map(l => l.toLowerCase());
     const idxLnd = lower.findIndex(l =>
@@ -657,8 +656,6 @@ async function handleOcr(input, side) {
       }
     }
 
-    // === ESTRAZIONE CALCIATRICI ===
-    // Pattern: [progressivo] [N°maglia] [data] [COGNOME NOME]
     const rosterRegex = /^(\d{1,2})\s+(\d{1,2})\s+\d{1,2}[\/\-\.\s]\d{1,2}[\/\-\.\s]\d{2,4}\s+([A-ZÀÁÈÉÌÒÓÙÜ][A-ZÀ-Ü' ]{3,40})/;
 
     const players = [];
@@ -668,7 +665,7 @@ async function handleOcr(input, side) {
       const m = line.match(rosterRegex);
       if (!m) continue;
 
-      const maglia = parseInt(m[2]); // SECONDO numero = N° maglia
+      const maglia = parseInt(m[2]);
       let name = m[3].trim().replace(/\s+/g, ' ');
 
       name = name.split(' ')
@@ -704,6 +701,7 @@ async function handleOcr(input, side) {
   }
   input.value = '';
 }
+
 async function pdfToImage(file) {
   if (!window['pdfjsLib']) throw new Error('Libreria PDF non disponibile');
   const arrayBuffer = await file.arrayBuffer();
