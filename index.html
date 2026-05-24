@@ -1,1755 +1,66 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="My Statistics">
-<meta name="theme-color" content="#0a1929">
-<title>My Statistics</title>
-
-<link rel="manifest" href='data:application/manifest+json,{"name":"My Statistics","short_name":"MyStats","start_url":".","display":"standalone","background_color":"%230a1929","theme_color":"%230a1929","orientation":"landscape"}'>
-
-<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script>
-  if (window['pdfjsLib']) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  }
-</script>
-
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
-    background: linear-gradient(135deg, #0a1929 0%, #122a44 100%);
-    color: #e8f0f7;
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: manipulation;
-  }
-  button { font-family: inherit; cursor: pointer; border: none; outline: none; }
-  input, select { font-family: inherit; outline: none; }
-
-  #app { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
-
-  .top-bar {
-    background: rgba(0,0,0,0.4);
-    padding: 10px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    flex-shrink: 0;
-  }
-  .logo {
-    font-size: 22px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
-    background: linear-gradient(135deg, #fff, #7fb8ff);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .logo span { color: #ffb84d; -webkit-text-fill-color: #ffb84d; }
-  .top-actions { display: flex; gap: 10px; }
-  .icon-btn { background: rgba(255,255,255,0.08); color: #fff; padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; }
-  .icon-btn:active { background: rgba(255,255,255,0.15); }
-
-  .screen { flex: 1; display: none; overflow: hidden; }
-  .screen.active { display: flex; }
-
-  #home-screen { flex-direction: column; padding: 30px 40px; overflow-y: auto; }
-  .home-title { font-size: 32px; font-weight: 800; margin-bottom: 8px; }
-  .home-subtitle { color: #7a96b3; margin-bottom: 30px; font-size: 16px; }
-  .home-actions { display: flex; gap: 16px; margin-bottom: 40px; flex-wrap: wrap; }
-  .primary-btn {
-    background: linear-gradient(135deg, #ff6b35, #ff8c42);
-    color: white; padding: 16px 28px; border-radius: 12px;
-    font-size: 16px; font-weight: 700; letter-spacing: 0.3px;
-    box-shadow: 0 4px 14px rgba(255,107,53,0.4);
-  }
-  .primary-btn:active { transform: scale(0.97); }
-  .secondary-btn {
-    background: rgba(255,255,255,0.08); color: #fff;
-    padding: 16px 28px; border-radius: 12px; font-size: 16px;
-    font-weight: 600; border: 1px solid rgba(255,255,255,0.12);
-  }
-  .secondary-btn:active { background: rgba(255,255,255,0.15); }
-
-  .history-title { font-size: 20px; font-weight: 700; margin-bottom: 16px; color: #b8d4ed; }
-  .history-list { display: flex; flex-direction: column; gap: 10px; }
-  .match-card {
-    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
-    padding: 18px 22px; border-radius: 12px;
-    display: flex; justify-content: space-between; align-items: center; cursor: pointer;
-  }
-  .match-card:active { background: rgba(255,255,255,0.1); }
-  .match-card-info { flex: 1; }
-  .match-card-teams { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
-  .match-card-meta { font-size: 13px; color: #7a96b3; }
-  .match-card-score { font-size: 22px; font-weight: 800; color: #ffb84d; margin: 0 20px; min-width: 70px; text-align: center; }
-  .match-card-delete { background: rgba(220,53,69,0.15); color: #ff6b7a; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; }
-  .empty-state { text-align: center; padding: 50px 20px; color: #5a7793; font-size: 15px; }
-
-  #setup-screen { flex-direction: column; overflow-y: auto; padding: 20px 30px 40px; }
-  .setup-section { margin-bottom: 24px; }
-  .section-title { font-size: 14px; font-weight: 700; color: #7fb8ff; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
-  .teams-input { display: grid; grid-template-columns: 1fr 60px 1fr; gap: 12px; align-items: center; }
-  .team-input {
-    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
-    color: #fff; padding: 14px 18px; border-radius: 10px;
-    font-size: 16px; font-weight: 600; width: 100%;
-  }
-  .team-input:focus { border-color: #7fb8ff; }
-  .vs-label { text-align: center; font-size: 18px; font-weight: 800; color: #ffb84d; }
-
-  .rosters-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  .roster-panel { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 18px; }
-  .roster-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-  .roster-name { font-size: 16px; font-weight: 700; }
-  .roster-count { font-size: 13px; color: #7a96b3; background: rgba(255,255,255,0.08); padding: 4px 10px; border-radius: 12px; }
-  .ocr-upload {
-    width: 100%;
-    background: linear-gradient(135deg, rgba(127,184,255,0.15), rgba(127,184,255,0.05));
-    border: 1.5px dashed rgba(127,184,255,0.4); color: #b8d4ed;
-    padding: 14px; border-radius: 10px; font-size: 14px; font-weight: 600;
-    margin-bottom: 12px; display: flex; align-items: center; justify-content: center;
-    gap: 8px; cursor: pointer;
-  }
-  .ocr-upload:active { background: rgba(127,184,255,0.2); }
-  .ocr-upload-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-  .ocr-upload-row .ocr-upload { margin-bottom: 0; padding: 12px 8px; font-size: 12px; text-align: center; }
-  .ocr-upload-row .ocr-upload .icon-big { font-size: 22px; display: block; margin-bottom: 4px; }
-  .ocr-progress { font-size: 12px; color: #ffb84d; margin-bottom: 10px; padding: 8px; background: rgba(255,184,77,0.1); border-radius: 6px; text-align: center; display: none; }
-  .ocr-progress.active { display: block; }
-  .roster-list { max-height: 320px; overflow-y: auto; margin-bottom: 10px; }
-  .roster-list-header { display: grid; grid-template-columns: 48px 1fr 70px 32px; gap: 6px; padding: 0 4px 6px; font-size: 10px; color: #5a7793; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-  .roster-row { display: grid; grid-template-columns: 48px 1fr 70px 32px; gap: 6px; margin-bottom: 6px; align-items: center; }
-  .roster-row input, .roster-row select { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 8px 8px; border-radius: 6px; font-size: 12px; width: 100%; }
-  .roster-row select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='%237fb8ff' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 6px center; background-size: 8px; padding-right: 20px; font-weight: 700; }
-  .roster-row input:focus, .roster-row select:focus { border-color: #7fb8ff; }
-  .roster-row input.num { text-align: center; font-weight: 700; }
-  .remove-row { background: rgba(220,53,69,0.2); color: #ff6b7a; border-radius: 6px; padding: 6px 0; font-size: 14px; font-weight: 700; }
-  .add-row-btn { width: 100%; background: rgba(127,184,255,0.1); color: #7fb8ff; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600; border: 1px dashed rgba(127,184,255,0.3); }
-  .setup-footer { margin-top: 24px; display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; }
-
-  #lineup-screen { flex-direction: column; padding: 20px 30px; overflow-y: auto; }
-  .lineup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 14px; }
-  .lineup-panel { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 18px; }
-  .lineup-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .lineup-counter { background: rgba(255,184,77,0.15); color: #ffb84d; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; }
-  .lineup-counter.full { background: rgba(46,204,113,0.2); color: #2ecc71; }
-  .player-toggle { display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-bottom: 4px; background: rgba(255,255,255,0.05); border-radius: 8px; cursor: pointer; border: 1.5px solid transparent; }
-  .player-toggle.selected { background: rgba(46,204,113,0.15); border-color: rgba(46,204,113,0.5); }
-  .player-toggle:active { transform: scale(0.99); }
-  .player-num { background: rgba(0,0,0,0.4); color: #ffb84d; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; flex-shrink: 0; }
-  .player-role-badge { background: rgba(127,184,255,0.2); color: #7fb8ff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800; letter-spacing: 0.5px; flex-shrink: 0; }
-  .player-role-badge.gk { background: rgba(241,196,15,0.2); color: #f1c40f; }
-  .player-role-badge.def { background: rgba(52,152,219,0.2); color: #3498db; }
-  .player-role-badge.mid { background: rgba(46,204,113,0.2); color: #2ecc71; }
-  .player-role-badge.fwd { background: rgba(231,76,60,0.2); color: #e74c3c; }
-  .player-role-badge.lm { background: rgba(155,89,182,0.2); color: #9b59b6; }
-  .player-name { flex: 1; font-size: 13px; font-weight: 600; }
-
-  #match-screen { flex-direction: row; }
-  .match-main { flex: 1; display: flex; flex-direction: column; padding: 16px 20px; min-width: 0; }
-  .scoreboard { background: linear-gradient(135deg, rgba(0,0,0,0.5), rgba(0,0,0,0.3)); border-radius: 16px; padding: 20px 24px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 18px; }
-  .scoreboard-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 20px; align-items: center; }
-  .team-block { text-align: center; }
-  .team-name-display { font-size: 18px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px; color: #e8f0f7; }
-  .team-score { font-size: 64px; font-weight: 900; line-height: 1; color: #ffb84d; font-variant-numeric: tabular-nums; }
-  .score-divider { font-size: 36px; color: #5a7793; font-weight: 300; }
-  .timer-section { background: rgba(0,0,0,0.3); border-radius: 14px; padding: 16px 20px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.06); }
-  .timer-display { display: flex; align-items: baseline; gap: 12px; }
-  .timer-clock { font-size: 38px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
-  .timer-period { font-size: 13px; color: #7fb8ff; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; background: rgba(127,184,255,0.15); padding: 4px 10px; border-radius: 6px; }
-  .timer-controls { display: flex; gap: 8px; }
-  .timer-btn { padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-  .timer-btn.start { background: #2ecc71; color: white; }
-  .timer-btn.pause { background: #f39c12; color: white; }
-  .timer-btn.next { background: rgba(127,184,255,0.2); color: #7fb8ff; }
-  .timer-btn:active { transform: scale(0.95); }
-  .actions-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; flex: 1; align-content: start; }
-  .action-btn { aspect-ratio: 1; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: white; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); padding: 12px; }
-  .action-btn:active { transform: scale(0.95); }
-  .action-btn .ico { font-size: 32px; }
-  .action-btn.goal { background: linear-gradient(135deg, #27ae60, #2ecc71); }
-  .action-btn.yellow { background: linear-gradient(135deg, #f1c40f, #f39c12); color: #2c1810; }
-  .action-btn.red { background: linear-gradient(135deg, #c0392b, #e74c3c); }
-  .action-btn.sub { background: linear-gradient(135deg, #2980b9, #3498db); }
-  .action-btn.add-player { background: linear-gradient(135deg, #8e44ad, #9b59b6); }
-  .events-sidebar { width: 340px; background: rgba(0,0,0,0.35); border-left: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; }
-  .events-header { padding: 18px 20px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; }
-  .events-title { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #7fb8ff; }
-  .events-list { flex: 1; overflow-y: auto; padding: 12px 16px; }
-  .event-item { background: rgba(255,255,255,0.05); border-left: 3px solid #7fb8ff; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; display: flex; gap: 10px; align-items: flex-start; animation: slideIn 0.3s ease; }
-  @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-  .event-item.goal { border-left-color: #2ecc71; }
-  .event-item.yellow { border-left-color: #f1c40f; }
-  .event-item.red { border-left-color: #e74c3c; }
-  .event-item.sub { border-left-color: #3498db; }
-  .event-min { font-size: 13px; font-weight: 800; color: #ffb84d; min-width: 36px; font-variant-numeric: tabular-nums; }
-  .event-content { flex: 1; font-size: 13px; line-height: 1.4; }
-  .event-type { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; color: #b8d4ed; }
-  .event-detail { color: #e8f0f7; font-weight: 600; }
-  .event-sub-detail { color: #7a96b3; font-size: 11px; margin-top: 2px; }
-  .event-delete { background: rgba(220,53,69,0.2); color: #ff6b7a; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700; align-self: center; }
-  .events-empty { text-align: center; padding: 40px 20px; color: #5a7793; font-size: 13px; }
-  .end-match-btn { margin: 12px 16px; background: linear-gradient(135deg, #e74c3c, #c0392b); color: white; padding: 14px; border-radius: 10px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-  .modal-overlay.active { display: flex; }
-  .modal { background: linear-gradient(135deg, #1a3556, #122a44); border: 1px solid rgba(255,255,255,0.1); border-radius: 18px; padding: 28px; width: 90%; max-width: 520px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
-  .modal-title { font-size: 22px; font-weight: 800; margin-bottom: 18px; color: #fff; }
-  .modal-field { margin-bottom: 16px; }
-  .modal-label { display: block; font-size: 12px; font-weight: 700; color: #7fb8ff; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
-  .modal-select, .modal-input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 12px 14px; border-radius: 8px; font-size: 15px; font-weight: 600; }
-  .modal-select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='%237fb8ff' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; background-size: 10px; padding-right: 36px; }
-  .modal-radio-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .modal-radio-group.cols-5 { grid-template-columns: repeat(5, 1fr); }
-  .modal-radio-group.cols-3 { grid-template-columns: repeat(3, 1fr); }
-  .radio-option { background: rgba(255,255,255,0.06); border: 1.5px solid rgba(255,255,255,0.1); color: #b8d4ed; padding: 12px; border-radius: 8px; font-size: 13px; font-weight: 700; text-align: center; cursor: pointer; }
-  .radio-option.selected { background: rgba(255,184,77,0.2); border-color: #ffb84d; color: #ffb84d; }
-  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
-  .modal-btn { padding: 12px 22px; border-radius: 8px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-  .modal-btn.cancel { background: rgba(255,255,255,0.1); color: #b8d4ed; }
-  .modal-btn.confirm { background: linear-gradient(135deg, #ff6b35, #ff8c42); color: white; }
-
-  #summary-screen { flex-direction: column; padding: 20px 30px 40px; overflow-y: auto; }
-  .summary-header { text-align: center; margin-bottom: 24px; padding: 20px; background: rgba(0,0,0,0.3); border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); }
-  .summary-teams { font-size: 22px; font-weight: 800; margin-bottom: 10px; }
-  .summary-score { font-size: 48px; font-weight: 900; color: #ffb84d; font-variant-numeric: tabular-nums; }
-  .summary-section { margin-bottom: 22px; }
-  .summary-event-list .event-item { animation: none; }
-  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-  .stats-panel { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; }
-  .stats-panel-title { font-size: 14px; font-weight: 700; color: #ffb84d; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .stats-table th { text-align: left; color: #7a96b3; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-  .stats-table td { padding: 8px 4px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #e8f0f7; }
-  .stats-table td.num-cell { text-align: center; font-weight: 800; color: #ffb84d; font-variant-numeric: tabular-nums; }
-  .stats-table .player-cell { display: flex; align-items: center; gap: 6px; }
-
-  .hidden { display: none !important; }
-
-  #rotate-prompt { display: none; position: fixed; inset: 0; background: #0a1929; z-index: 1000; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center; }
-  @media (orientation: portrait) and (max-width: 900px) { #rotate-prompt { display: flex; } }
-  #rotate-prompt .icon { font-size: 80px; margin-bottom: 20px; animation: rotate 2s ease-in-out infinite; }
-  @keyframes rotate { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } }
-
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
-</style>
-</head>
-<body>
-
-<div id="rotate-prompt">
-  <div class="icon">📱</div>
-  <h2 style="margin-bottom: 12px;">Ruota l'iPad</h2>
-  <p style="color: #7a96b3;">My Statistics è ottimizzata per la modalità orizzontale</p>
-</div>
-
-<div id="app">
-
-  <div class="top-bar">
-    <div class="logo">MY <span>STATISTICS</span></div>
-    <div class="top-actions"></div>
-  </div>
-
-  <div class="screen active" id="home-screen">
-    <h1 class="home-title">Le tue partite</h1>
-    <p class="home-subtitle">F.I.G.C. - Lega Nazionale Dilettanti • Calcio femminile a 11</p>
-    <div class="home-actions">
-      <button class="primary-btn" onclick="startNewMatch()">⚽ Nuova partita</button>
-      <button class="secondary-btn" onclick="exportAllData()">📤 Backup completo</button>
-      <button class="secondary-btn" onclick="importData()">📥 Importa</button>
-      <button class="secondary-btn" onclick="openSettingsModal()">⚙️ Impostazioni</button>
-    </div>
-    <h2 class="history-title">Storico</h2>
-    <div class="history-list" id="history-list"></div>
-  </div>
-
-  <div class="screen" id="setup-screen">
-    <h1 class="home-title" style="margin-bottom: 24px;">Impostazione partita</h1>
-
-    <div class="setup-section">
-      <div class="section-title">Squadre</div>
-      <div class="teams-input">
-        <input type="text" class="team-input" id="team-home" placeholder="Squadra di casa">
-        <div class="vs-label">VS</div>
-        <input type="text" class="team-input" id="team-away" placeholder="Squadra ospite">
-      </div>
-    </div>
-
-    <div class="setup-section">
-      <div class="section-title">Rose calciatrici</div>
-      <div class="rosters-grid">
-        <div class="roster-panel">
-          <div class="roster-header">
-            <div class="roster-name" id="roster-home-name">Casa</div>
-            <div class="roster-count" id="roster-home-count">0 atlete</div>
-          </div>
-          <div class="ocr-upload-row">
-            <label class="ocr-upload">
-              <span><span class="icon-big">📷</span>Scatta foto</span>
-              <input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleOcr(this, 'home')">
-            </label>
-            <label class="ocr-upload">
-              <span><span class="icon-big">📁</span>Carica file</span>
-              <input type="file" accept="image/jpeg,image/jpg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" style="display:none" onchange="handleOcr(this, 'home')">
-            </label>
-          </div>
-          <div class="ocr-progress" id="ocr-progress-home"></div>
-          <div class="roster-list-header">
-            <span>N°</span><span>COGNOME E NOME</span><span>RUOLO</span><span></span>
-          </div>
-          <div class="roster-list" id="roster-list-home"></div>
-          <button class="add-row-btn" onclick="addRosterRow('home')">+ Aggiungi calciatrice</button>
-        </div>
-        <div class="roster-panel">
-          <div class="roster-header">
-            <div class="roster-name" id="roster-away-name">Ospiti</div>
-            <div class="roster-count" id="roster-away-count">0 atlete</div>
-          </div>
-          <div class="ocr-upload-row">
-            <label class="ocr-upload">
-              <span><span class="icon-big">📷</span>Scatta foto</span>
-              <input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleOcr(this, 'away')">
-            </label>
-            <label class="ocr-upload">
-              <span><span class="icon-big">📁</span>Carica file</span>
-              <input type="file" accept="image/jpeg,image/jpg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" style="display:none" onchange="handleOcr(this, 'away')">
-            </label>
-          </div>
-          <div class="ocr-progress" id="ocr-progress-away"></div>
-          <div class="roster-list-header">
-            <span>N°</span><span>COGNOME E NOME</span><span>RUOLO</span><span></span>
-          </div>
-          <div class="roster-list" id="roster-list-away"></div>
-          <button class="add-row-btn" onclick="addRosterRow('away')">+ Aggiungi calciatrice</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="setup-footer">
-      <button class="secondary-btn" onclick="goHome()">Annulla</button>
-      <button class="primary-btn" onclick="goToLineup()">Avanti: formazione →</button>
-    </div>
-  </div>
-
-  <div class="screen" id="lineup-screen">
-    <h1 class="home-title" style="margin-bottom: 6px;">Formazione iniziale</h1>
-    <p class="home-subtitle" style="margin-bottom: 0;">Seleziona le 11 titolari per ogni squadra. I minuti giocati saranno calcolati da qui.</p>
-    <div class="lineup-grid">
-      <div class="lineup-panel">
-        <div class="lineup-header">
-          <div class="roster-name" id="lineup-home-name">Casa</div>
-          <div class="lineup-counter" id="lineup-home-counter">0 / 11</div>
-        </div>
-        <div id="lineup-home-list"></div>
-      </div>
-      <div class="lineup-panel">
-        <div class="lineup-header">
-          <div class="roster-name" id="lineup-away-name">Ospiti</div>
-          <div class="lineup-counter" id="lineup-away-counter">0 / 11</div>
-        </div>
-        <div id="lineup-away-list"></div>
-      </div>
-    </div>
-    <div class="setup-footer">
-      <button class="secondary-btn" onclick="showScreen('setup-screen')">← Indietro</button>
-      <button class="secondary-btn" onclick="skipLineup()">Salta (compilo dopo)</button>
-      <button class="primary-btn" onclick="startMatch()">Inizia partita ⚽</button>
-    </div>
-  </div>
-
-  <div class="screen" id="match-screen">
-    <div class="match-main">
-      <div class="scoreboard">
-        <div class="scoreboard-row">
-          <div class="team-block">
-            <div class="team-name-display" id="display-home"></div>
-            <div class="team-score" id="score-home">0</div>
-          </div>
-          <div class="score-divider">–</div>
-          <div class="team-block">
-            <div class="team-name-display" id="display-away"></div>
-            <div class="team-score" id="score-away">0</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="timer-section">
-        <div class="timer-display">
-          <div class="timer-clock" id="timer-clock">00:00</div>
-          <div class="timer-period" id="timer-period">1° tempo</div>
-        </div>
-        <div class="timer-controls">
-          <button class="timer-btn start" id="timer-toggle" onclick="toggleTimer()">▶ Start</button>
-          <button class="timer-btn next" onclick="nextPeriod()">⏭ Prossimo</button>
-        </div>
-      </div>
-
-      <div class="actions-grid">
-        <button class="action-btn goal" onclick="openEventModal('goal')">
-          <span class="ico">⚽</span><span>Goal</span>
-        </button>
-        <button class="action-btn yellow" onclick="openEventModal('yellow')">
-          <span class="ico">🟨</span><span>Giallo</span>
-        </button>
-        <button class="action-btn red" onclick="openEventModal('red')">
-          <span class="ico">🟥</span><span>Rosso</span>
-        </button>
-        <button class="action-btn sub" onclick="openEventModal('sub')">
-          <span class="ico">🔄</span><span>Sostituz.</span>
-        </button>
-        <button class="action-btn add-player" onclick="openAddPlayerModal()">
-          <span class="ico">➕</span><span>Atleta</span>
-        </button>
-      </div>
-    </div>
-
-    <div class="events-sidebar">
-      <div class="events-header">
-        <div class="events-title">Eventi partita</div>
-        <div class="roster-count" id="events-count">0</div>
-      </div>
-      <div class="events-list" id="events-list">
-        <div class="events-empty">Nessun evento registrato</div>
-      </div>
-      <button class="end-match-btn" onclick="endMatch()">🏁 Termina partita</button>
-    </div>
-  </div>
-
-  <div class="screen" id="summary-screen">
-    <div class="summary-header">
-      <div class="summary-teams" id="summary-teams"></div>
-      <div class="summary-score" id="summary-score"></div>
-      <div style="color: #7a96b3; margin-top: 8px; font-size: 14px;" id="summary-date"></div>
-    </div>
-
-    <div class="summary-section">
-      <div class="section-title">Statistiche calciatrici</div>
-      <div class="stats-grid" id="summary-stats"></div>
-    </div>
-
-    <div class="summary-section">
-      <div class="section-title">Classifica marcatrici</div>
-      <div class="stats-panel">
-        <table class="stats-table" id="summary-scorers"></table>
-      </div>
-    </div>
-
-    <div class="summary-section">
-      <div class="section-title">Cronologia eventi</div>
-      <div class="events-list summary-event-list" id="summary-events"></div>
-    </div>
-
-    <div class="setup-footer">
-      <button class="secondary-btn" onclick="goHome()">← Home</button>
-      <button class="secondary-btn" onclick="exportCurrentMatch()">📤 JSON</button>
-      <button class="secondary-btn" onclick="exportMatchXlsx()">📊 Excel</button>
-      <button class="secondary-btn" onclick="exportMatchPdf()">📄 PDF</button>
-      <button class="primary-btn" onclick="syncToSheets()">☁️ Sincronizza su Sheets</button>
-    </div>
-  </div>
-
-</div>
-
-<div class="modal-overlay" id="event-modal">
-  <div class="modal">
-    <div class="modal-title" id="event-modal-title">Nuovo evento</div>
-    <div id="event-modal-body"></div>
-    <div class="modal-footer">
-      <button class="modal-btn cancel" onclick="closeModal('event-modal')">Annulla</button>
-      <button class="modal-btn confirm" id="event-modal-confirm">Conferma</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="add-player-modal">
-  <div class="modal">
-    <div class="modal-title">Aggiungi calciatrice</div>
-    <div>
-      <div class="modal-field">
-        <label class="modal-label">Squadra</label>
-        <div class="modal-radio-group" id="add-player-team-choice"></div>
-      </div>
-      <div class="modal-field">
-        <label class="modal-label">Numero maglia</label>
-        <input type="number" class="modal-input" id="new-player-num" placeholder="Es. 17">
-      </div>
-      <div class="modal-field">
-        <label class="modal-label">Cognome e nome</label>
-        <input type="text" class="modal-input" id="new-player-name" placeholder="Es. Rossi Maria">
-      </div>
-      <div class="modal-field">
-        <label class="modal-label">Ruolo</label>
-        <div class="modal-radio-group cols-5" id="new-player-role-choice"></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="modal-btn cancel" onclick="closeModal('add-player-modal')">Annulla</button>
-      <button class="modal-btn confirm" onclick="confirmAddPlayer()">Aggiungi</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="settings-modal">
-  <div class="modal">
-    <div class="modal-title">⚙️ Impostazioni</div>
-    <div>
-      <div class="modal-field">
-        <label class="modal-label">URL Backend Google Sheets</label>
-        <input type="text" class="modal-input" id="settings-sheets-url" placeholder="https://script.google.com/macros/s/.../exec" style="font-size:11px;font-family:monospace;">
-        <div style="font-size:11px;color:#7a96b3;margin-top:6px;line-height:1.4;">Incolla l'URL del tuo Web App Apps Script. Verrà salvato solo sul tuo dispositivo.</div>
-      </div>
-      <div id="settings-test-result" style="font-size:12px;padding:8px;border-radius:6px;display:none;margin-bottom:10px;"></div>
-      <div style="display:flex;gap:8px;">
-        <button class="secondary-btn" onclick="testSheetsConnection()" style="flex:1;padding:10px;font-size:13px;">🔗 Testa connessione</button>
-        <button class="secondary-btn" onclick="clearSheetsUrl()" style="flex:1;padding:10px;font-size:13px;background:rgba(220,53,69,0.15);color:#ff6b7a;">🗑️ Rimuovi</button>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="modal-btn cancel" onclick="closeModal('settings-modal')">Chiudi</button>
-      <button class="modal-btn confirm" onclick="saveSheetsUrl()">Salva</button>
-    </div>
-  </div>
-</div>
-  <script>
-const STORAGE_KEY = 'mystatistics_matches_v2';
-const ROLES = ['GK', 'DEF', 'MID', 'FWD', 'LM'];
-const ROLE_LABELS = { GK: 'Portiere', DEF: 'Difensore', MID: 'Centrale', FWD: 'Attaccante', LM: 'Tutta fascia' };
-const PERIODS = ['1° tempo', '2° tempo', '1° supplementare', '2° supplementare', 'Partita conclusa'];
-const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
-
-let state = {
-  currentMatch: null,
-  timer: { running: false, elapsedMs: 0, periodIndex: 0, startTimestamp: null, intervalId: null }
-};
-
-function loadMatches() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
-  catch { return []; }
-}
-function saveMatches(matches) { localStorage.setItem(STORAGE_KEY, JSON.stringify(matches)); }
-function persistCurrent() {
-  if (!state.currentMatch) return;
-  const matches = loadMatches();
-  const idx = matches.findIndex(m => m.id === state.currentMatch.id);
-  if (idx >= 0) matches[idx] = state.currentMatch;
-  else matches.unshift(state.currentMatch);
-  saveMatches(matches);
-}
-
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-}
-function goHome() {
-  stopTimer();
-  state.currentMatch = null;
-  showScreen('home-screen');
-  renderHistory();
-}
-
-function renderHistory() {
-  const matches = loadMatches();
-  const list = document.getElementById('history-list');
-  if (matches.length === 0) {
-    list.innerHTML = '<div class="empty-state">Nessuna partita registrata.<br>Inizia con "Nuova partita".</div>';
-    return;
-  }
-  list.innerHTML = matches.map(m => {
-    const d = new Date(m.createdAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
-    const status = m.completed ? '✅ Completata' : '⏸ In corso';
-    const sync = m.syncedAt ? ' • ☁️ Sincronizzata' : '';
-    return `
-      <div class="match-card" onclick="openMatch('${m.id}')">
-        <div class="match-card-info">
-          <div class="match-card-teams">${escapeHtml(m.home.name || 'Casa')} vs ${escapeHtml(m.away.name || 'Ospiti')}</div>
-          <div class="match-card-meta">${d} • ${status}${sync}</div>
-        </div>
-        <div class="match-card-score">${m.home.score}–${m.away.score}</div>
-        <button class="match-card-delete" onclick="event.stopPropagation(); deleteMatch('${m.id}')">Elimina</button>
-      </div>`;
-  }).join('');
-}
-function deleteMatch(id) {
-  if (!confirm('Eliminare questa partita? L\'azione non è reversibile.')) return;
-  saveMatches(loadMatches().filter(m => m.id !== id));
-  renderHistory();
-}
-function openMatch(id) {
-  const m = loadMatches().find(x => x.id === id);
-  if (!m) return;
-  if (!m.lineup) m.lineup = { home: [], away: [] };
-  m.home.roster.forEach(p => { if (!p.role) p.role = ''; });
-  m.away.roster.forEach(p => { if (!p.role) p.role = ''; });
-  state.currentMatch = m;
-  if (m.completed) renderSummary();
-  else { renderMatchScreen(); showScreen('match-screen'); }
-}
-
-function startNewMatch() {
-  state.currentMatch = {
-    id: 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-    createdAt: Date.now(),
-    completed: false,
-    home: { name: '', score: 0, roster: [] },
-    away: { name: '', score: 0, roster: [] },
-    lineup: { home: [], away: [] },
-    events: [],
-    timer: { elapsedMs: 0, periodIndex: 0 }
-  };
-  document.getElementById('team-home').value = '';
-  document.getElementById('team-away').value = '';
-  renderRoster('home');
-  renderRoster('away');
-  showScreen('setup-screen');
-}
-
-function renderRoster(side) {
-  const roster = state.currentMatch[side].roster;
-  const list = document.getElementById('roster-list-' + side);
-  list.innerHTML = roster.map((p, i) => `
-    <div class="roster-row">
-      <input type="number" class="num" value="${p.num ?? ''}" onchange="updateRoster('${side}', ${i}, 'num', this.value)" placeholder="N°">
-      <input type="text" value="${escapeHtml(p.name || '')}" onchange="updateRoster('${side}', ${i}, 'name', this.value)" placeholder="Cognome Nome">
-      <select onchange="updateRoster('${side}', ${i}, 'role', this.value)">
-        <option value="" ${!p.role ? 'selected' : ''}>—</option>
-        ${ROLES.map(r => `<option value="${r}" ${p.role === r ? 'selected' : ''}>${r}</option>`).join('')}
-      </select>
-      <button class="remove-row" onclick="removeRosterRow('${side}', ${i})">×</button>
-    </div>
-  `).join('');
-  document.getElementById('roster-' + side + '-count').textContent = roster.length + ' atlet' + (roster.length === 1 ? 'a' : 'e');
-}
-function updateRoster(side, idx, field, value) {
-  state.currentMatch[side].roster[idx][field] = field === 'num'
-    ? (value === '' ? null : parseInt(value))
-    : value;
-}
-function addRosterRow(side) {
-  state.currentMatch[side].roster.push({ num: null, name: '', role: '' });
-  renderRoster(side);
-}
-function removeRosterRow(side, idx) {
-  state.currentMatch[side].roster.splice(idx, 1);
-  renderRoster(side);
-}
-
-async function handleOcr(input, side) {
-  const file = input.files[0];
-  if (!file) return;
-  const progressEl = document.getElementById('ocr-progress-' + side);
-  progressEl.classList.add('active');
-
-  try {
-    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-    let imageSource = file;
-
-    if (isPdf) {
-      progressEl.textContent = '⏳ Conversione PDF in immagine...';
-      imageSource = await pdfToImage(file);
-    }
-
-    progressEl.textContent = '⏳ Lettura distinta in corso...';
-    const { data } = await Tesseract.recognize(imageSource, 'ita', {
-      logger: m => {
-        if (m.status === 'recognizing text') {
-          progressEl.textContent = `⏳ Riconoscimento ${Math.round(m.progress * 100)}%`;
-        }
-      }
-    });
-    const rawLines = data.text.split('\n').map(l => l.trim()).filter(Boolean);
-
-    window.lastOcrText = data.text;
-
-    let teamName = null;
-    const lower = rawLines.map(l => l.toLowerCase());
-    const idxLnd = lower.findIndex(l =>
-      l.includes('lega nazionale') || l.includes('dilettanti')
-    );
-    if (idxLnd >= 0 && idxLnd + 1 < rawLines.length) {
-      let candidate = rawLines[idxLnd + 1];
-      candidate = candidate.replace(/^\d{4,7}\s+/, '').trim();
-      if (candidate.length > 2 && candidate.length < 80) {
-        teamName = candidate;
-      }
-    }
-
-    const rosterRegex = /^(\d{1,2})\s+(\d{1,2})\s+\d{1,2}[\/\-\.\s]\d{1,2}[\/\-\.\s]\d{2,4}\s+([A-ZÀÁÈÉÌÒÓÙÜ][A-ZÀ-Ü' ]{3,40})/;
-
-    const players = [];
-    const seenNums = new Set();
-
-    for (const line of rawLines) {
-      const m = line.match(rosterRegex);
-      if (!m) continue;
-
-      const maglia = parseInt(m[2]);
-      let name = m[3].trim().replace(/\s+/g, ' ');
-
-      name = name.split(' ')
-        .filter(w => w.length >= 2 && /^[A-ZÀ-Ü']+$/i.test(w))
-        .slice(0, 4)
-        .join(' ');
-
-      if (maglia < 1 || maglia > 99) continue;
-      if (name.length < 4) continue;
-      if (seenNums.has(maglia)) continue;
-
-      seenNums.add(maglia);
-      players.push({ num: maglia, name, role: '' });
-    }
-
-    if (teamName && !document.getElementById('team-' + side).value) {
-      document.getElementById('team-' + side).value = teamName;
-    }
-
-    const debugBtn = `<button onclick="showOcrDebug()" style="margin-left:8px;background:#ffb84d;color:#000;border:none;padding:4px 10px;border-radius:4px;font-weight:700;font-size:11px;cursor:pointer;">🔍 Vedi testo OCR</button>`;
-
-    if (players.length === 0) {
-      progressEl.innerHTML = `⚠️ Nessuna calciatrice riconosciuta su ${rawLines.length} righe lette.${debugBtn}`;
-    } else {
-      const existing = state.currentMatch[side].roster.filter(p => p.num || p.name);
-      state.currentMatch[side].roster = [...existing, ...players];
-      renderRoster(side);
-      progressEl.innerHTML = `✅ ${players.length} atlete riconosciute su ${rawLines.length} righe.${debugBtn}`;
-      setTimeout(() => progressEl.classList.remove('active'), 10000);
-    }
-  } catch (e) {
-    progressEl.textContent = '❌ Errore: ' + (e.message || e);
-    setTimeout(() => progressEl.classList.remove('active'), 4000);
-  }
-  input.value = '';
-}
-
-async function pdfToImage(file) {
-  if (!window['pdfjsLib']) throw new Error('Libreria PDF non disponibile');
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  const page = await pdf.getPage(1);
-  const viewport = page.getViewport({ scale: 2.0 });
-  const canvas = document.createElement('canvas');
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  const ctx = canvas.getContext('2d');
-  await page.render({ canvasContext: ctx, viewport }).promise;
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(blob => {
-      if (blob) resolve(blob);
-      else reject(new Error('Impossibile convertire il PDF in immagine'));
-    }, 'image/png');
-  });
-}
-
-function showOcrDebug() {
-  if (!window.lastOcrText) {
-    alert('Nessun testo OCR disponibile. Carica prima una distinta.');
-    return;
-  }
-  const text = window.lastOcrText;
-  const lines = text.split('\n').filter(l => l.trim());
-
-  const modal = document.createElement('div');
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;';
-  modal.innerHTML = `
-    <div style="background:#1a3556;border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:24px;max-width:90%;width:700px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
-      <h2 style="color:#ffb84d;margin:0 0 12px 0;font-size:18px;">🔍 Testo grezzo letto dall'OCR</h2>
-      <p style="color:#7a96b3;font-size:12px;margin:0 0 12px 0;">${lines.length} righe rilevate.</p>
-      <textarea id="ocr-debug-text" readonly style="flex:1;background:#0a1929;color:#e8f0f7;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px;font-family:monospace;font-size:12px;line-height:1.5;resize:none;min-height:300px;">${text.replace(/</g,'&lt;')}</textarea>
-      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
-        <button onclick="copyOcrText(this)" style="background:#2ecc71;color:white;border:none;padding:10px 18px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">📋 Copia tutto</button>
-        <button onclick="this.parentElement.parentElement.parentElement.remove()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">Chiudi</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-}
-
-function copyOcrText(btn) {
-  const ta = document.getElementById('ocr-debug-text');
-  if (!ta) return;
-  ta.select();
-  ta.setSelectionRange(0, 99999);
-  try {
-    document.execCommand('copy');
-    const orig = btn.innerHTML;
-    btn.innerHTML = '✅ Copiato!';
-    setTimeout(() => { btn.innerHTML = orig; }, 2000);
-  } catch (e) {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(ta.value).then(() => {
-        btn.innerHTML = '✅ Copiato!';
-        setTimeout(() => { btn.innerHTML = '📋 Copia tutto'; }, 2000);
-      });
-    } else {
-      alert('Copia manuale: seleziona il testo e premi Ctrl+C');
-    }
-  }
-}
-
-function goToLineup() {
-  const home = document.getElementById('team-home').value.trim();
-  const away = document.getElementById('team-away').value.trim();
-  if (!home || !away) { alert('Inserisci entrambi i nomi delle squadre'); return; }
-  state.currentMatch.home.name = home;
-  state.currentMatch.away.name = away;
-  state.currentMatch.home.roster = state.currentMatch.home.roster.filter(p => p.num || p.name);
-  state.currentMatch.away.roster = state.currentMatch.away.roster.filter(p => p.num || p.name);
-
-  document.getElementById('lineup-home-name').textContent = home;
-  document.getElementById('lineup-away-name').textContent = away;
-  renderLineupPanel('home');
-  renderLineupPanel('away');
-  showScreen('lineup-screen');
-}
-
-function renderLineupPanel(side) {
-  const roster = state.currentMatch[side].roster;
-  const lineup = state.currentMatch.lineup[side];
-  const list = document.getElementById('lineup-' + side + '-list');
-  const roleOrder = { GK: 1, DEF: 2, LM: 3, MID: 4, FWD: 5, '': 9 };
-  const sorted = [...roster].sort((a, b) => {
-    const ra = roleOrder[a.role || ''] - roleOrder[b.role || ''];
-    if (ra !== 0) return ra;
-    return (a.num || 99) - (b.num || 99);
-  });
-  list.innerHTML = sorted.map(p => {
-    const isSelected = lineup.some(l => l.num === p.num && l.name === p.name);
-    const roleClass = p.role ? p.role.toLowerCase() : '';
-    return `
-      <div class="player-toggle ${isSelected ? 'selected' : ''}" onclick="toggleLineup('${side}', ${p.num}, ${JSON.stringify(p.name).replace(/"/g,'&quot;')})">
-        <div class="player-num">${p.num ?? '?'}</div>
-        <div class="player-role-badge ${roleClass}">${p.role || '—'}</div>
-        <div class="player-name">${escapeHtml(p.name || 'Senza nome')}</div>
-        ${isSelected ? '<div style="color:#2ecc71;font-size:18px;">✓</div>' : ''}
-      </div>
-    `;
-  }).join('');
-  const counter = document.getElementById('lineup-' + side + '-counter');
-  counter.textContent = `${lineup.length} / 11`;
-  counter.classList.toggle('full', lineup.length === 11);
-}
-
-function toggleLineup(side, num, name) {
-  const lineup = state.currentMatch.lineup[side];
-  const idx = lineup.findIndex(l => l.num === num && l.name === name);
-  if (idx >= 0) lineup.splice(idx, 1);
-  else if (lineup.length < 11) lineup.push({ num, name });
-  else { alert('Hai già selezionato 11 titolari'); return; }
-  renderLineupPanel(side);
-}
-
-function skipLineup() {
-  if (!confirm('Saltando la formazione, i minuti giocati per ogni calciatrice non potranno essere calcolati. Continuare?')) return;
-  startMatch();
-}
-
-function startMatch() {
-  persistCurrent();
-  renderMatchScreen();
-  showScreen('match-screen');
-}
-
-function renderMatchScreen() {
-  const m = state.currentMatch;
-  document.getElementById('display-home').textContent = m.home.name;
-  document.getElementById('display-away').textContent = m.away.name;
-  document.getElementById('score-home').textContent = m.home.score;
-  document.getElementById('score-away').textContent = m.away.score;
-  state.timer.elapsedMs = m.timer.elapsedMs;
-  state.timer.periodIndex = m.timer.periodIndex;
-  state.timer.running = false;
-  updateTimerDisplay();
-  renderEvents();
-}
-
-function toggleTimer() {
-  if (state.timer.running) stopTimer();
-  else startTimer();
-}
-function startTimer() {
-  if (state.timer.periodIndex >= PERIODS.length - 1) return;
-  state.timer.running = true;
-  state.timer.startTimestamp = Date.now();
-  state.timer.intervalId = setInterval(() => updateTimerDisplay(), 250);
-  const btn = document.getElementById('timer-toggle');
-  btn.textContent = '⏸ Pausa';
-  btn.className = 'timer-btn pause';
-}
-function stopTimer() {
-  if (!state.timer.running) return;
-  state.timer.elapsedMs += Date.now() - state.timer.startTimestamp;
-  state.timer.running = false;
-  state.timer.startTimestamp = null;
-  if (state.timer.intervalId) { clearInterval(state.timer.intervalId); state.timer.intervalId = null; }
-  if (state.currentMatch) {
-    state.currentMatch.timer.elapsedMs = state.timer.elapsedMs;
-    persistCurrent();
-  }
-  const btn = document.getElementById('timer-toggle');
-  if (btn) { btn.textContent = '▶ Start'; btn.className = 'timer-btn start'; }
-  updateTimerDisplay();
-}
-function nextPeriod() {
-  if (state.timer.periodIndex >= PERIODS.length - 1) return;
-  stopTimer();
-  state.timer.periodIndex++;
-  state.timer.elapsedMs = 0;
-  if (state.currentMatch) {
-    state.currentMatch.timer.periodIndex = state.timer.periodIndex;
-    state.currentMatch.timer.elapsedMs = 0;
-    persistCurrent();
-  }
-  updateTimerDisplay();
-}
-function updateTimerDisplay() {
-  let ms = state.timer.elapsedMs;
-  if (state.timer.running && state.timer.startTimestamp) ms += Date.now() - state.timer.startTimestamp;
-  const totalSec = Math.floor(ms / 1000);
-  const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
-  const ss = String(totalSec % 60).padStart(2, '0');
-  document.getElementById('timer-clock').textContent = `${mm}:${ss}`;
-  document.getElementById('timer-period').textContent = PERIODS[state.timer.periodIndex];
-}
-function getCurrentMatchMinute() {
-  let ms = state.timer.elapsedMs;
-  if (state.timer.running && state.timer.startTimestamp) ms += Date.now() - state.timer.startTimestamp;
-  const baseMinute = Math.floor(ms / 60000);
-  return baseMinute + (PERIOD_OFFSETS[state.timer.periodIndex] || 0);
-}
-
-let currentEventDraft = null;
-
-function openEventModal(type) {
-  if (!state.currentMatch) return;
-  currentEventDraft = { type, team: 'home', minute: getCurrentMatchMinute(), period: state.timer.periodIndex };
-  const titles = { goal: '⚽ Goal', yellow: '🟨 Ammonizione', red: '🟥 Espulsione', sub: '🔄 Sostituzione' };
-  document.getElementById('event-modal-title').textContent = titles[type];
-  renderEventModalBody();
-  document.getElementById('event-modal-confirm').onclick = confirmEvent;
-  document.getElementById('event-modal').classList.add('active');
-}
-
-function renderEventModalBody() {
-  const { type } = currentEventDraft;
-  const teamOpts = `
-    <div class="modal-radio-group">
-      <div class="radio-option ${currentEventDraft.team==='home'?'selected':''}" onclick="setEventField('team','home')">${escapeHtml(state.currentMatch.home.name)}</div>
-      <div class="radio-option ${currentEventDraft.team==='away'?'selected':''}" onclick="setEventField('team','away')">${escapeHtml(state.currentMatch.away.name)}</div>
-    </div>`;
-
-  const minuteField = `
-    <div class="modal-field">
-      <label class="modal-label">Minuto</label>
-      <input type="number" class="modal-input" id="event-minute" value="${currentEventDraft.minute}" min="0" max="130">
-    </div>`;
-
-  let body = `
-    <div class="modal-field">
-      <label class="modal-label">Squadra</label>
-      ${teamOpts}
-    </div>
-    ${minuteField}
-  `;
-
-  if (type === 'goal') {
-    body += `
-      <div class="modal-field">
-        <label class="modal-label">Marcatrice</label>
-        ${playerSelect('event-scorer', currentEventDraft.team)}
-      </div>
-      <div class="modal-field">
-        <label class="modal-label">Assist (opzionale)</label>
-        ${playerSelect('event-assist', currentEventDraft.team, true)}
-      </div>
-      <div class="modal-field">
-        <label class="modal-label">Tipo</label>
-        <div class="modal-radio-group">
-          ${['azione','rigore','punizione','autogol'].map(t => `
-            <div class="radio-option ${currentEventDraft.goalType===t?'selected':''}" onclick="setEventField('goalType','${t}')">${t}</div>
-          `).join('')}
-        </div>
-      </div>`;
-  } else if (type === 'yellow' || type === 'red') {
-    body += `
-      <div class="modal-field">
-        <label class="modal-label">Calciatrice</label>
-        ${playerSelect('event-player', currentEventDraft.team)}
-      </div>`;
-  } else if (type === 'sub') {
-    body += `
-      <div class="modal-field">
-        <label class="modal-label">Esce</label>
-        ${playerSelect('event-out', currentEventDraft.team)}
-      </div>
-      <div class="modal-field">
-        <label class="modal-label">Entra</label>
-        ${playerSelect('event-in', currentEventDraft.team)}
-      </div>
-      <div class="modal-field">
-        <label class="modal-label">Motivo</label>
-        <div class="modal-radio-group cols-3">
-          ${['tattica','infortunio','altro'].map(t => `
-            <div class="radio-option ${currentEventDraft.subReason===t?'selected':''}" onclick="setEventField('subReason','${t}')">${t}</div>
-          `).join('')}
-        </div>
-      </div>`;
-  }
-  document.getElementById('event-modal-body').innerHTML = body;
-}
-
-function playerSelect(id, team, optional = false) {
-  const roster = state.currentMatch[team].roster;
-  const sorted = [...roster].sort((a, b) => (a.num || 99) - (b.num || 99));
-  const opts = sorted.map(p => {
-    const roleStr = p.role ? `[${p.role}] ` : '';
-    return `<option value="${p.num}|${escapeHtml(p.name)}">${p.num ?? '?'} - ${roleStr}${escapeHtml(p.name || 'Senza nome')}</option>`;
-  }).join('');
-  return `<select class="modal-select" id="${id}">
-    <option value="">${optional ? '— Nessuno —' : '— Seleziona —'}</option>
-    ${opts}
-  </select>`;
-}
-
-function setEventField(field, value) {
-  currentEventDraft[field] = value;
-  renderEventModalBody();
-}
-
-function confirmEvent() {
-  const minute = parseInt(document.getElementById('event-minute').value);
-  if (isNaN(minute)) { alert('Inserisci un minuto valido'); return; }
-  currentEventDraft.minute = minute;
-
-  const { type, team } = currentEventDraft;
-  if (type === 'goal') {
-    const scorerVal = document.getElementById('event-scorer').value;
-    if (!scorerVal) { alert('Seleziona la marcatrice'); return; }
-    if (!currentEventDraft.goalType) currentEventDraft.goalType = 'azione';
-    currentEventDraft.scorer = parsePlayer(scorerVal);
-    const assistVal = document.getElementById('event-assist').value;
-    if (assistVal) currentEventDraft.assist = parsePlayer(assistVal);
-    if (currentEventDraft.goalType === 'autogol') {
-      state.currentMatch[team === 'home' ? 'away' : 'home'].score++;
-    } else {
-      state.currentMatch[team].score++;
-    }
-  } else if (type === 'yellow' || type === 'red') {
-    const pv = document.getElementById('event-player').value;
-    if (!pv) { alert('Seleziona la calciatrice'); return; }
-    currentEventDraft.player = parsePlayer(pv);
-  } else if (type === 'sub') {
-    const outV = document.getElementById('event-out').value;
-    const inV = document.getElementById('event-in').value;
-    if (!outV || !inV) { alert('Seleziona entrambe le calciatrici'); return; }
-    currentEventDraft.playerOut = parsePlayer(outV);
-    currentEventDraft.playerIn = parsePlayer(inV);
-    if (!currentEventDraft.subReason) currentEventDraft.subReason = 'tattica';
-  }
-
-  currentEventDraft.id = 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-  currentEventDraft.timestamp = Date.now();
-  state.currentMatch.events.push(currentEventDraft);
-  persistCurrent();
-  renderMatchScreen();
-  closeModal('event-modal');
-  currentEventDraft = null;
-}
-
-function parsePlayer(val) {
-  const [num, ...rest] = val.split('|');
-  return { num: parseInt(num) || null, name: rest.join('|') };
-}
-
-function deleteEvent(id) {
-  if (!confirm('Eliminare questo evento?')) return;
-  const ev = state.currentMatch.events.find(e => e.id === id);
-  if (ev && ev.type === 'goal') {
-    if (ev.goalType === 'autogol') state.currentMatch[ev.team === 'home' ? 'away' : 'home'].score--;
-    else state.currentMatch[ev.team].score--;
-  }
-  state.currentMatch.events = state.currentMatch.events.filter(e => e.id !== id);
-  persistCurrent();
-  renderMatchScreen();
-}
-
-function renderEvents() {
-  const list = document.getElementById('events-list');
-  const events = [...state.currentMatch.events].sort((a, b) => b.minute - a.minute);
-  document.getElementById('events-count').textContent = events.length;
-  if (events.length === 0) {
-    list.innerHTML = '<div class="events-empty">Nessun evento registrato</div>';
-    return;
-  }
-  list.innerHTML = events.map(e => eventCardHtml(e)).join('');
-}
-
-function eventCardHtml(e) {
-  const teamName = state.currentMatch[e.team].name;
-  let typeLabel = '', detail = '', subDetail = '';
-  if (e.type === 'goal') {
-    typeLabel = e.goalType === 'autogol' ? `🔴 Autogol (${escapeHtml(teamName)})` : `⚽ Goal · ${escapeHtml(teamName)}`;
-    detail = `${e.scorer.num ?? '?'} ${escapeHtml(e.scorer.name)}`;
-    const extras = [];
-    if (e.assist) extras.push(`Assist: ${e.assist.num ?? '?'} ${escapeHtml(e.assist.name)}`);
-    if (e.goalType && e.goalType !== 'azione' && e.goalType !== 'autogol') extras.push('su ' + e.goalType);
-    subDetail = extras.join(' • ');
-  } else if (e.type === 'yellow') {
-    typeLabel = `🟨 Ammonizione · ${escapeHtml(teamName)}`;
-    detail = `${e.player.num ?? '?'} ${escapeHtml(e.player.name)}`;
-  } else if (e.type === 'red') {
-    typeLabel = `🟥 Espulsione · ${escapeHtml(teamName)}`;
-    detail = `${e.player.num ?? '?'} ${escapeHtml(e.player.name)}`;
-  } else if (e.type === 'sub') {
-    typeLabel = `🔄 Sostituzione · ${escapeHtml(teamName)}`;
-    detail = `Esce ${e.playerOut.num ?? '?'} ${escapeHtml(e.playerOut.name)}`;
-    subDetail = `Entra ${e.playerIn.num ?? '?'} ${escapeHtml(e.playerIn.name)} • ${e.subReason}`;
-  }
-  return `
-    <div class="event-item ${e.type}">
-      <div class="event-min">${e.minute}'</div>
-      <div class="event-content">
-        <div class="event-type">${typeLabel}</div>
-        <div class="event-detail">${detail}</div>
-        ${subDetail ? `<div class="event-sub-detail">${subDetail}</div>` : ''}
-      </div>
-      <button class="event-delete" onclick="deleteEvent('${e.id}')">×</button>
-    </div>
-  `;
-}
-
-function openAddPlayerModal() {
-  if (!state.currentMatch) return;
-  const choice = document.getElementById('add-player-team-choice');
-  choice.innerHTML = `
-    <div class="radio-option selected" onclick="selectAddPlayerTeam(this, 'home')">${escapeHtml(state.currentMatch.home.name)}</div>
-    <div class="radio-option" onclick="selectAddPlayerTeam(this, 'away')">${escapeHtml(state.currentMatch.away.name)}</div>
-  `;
-  choice.dataset.selected = 'home';
-
-  const roleChoice = document.getElementById('new-player-role-choice');
-  roleChoice.innerHTML = ROLES.map(r =>
-    `<div class="radio-option" onclick="selectAddPlayerRole(this, '${r}')" title="${ROLE_LABELS[r]}">${r}</div>`
-  ).join('');
-  roleChoice.dataset.selected = '';
-
-  document.getElementById('new-player-num').value = '';
-  document.getElementById('new-player-name').value = '';
-  document.getElementById('add-player-modal').classList.add('active');
-}
-function selectAddPlayerTeam(el, team) {
-  document.querySelectorAll('#add-player-team-choice .radio-option').forEach(x => x.classList.remove('selected'));
-  el.classList.add('selected');
-  document.getElementById('add-player-team-choice').dataset.selected = team;
-}
-function selectAddPlayerRole(el, role) {
-  document.querySelectorAll('#new-player-role-choice .radio-option').forEach(x => x.classList.remove('selected'));
-  el.classList.add('selected');
-  document.getElementById('new-player-role-choice').dataset.selected = role;
-}
-function confirmAddPlayer() {
-  const team = document.getElementById('add-player-team-choice').dataset.selected;
-  const role = document.getElementById('new-player-role-choice').dataset.selected || '';
-  const num = parseInt(document.getElementById('new-player-num').value);
-  const name = document.getElementById('new-player-name').value.trim();
-  if (!name) { alert('Inserisci cognome e nome'); return; }
-  state.currentMatch[team].roster.push({ num: isNaN(num) ? null : num, name, role });
-  persistCurrent();
-  closeModal('add-player-modal');
-}
-
-function computePlayerStats(side) {
-  const m = state.currentMatch;
-  const roster = m[side].roster;
-  const lineup = m.lineup[side] || [];
-
-  const maxPeriod = Math.min(m.timer.periodIndex, PERIODS.length - 2);
-  const endMinute = (PERIOD_OFFSETS[maxPeriod] || 0) + Math.floor(m.timer.elapsedMs / 60000);
-  const matchEndMinute = m.completed
-    ? Math.max(endMinute, m.timer.periodIndex >= 2 ? 120 : 90)
-    : endMinute;
-
-  const stats = {};
-  roster.forEach(p => {
-    const key = `${p.num}_${p.name}`;
-    stats[key] = {
-      num: p.num, name: p.name, role: p.role || '',
-      goals: 0, assists: 0, yellows: 0, reds: 0,
-      minutesIn: null, minutesOut: null, minutesPlayed: 0,
-      starter: lineup.some(l => l.num === p.num && l.name === p.name)
-    };
-    if (stats[key].starter) stats[key].minutesIn = 0;
-  });
-
-  m.events.forEach(e => {
-    if (e.type === 'goal' && e.team === side && e.goalType !== 'autogol') {
-      const k = `${e.scorer.num}_${e.scorer.name}`;
-      if (stats[k]) stats[k].goals++;
-      if (e.assist) {
-        const ak = `${e.assist.num}_${e.assist.name}`;
-        if (stats[ak]) stats[ak].assists++;
-      }
-    }
-    if ((e.type === 'yellow' || e.type === 'red') && e.team === side) {
-      const k = `${e.player.num}_${e.player.name}`;
-      if (stats[k]) {
-        if (e.type === 'yellow') stats[k].yellows++;
-        else stats[k].reds++;
-      }
-    }
-    if (e.type === 'sub' && e.team === side) {
-      const outK = `${e.playerOut.num}_${e.playerOut.name}`;
-      const inK = `${e.playerIn.num}_${e.playerIn.name}`;
-      if (stats[outK] && stats[outK].minutesOut == null) stats[outK].minutesOut = e.minute;
-      if (stats[inK] && stats[inK].minutesIn == null) stats[inK].minutesIn = e.minute;
-    }
-    if (e.type === 'red' && e.team === side) {
-      const k = `${e.player.num}_${e.player.name}`;
-      if (stats[k] && stats[k].minutesOut == null) stats[k].minutesOut = e.minute;
-    }
-  });
-
-  Object.values(stats).forEach(s => {
-    if (s.minutesIn != null) {
-      const out = s.minutesOut != null ? s.minutesOut : matchEndMinute;
-      s.minutesPlayed = Math.max(0, out - s.minutesIn);
-    }
-  });
-
-  return Object.values(stats).sort((a, b) => {
-    if (b.goals !== a.goals) return b.goals - a.goals;
-    if (b.assists !== a.assists) return b.assists - a.assists;
-    return (a.num || 99) - (b.num || 99);
-  });
-}
-
-function endMatch() {
-  if (!confirm('Confermi la fine della partita? I dati saranno salvati nello storico.')) return;
-  stopTimer();
-  state.currentMatch.completed = true;
-  state.currentMatch.endedAt = Date.now();
-  persistCurrent();
-  renderSummary();
-}
-
-function renderSummary() {
-  const m = state.currentMatch;
-  document.getElementById('summary-teams').textContent = `${m.home.name}  vs  ${m.away.name}`;
-  document.getElementById('summary-score').textContent = `${m.home.score} – ${m.away.score}`;
-  const d = new Date(m.endedAt || m.createdAt).toLocaleString('it-IT');
-  document.getElementById('summary-date').textContent = d;
-
-  const statsHome = computePlayerStats('home');
-  const statsAway = computePlayerStats('away');
-  document.getElementById('summary-stats').innerHTML = `
-    ${statsPanelHtml(m.home.name, statsHome)}
-    ${statsPanelHtml(m.away.name, statsAway)}
-  `;
-
-  const allScorers = [...statsHome, ...statsAway].filter(s => s.goals > 0)
-    .sort((a, b) => b.goals - a.goals);
-  const scorersTable = document.getElementById('summary-scorers');
-  if (allScorers.length === 0) {
-    scorersTable.innerHTML = '<tr><td style="text-align:center;color:#5a7793;padding:20px;">Nessun marcatore</td></tr>';
-  } else {
-    scorersTable.innerHTML = `
-      <thead><tr><th>Calciatrice</th><th>Squadra</th><th style="text-align:center">Goal</th><th style="text-align:center">Assist</th></tr></thead>
-      <tbody>
-        ${allScorers.map(s => {
-          const team = statsHome.includes(s) ? m.home.name : m.away.name;
-          return `<tr>
-            <td>${s.num ?? '?'} ${escapeHtml(s.name)} ${s.role ? `<span style="opacity:0.6;font-size:11px">[${s.role}]</span>` : ''}</td>
-            <td style="color:#7a96b3;font-size:12px">${escapeHtml(team)}</td>
-            <td class="num-cell">${s.goals}</td>
-            <td class="num-cell">${s.assists}</td>
-          </tr>`;
-        }).join('')}
-      </tbody>`;
-  }
-
-  const events = [...m.events].sort((a, b) => a.minute - b.minute);
-  document.getElementById('summary-events').innerHTML = events.length === 0
-    ? '<div class="events-empty">Nessun evento registrato</div>'
-    : events.map(e => eventCardHtml(e)).join('');
-
-  showScreen('summary-screen');
-}
-
-function statsPanelHtml(teamName, stats) {
-  const rows = stats.map(s => `
-    <tr>
-      <td class="player-cell">
-        <span style="background:rgba(0,0,0,0.4);color:#ffb84d;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;">${s.num ?? '?'}</span>
-        ${s.role ? `<span class="player-role-badge ${s.role.toLowerCase()}">${s.role}</span>` : ''}
-        <span>${escapeHtml(s.name)}</span>
-      </td>
-      <td class="num-cell">${s.goals || ''}</td>
-      <td class="num-cell">${s.assists || ''}</td>
-      <td class="num-cell" style="color:#f1c40f">${s.yellows || ''}</td>
-      <td class="num-cell" style="color:#e74c3c">${s.reds || ''}</td>
-      <td class="num-cell">${s.minutesPlayed || (s.minutesIn != null ? 0 : '—')}'</td>
-    </tr>
-  `).join('');
-  return `
-    <div class="stats-panel">
-      <div class="stats-panel-title">${escapeHtml(teamName)}</div>
-      <table class="stats-table">
-        <thead>
-          <tr>
-            <th>Calciatrice</th>
-            <th style="text-align:center" title="Goal">⚽</th>
-            <th style="text-align:center" title="Assist">A</th>
-            <th style="text-align:center" title="Ammonizioni">🟨</th>
-            <th style="text-align:center" title="Espulsioni">🟥</th>
-            <th style="text-align:center" title="Minuti giocati">MIN</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-  `;
-}
-
-function exportAllData() {
-  const data = JSON.stringify(loadMatches(), null, 2);
-  downloadFile('mystatistics_backup_' + Date.now() + '.json', data, 'application/json');
-}
-function exportCurrentMatch() {
-  if (!state.currentMatch) return;
-  const data = JSON.stringify(state.currentMatch, null, 2);
-  const fname = `match_${state.currentMatch.home.name}_vs_${state.currentMatch.away.name}_${Date.now()}.json`.replace(/\s+/g, '_');
-  downloadFile(fname, data, 'application/json');
-}
-function downloadFile(filename, content, mime) {
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-function importData() {
-  const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'application/json';
-  input.onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      const arr = Array.isArray(data) ? data : [data];
-      const existing = loadMatches();
-      const merged = [...arr, ...existing.filter(m => !arr.some(a => a.id === m.id))];
-      saveMatches(merged);
-      renderHistory();
-      alert(`Importate ${arr.length} partite.`);
-    } catch (err) {
-      alert('Errore importazione: ' + err.message);
-    }
-  };
-  input.click();
-}
-
-function exportMatchXlsx() {
-  if (!state.currentMatch) return;
-  if (typeof XLSX === 'undefined') {
-    alert('Libreria Excel non caricata. Verifica la connessione internet e ricarica la pagina.');
-    return;
-  }
-  const m = state.currentMatch;
-  const wb = XLSX.utils.book_new();
-
-  const matchDate = new Date(m.endedAt || m.createdAt);
-  const summaryData = [
-    ['MY STATISTICS - Riepilogo Partita'],
-    [],
-    ['Data', matchDate.toLocaleDateString('it-IT')],
-    ['Ora', matchDate.toLocaleTimeString('it-IT')],
-    [],
-    ['Squadra Casa', m.home.name],
-    ['Squadra Ospite', m.away.name],
-    [],
-    ['Risultato finale', `${m.home.score} - ${m.away.score}`],
-    ['Goal Casa', m.home.score],
-    ['Goal Ospite', m.away.score],
-    [],
-    ['Periodo raggiunto', PERIODS[Math.min(m.timer.periodIndex, PERIODS.length - 1)]],
-    ['Stato', m.completed ? 'Completata' : 'In corso'],
-    [],
-    ['Totale eventi', m.events.length],
-    ['Goal totali', m.events.filter(e => e.type === 'goal').length],
-    ['Ammonizioni', m.events.filter(e => e.type === 'yellow').length],
-    ['Espulsioni', m.events.filter(e => e.type === 'red').length],
-    ['Sostituzioni', m.events.filter(e => e.type === 'sub').length],
-  ];
-  const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
-  ws1['!cols'] = [{ wch: 25 }, { wch: 35 }];
-  XLSX.utils.book_append_sheet(wb, ws1, 'Riepilogo');
-
-  const statsHome = computePlayerStats('home');
-  const statsAway = computePlayerStats('away');
-  const statsHeaders = ['Squadra', 'N° Maglia', 'Ruolo', 'Cognome e Nome', 'Goal', 'Assist', 'Ammonizioni', 'Espulsioni', 'Minuti giocati', 'Titolare'];
-  const statsRows = [statsHeaders];
-
-  statsHome.forEach(s => {
-    statsRows.push([m.home.name, s.num ?? '', s.role || '', s.name, s.goals, s.assists, s.yellows, s.reds, s.minutesPlayed || (s.minutesIn != null ? 0 : ''), s.starter ? 'Sì' : 'No']);
-  });
-  statsRows.push([]);
-  statsAway.forEach(s => {
-    statsRows.push([m.away.name, s.num ?? '', s.role || '', s.name, s.goals, s.assists, s.yellows, s.reds, s.minutesPlayed || (s.minutesIn != null ? 0 : ''), s.starter ? 'Sì' : 'No']);
-  });
-
-  const ws2 = XLSX.utils.aoa_to_sheet(statsRows);
-  ws2['!cols'] = [{ wch: 25 }, { wch: 10 }, { wch: 8 }, { wch: 30 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 10 }];
-  XLSX.utils.book_append_sheet(wb, ws2, 'Statistiche');
-
-  const eventsHeaders = ['Minuto', 'Periodo', 'Tipo evento', 'Squadra', 'Calciatrice', 'Dettaglio aggiuntivo', 'Note'];
-  const eventsRows = [eventsHeaders];
-
-  const sortedEvents = [...m.events].sort((a, b) => a.minute - b.minute);
-  sortedEvents.forEach(e => {
-    const teamName = m[e.team].name;
-    const periodName = PERIODS[e.period] || '';
-    let tipoEvento = '', calciatrice = '', dettaglioAgg = '', note = '';
-
-    if (e.type === 'goal') {
-      tipoEvento = e.goalType === 'autogol' ? 'Autogol' : 'Goal';
-      calciatrice = `${e.scorer.num ?? '?'} ${e.scorer.name}`;
-      if (e.assist) dettaglioAgg = `Assist: ${e.assist.num ?? '?'} ${e.assist.name}`;
-      note = e.goalType || 'azione';
-    } else if (e.type === 'yellow') {
-      tipoEvento = 'Ammonizione';
-      calciatrice = `${e.player.num ?? '?'} ${e.player.name}`;
-    } else if (e.type === 'red') {
-      tipoEvento = 'Espulsione';
-      calciatrice = `${e.player.num ?? '?'} ${e.player.name}`;
-    } else if (e.type === 'sub') {
-      tipoEvento = 'Sostituzione';
-      calciatrice = `Esce: ${e.playerOut.num ?? '?'} ${e.playerOut.name}`;
-      dettaglioAgg = `Entra: ${e.playerIn.num ?? '?'} ${e.playerIn.name}`;
-      note = e.subReason || '';
-    }
-    eventsRows.push([e.minute, periodName, tipoEvento, teamName, calciatrice, dettaglioAgg, note]);
-  });
-
-  const ws3 = XLSX.utils.aoa_to_sheet(eventsRows);
-  ws3['!cols'] = [{ wch: 8 }, { wch: 18 }, { wch: 15 }, { wch: 25 }, { wch: 30 }, { wch: 30 }, { wch: 15 }];
-  XLSX.utils.book_append_sheet(wb, ws3, 'Eventi');
-
-  const allScorers = [...statsHome, ...statsAway].filter(s => s.goals > 0).sort((a, b) => b.goals - a.goals || b.assists - a.assists);
-  if (allScorers.length > 0) {
-    const scorersRows = [['Squadra', 'N° Maglia', 'Cognome e Nome', 'Goal', 'Assist']];
-    allScorers.forEach(s => {
-      const team = statsHome.includes(s) ? m.home.name : m.away.name;
-      scorersRows.push([team, s.num ?? '', s.name, s.goals, s.assists]);
-    });
-    const ws4 = XLSX.utils.aoa_to_sheet(scorersRows);
-    ws4['!cols'] = [{ wch: 25 }, { wch: 10 }, { wch: 30 }, { wch: 8 }, { wch: 8 }];
-    XLSX.utils.book_append_sheet(wb, ws4, 'Marcatrici');
-  }
-
-  const dateStr = matchDate.toISOString().slice(0, 10);
-  const fname = `MyStatistics_${m.home.name}_vs_${m.away.name}_${dateStr}.xlsx`.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
-  XLSX.writeFile(wb, fname);
-}
-
-function exportMatchPdf() {
-  if (!state.currentMatch) return;
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const m = state.currentMatch;
-
-  doc.setFillColor(10, 25, 41);
-  doc.rect(0, 0, 210, 35, 'F');
-  doc.setTextColor(255, 184, 77);
-  doc.setFontSize(22); doc.setFont('helvetica', 'bold');
-  doc.text('MY STATISTICS', 105, 14, { align: 'center' });
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(11); doc.setFont('helvetica', 'normal');
-  doc.text('F.I.G.C. - Lega Nazionale Dilettanti — Referto partita', 105, 22, { align: 'center' });
-  doc.setFontSize(9);
-  doc.text(new Date(m.endedAt || m.createdAt).toLocaleString('it-IT'), 105, 29, { align: 'center' });
-
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(16); doc.setFont('helvetica', 'bold');
-  doc.text(`${m.home.name}  ${m.home.score} – ${m.away.score}  ${m.away.name}`, 105, 48, { align: 'center' });
-
-  let y = 60;
-  const statsHome = computePlayerStats('home');
-  const statsAway = computePlayerStats('away');
-
-  function drawTeamStats(teamName, stats, yStart) {
-    doc.setFontSize(12); doc.setFont('helvetica', 'bold');
-    doc.setTextColor(255, 107, 53);
-    doc.text(teamName.toUpperCase(), 14, yStart);
-    doc.setFontSize(8); doc.setFont('helvetica', 'bold');
-    doc.setTextColor(80, 80, 80);
-    const headers = ['N°', 'RUOLO', 'CALCIATRICE', 'G', 'A', 'Y', 'R', 'MIN'];
-    const xs = [14, 22, 36, 130, 142, 154, 166, 178];
-    headers.forEach((h, i) => doc.text(h, xs[i], yStart + 5));
-    doc.setLineWidth(0.2);
-    doc.line(14, yStart + 6.5, 196, yStart + 6.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(20, 20, 20);
-    let yy = yStart + 11;
-    stats.forEach(s => {
-      if (yy > 280) { doc.addPage(); yy = 20; }
-      doc.text(String(s.num ?? '—'), xs[0], yy);
-      doc.text(s.role || '—', xs[1], yy);
-      doc.text(s.name.substring(0, 40), xs[2], yy);
-      doc.text(String(s.goals || ''), xs[3], yy);
-      doc.text(String(s.assists || ''), xs[4], yy);
-      doc.text(String(s.yellows || ''), xs[5], yy);
-      doc.text(String(s.reds || ''), xs[6], yy);
-      doc.text(s.minutesPlayed ? String(s.minutesPlayed) + "'" : (s.minutesIn != null ? "0'" : '—'), xs[7], yy);
-      yy += 5;
-    });
-    return yy + 4;
-  }
-
-  y = drawTeamStats(m.home.name, statsHome, y);
-  if (y > 220) { doc.addPage(); y = 20; }
-  y = drawTeamStats(m.away.name, statsAway, y);
-
-  if (y > 240) { doc.addPage(); y = 20; }
-  doc.setFontSize(12); doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 107, 53);
-  doc.text('CRONOLOGIA EVENTI', 14, y);
-  y += 6;
-  doc.setFontSize(8); doc.setFont('helvetica', 'normal');
-  doc.setTextColor(20, 20, 20);
-
-  const events = [...m.events].sort((a, b) => a.minute - b.minute);
-  events.forEach(e => {
-    if (y > 285) { doc.addPage(); y = 20; }
-    const team = m[e.team].name;
-    let line = `${e.minute}'  `;
-    if (e.type === 'goal') {
-      const t = e.goalType === 'autogol' ? `AUTOGOL (${team})` : `GOAL (${team})`;
-      line += `${t}: ${e.scorer.num ?? '?'} ${e.scorer.name}`;
-      if (e.assist) line += ` — assist: ${e.assist.num ?? '?'} ${e.assist.name}`;
-      if (e.goalType && e.goalType !== 'azione' && e.goalType !== 'autogol') line += ` (${e.goalType})`;
-    } else if (e.type === 'yellow') {
-      line += `AMMONIZIONE (${team}): ${e.player.num ?? '?'} ${e.player.name}`;
-    } else if (e.type === 'red') {
-      line += `ESPULSIONE (${team}): ${e.player.num ?? '?'} ${e.player.name}`;
-    } else if (e.type === 'sub') {
-      line += `SOSTITUZIONE (${team}): out ${e.playerOut.num ?? '?'} ${e.playerOut.name} → in ${e.playerIn.num ?? '?'} ${e.playerIn.name} (${e.subReason})`;
-    }
-    doc.text(line, 14, y, { maxWidth: 182 });
-    y += 5;
-  });
-
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFontSize(7); doc.setTextColor(120, 120, 120);
-    doc.text(`Pagina ${i} di ${pageCount} — Generato da My Statistics`, 105, 293, { align: 'center' });
-  }
-
-  const fname = `referto_${m.home.name}_vs_${m.away.name}_${new Date(m.endedAt || m.createdAt).toISOString().slice(0,10)}.pdf`.replace(/\s+/g, '_');
-  doc.save(fname);
-}
-
-function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-function escapeHtml(s) {
-  if (s == null) return '';
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-const SHEETS_URL_KEY = 'mystatistics_sheets_url';
-
-function getSheetsUrl() {
-  return localStorage.getItem(SHEETS_URL_KEY) || '';
-}
-
-function openSettingsModal() {
-  document.getElementById('settings-sheets-url').value = getSheetsUrl();
-  document.getElementById('settings-test-result').style.display = 'none';
-  document.getElementById('settings-modal').classList.add('active');
-}
-
-function saveSheetsUrl() {
-  const url = document.getElementById('settings-sheets-url').value.trim();
-  if (url && !url.startsWith('https://script.google.com/')) {
-    alert('URL non valido. Deve iniziare con https://script.google.com/');
-    return;
-  }
-  localStorage.setItem(SHEETS_URL_KEY, url);
-  closeModal('settings-modal');
-  alert('Impostazioni salvate.');
-}
-
-function clearSheetsUrl() {
-  if (!confirm('Rimuovere l\'URL del backend? La sincronizzazione non sarà più disponibile.')) return;
-  localStorage.removeItem(SHEETS_URL_KEY);
-  document.getElementById('settings-sheets-url').value = '';
-  alert('URL rimosso.');
-}
-
-async function testSheetsConnection() {
-  const url = document.getElementById('settings-sheets-url').value.trim();
-  const resultEl = document.getElementById('settings-test-result');
-  resultEl.style.display = 'block';
-  resultEl.style.background = 'rgba(127,184,255,0.15)';
-  resultEl.style.color = '#7fb8ff';
-  resultEl.textContent = '⏳ Test in corso...';
-
-  if (!url) {
-    resultEl.style.background = 'rgba(220,53,69,0.15)';
-    resultEl.style.color = '#ff6b7a';
-    resultEl.textContent = '❌ Inserisci prima un URL';
-    return;
-  }
-
-  try {
-    const response = await fetch(url, { method: 'GET', redirect: 'follow' });
-    const data = await response.json();
-    if (data && data.ok) {
-      resultEl.style.background = 'rgba(46,204,113,0.15)';
-      resultEl.style.color = '#2ecc71';
-      resultEl.textContent = `✅ Connesso! ${data.message || 'Backend attivo'}`;
-    } else {
-      resultEl.style.background = 'rgba(220,53,69,0.15)';
-      resultEl.style.color = '#ff6b7a';
-      resultEl.textContent = '❌ Risposta inattesa: ' + JSON.stringify(data);
-    }
-  } catch (e) {
-    resultEl.style.background = 'rgba(220,53,69,0.15)';
-    resultEl.style.color = '#ff6b7a';
-    resultEl.textContent = '❌ Errore connessione: ' + e.message;
-  }
-}
-
-async function syncToSheets() {
-  if (!state.currentMatch) return;
-  const url = getSheetsUrl();
-  if (!url) {
-    if (confirm('Non hai ancora configurato l\'URL del backend Google Sheets.\nVuoi farlo ora?')) {
-      openSettingsModal();
-    }
-    return;
-  }
-
-  const m = state.currentMatch;
-  const btn = event.target.closest('button');
-  const originalText = btn ? btn.innerHTML : '';
-  if (btn) {
-    btn.disabled = true;
-    btn.style.opacity = '0.7';
-    btn.innerHTML = '⏳ Sincronizzazione...';
-  }
-
-  try {
-    const statsHome = computePlayerStats('home');
-    const statsAway = computePlayerStats('away');
-
-    const payload = {
-      match: m,
-      stats: { home: statsHome, away: statsAway },
-      periodLabel: PERIODS[Math.min(m.timer.periodIndex, PERIODS.length - 1)],
-      periodNames: PERIODS
-    };
-
-    const response = await fetch(url, {
-      method: 'POST',
-      mode: 'cors',
-      redirect: 'follow',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-
-    const result = await response.json();
-
-    if (result.ok) {
-      state.currentMatch.syncedAt = Date.now();
-      persistCurrent();
-      if (btn) {
-        btn.innerHTML = '✅ Sincronizzato!';
-        btn.style.background = 'linear-gradient(135deg, #27ae60, #2ecc71)';
-      }
-      setTimeout(() => {
-        alert(`✅ Partita sincronizzata su Google Sheets!\n\n${result.home} vs ${result.away} (${result.score})\n${result.statsRows} righe statistiche\n${result.eventiRows} eventi\nSalvato il ${result.savedAt}`);
-        if (btn) {
-          btn.disabled = false;
-          btn.style.opacity = '1';
-          btn.innerHTML = originalText || '☁️ Sincronizza su Sheets';
-          btn.style.background = '';
-        }
-      }, 500);
-    } else {
-      throw new Error(result.error || 'Errore sconosciuto dal backend');
-    }
-  } catch (e) {
-    if (btn) {
-      btn.disabled = false;
-      btn.style.opacity = '1';
-      btn.innerHTML = originalText || '☁️ Sincronizza su Sheets';
-    }
-    alert('❌ Errore sincronizzazione:\n' + e.message + '\n\nVerifica connessione internet e URL backend nelle Impostazioni.');
-  }
-}
-
-renderHistory();
-window.addEventListener('beforeunload', () => { if (state.timer.running) stopTimer(); });
-</script>
-</body>
-</html>
-
 // ============================================
-// CLAUDE API - OCR Distinta FIGC
+// MY STATISTICS - Apps Script Backend
 // ============================================
 
+const SHEET_PARTITE = 'Partite';
+const SHEET_STATISTICHE = 'Statistiche';
+const SHEET_EVENTI = 'Eventi';
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
+
+function doPost(e) {
+  try {
+    const payload = JSON.parse(e.postData.contents);
+    if (payload.action === 'ocr') {
+      return handleOcrRequest(payload);
+    }
+    return handleSyncRequest(payload);
+  } catch (err) {
+    return jsonResponse({ ok: false, error: String(err) });
+  }
+}
+
+function doGet() {
+  return jsonResponse({
+    ok: true,
+    message: 'My Statistics endpoint attivo (v2 con OCR Claude)',
+    timestamp: new Date().toISOString()
+  });
+}
 
 function handleOcrRequest(payload) {
   const apiKey = PropertiesService.getScriptProperties().getProperty('CLAUDE_API_KEY');
   if (!apiKey) {
     return jsonResponse({ ok: false, error: 'API Key Claude non configurata in Script Properties' });
   }
-  
   const imageData = payload.imageBase64;
   const mediaType = payload.mediaType || 'image/jpeg';
-  
   if (!imageData) {
     return jsonResponse({ ok: false, error: 'Immagine mancante' });
   }
   
   const prompt = `Analizza questa distinta calcio FIGC (Lega Nazionale Dilettanti, calcio femminile a 11) ed estrai le calciatrici iscritte.
 
-Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura esatta, senza commenti, senza markdown, senza testo aggiuntivo prima o dopo:
+Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura esatta, senza commenti, senza markdown:
 
 {
-  "teamName": "nome esatto della squadra come scritto nella distinta",
+  "teamName": "nome esatto della squadra",
   "players": [
     {"num": 1, "name": "COGNOME NOME", "role": "GK"},
     {"num": 2, "name": "COGNOME NOME", "role": "DEF"}
   ]
 }
 
-REGOLE IMPORTANTI:
-- "teamName": nome completo della squadra (es. "A.S.D. FIAMMA MONZA 1970" o "CITTA DI BRUGHERIO"). Pulisci eventuali caratteri spuri.
-- "num": numero di maglia (colonna N° del Ruolo, NON il numero della riga). Numero intero tra 1 e 99.
-- "name": cognome e nome in MAIUSCOLO, come scritto. Includi tutti i nomi (es. "PACI FRANCESCA ELEONORA"). Niente caratteri spuri.
-- "role": uno tra "GK" (portiere, se c'è "(P)" o "Portiere"), "DEF", "MID", "FWD", "LM". Se non chiaro dal contesto, usa stringa vuota "".
-- Includi SOLO le righe con calciatrici reali (con numero maglia e cognome). Salta le righe vuote in fondo.
-- Salta le righe di staff (allenatore, dirigente, massaggiatore, medico, assistente arbitro).
-- Se non riesci a determinare il numero di maglia, usa null.
+REGOLE:
+- "teamName": nome completo squadra (es. "A.S.D. FIAMMA MONZA 1970"). Pulisci caratteri spuri.
+- "num": numero di maglia (colonna N° del Ruolo). Numero intero 1-99.
+- "name": cognome e nome in MAIUSCOLO. Includi tutti i nomi.
+- "role": uno tra "GK" (se c'è "(P)" o "Portiere"), "DEF", "MID", "FWD", "LM". Se non chiaro, usa "".
+- Includi SOLO righe con calciatrici (numero maglia + cognome). Salta righe vuote in fondo.
+- Salta righe di staff (allenatore, dirigente, massaggiatore, medico, assistente arbitro).
+- Se numero maglia non determinabile, usa null.
 
-Restituisci SOLO il JSON, niente altro.`;
+Restituisci SOLO il JSON.`;
 
   const requestBody = {
     model: CLAUDE_MODEL,
@@ -1757,18 +68,8 @@ Restituisci SOLO il JSON, niente altro.`;
     messages: [{
       role: 'user',
       content: [
-        {
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: mediaType,
-            data: imageData
-          }
-        },
-        {
-          type: 'text',
-          text: prompt
-        }
+        { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageData } },
+        { type: 'text', text: prompt }
       ]
     }]
   };
@@ -1776,10 +77,7 @@ Restituisci SOLO il JSON, niente altro.`;
   const options = {
     method: 'post',
     contentType: 'application/json',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
+    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     payload: JSON.stringify(requestBody),
     muteHttpExceptions: true
   };
@@ -1788,31 +86,129 @@ Restituisci SOLO il JSON, niente altro.`;
     const response = UrlFetchApp.fetch(CLAUDE_API_URL, options);
     const responseCode = response.getResponseCode();
     const responseText = response.getContentText();
-    
     if (responseCode !== 200) {
-      return jsonResponse({ 
-        ok: false, 
-        error: 'Claude API error ' + responseCode + ': ' + responseText.substring(0, 500) 
-      });
+      return jsonResponse({ ok: false, error: 'Claude API error ' + responseCode + ': ' + responseText.substring(0, 500) });
     }
-    
     const claudeResponse = JSON.parse(responseText);
     const claudeText = claudeResponse.content[0].text.trim();
-    
     let jsonText = claudeText;
     const jsonMatch = claudeText.match(/\{[\s\S]*\}/);
     if (jsonMatch) jsonText = jsonMatch[0];
-    
     const result = JSON.parse(jsonText);
-    
     return jsonResponse({
       ok: true,
       teamName: result.teamName || '',
       players: result.players || [],
       usage: claudeResponse.usage
     });
-    
   } catch (err) {
     return jsonResponse({ ok: false, error: 'Errore chiamata Claude: ' + err.toString() });
+  }
+}
+
+function handleSyncRequest(payload) {
+  const match = payload.match;
+  if (!match) return jsonResponse({ ok: false, error: 'Payload mancante' });
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const dataPartita = formatDate(new Date(match.endedAt || match.createdAt));
+  const dataSalvataggio = formatDateTime(new Date());
+  
+  const sheetPartite = ss.getSheetByName(SHEET_PARTITE);
+  deleteRowsById(sheetPartite, 'A', match.id);
+  sheetPartite.appendRow([
+    match.id, dataPartita, match.home.name, match.away.name,
+    match.home.score, match.away.score,
+    match.completed ? 'Completata' : 'In corso',
+    payload.periodLabel || '', dataSalvataggio
+  ]);
+  
+  const sheetStats = ss.getSheetByName(SHEET_STATISTICHE);
+  deleteRowsById(sheetStats, 'A', match.id);
+  const statsRows = [];
+  ['home', 'away'].forEach(side => {
+    const stats = payload.stats[side] || [];
+    const teamName = match[side].name;
+    stats.forEach(s => {
+      statsRows.push([
+        match.id, dataPartita, teamName, s.num, s.role, s.name,
+        s.goals, s.assists, s.yellows, s.reds, s.minutesPlayed,
+        s.starter ? 'Sì' : 'No'
+      ]);
+    });
+  });
+  if (statsRows.length > 0) {
+    sheetStats.getRange(sheetStats.getLastRow() + 1, 1, statsRows.length, 12).setValues(statsRows);
+  }
+  
+  const sheetEventi = ss.getSheetByName(SHEET_EVENTI);
+  deleteRowsById(sheetEventi, 'A', match.id);
+  const eventiRows = [];
+  const sortedEvents = [...match.events].sort((a, b) => a.minute - b.minute);
+  sortedEvents.forEach(ev => {
+    const teamName = match[ev.team].name;
+    let tipo = '', calc = '', dettaglio = '', note = '';
+    if (ev.type === 'goal') {
+      tipo = ev.goalType === 'autogol' ? 'Autogol' : 'Goal';
+      calc = (ev.scorer.num || '?') + ' ' + ev.scorer.name;
+      if (ev.assist) dettaglio = 'Assist: ' + (ev.assist.num || '?') + ' ' + ev.assist.name;
+      note = ev.goalType || 'azione';
+    } else if (ev.type === 'yellow') {
+      tipo = 'Ammonizione';
+      calc = (ev.player.num || '?') + ' ' + ev.player.name;
+    } else if (ev.type === 'red') {
+      tipo = 'Espulsione';
+      calc = (ev.player.num || '?') + ' ' + ev.player.name;
+    } else if (ev.type === 'sub') {
+      tipo = 'Sostituzione';
+      calc = 'Esce: ' + (ev.playerOut.num || '?') + ' ' + ev.playerOut.name;
+      dettaglio = 'Entra: ' + (ev.playerIn.num || '?') + ' ' + ev.playerIn.name;
+      note = ev.subReason || '';
+    }
+    eventiRows.push([
+      match.id, dataPartita, ev.minute,
+      payload.periodNames ? (payload.periodNames[ev.period] || '') : '',
+      tipo, teamName, calc, dettaglio, note
+    ]);
+  });
+  if (eventiRows.length > 0) {
+    sheetEventi.getRange(sheetEventi.getLastRow() + 1, 1, eventiRows.length, 9).setValues(eventiRows);
+  }
+  
+  return jsonResponse({
+    ok: true,
+    matchId: match.id,
+    home: match.home.name,
+    away: match.away.name,
+    score: match.home.score + '-' + match.away.score,
+    statsRows: statsRows.length,
+    eventiRows: eventiRows.length,
+    savedAt: dataSalvataggio
+  });
+}
+
+function jsonResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function formatDate(d) {
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return day + '/' + month + '/' + year;
+}
+
+function formatDateTime(d) {
+  return formatDate(d) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function deleteRowsById(sheet, idColLetter, idValue) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  const ids = sheet.getRange(idColLetter + '2:' + idColLetter + lastRow).getValues();
+  for (let i = ids.length - 1; i >= 0; i--) {
+    if (ids[i][0] === idValue) {
+      sheet.deleteRow(i + 2);
+    }
   }
 }
