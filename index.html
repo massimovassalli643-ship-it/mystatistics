@@ -1707,3 +1707,112 @@ window.addEventListener('beforeunload', () => { if (state.timer.running) stopTim
 </script>
 </body>
 </html>
+
+// ============================================
+// CLAUDE API - OCR Distinta FIGC
+// ============================================
+
+const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
+const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
+
+function handleOcrRequest(payload) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('CLAUDE_API_KEY');
+  if (!apiKey) {
+    return jsonResponse({ ok: false, error: 'API Key Claude non configurata in Script Properties' });
+  }
+  
+  const imageData = payload.imageBase64;
+  const mediaType = payload.mediaType || 'image/jpeg';
+  
+  if (!imageData) {
+    return jsonResponse({ ok: false, error: 'Immagine mancante' });
+  }
+  
+  const prompt = `Analizza questa distinta calcio FIGC (Lega Nazionale Dilettanti, calcio femminile a 11) ed estrai le calciatrici iscritte.
+
+Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura esatta, senza commenti, senza markdown, senza testo aggiuntivo prima o dopo:
+
+{
+  "teamName": "nome esatto della squadra come scritto nella distinta",
+  "players": [
+    {"num": 1, "name": "COGNOME NOME", "role": "GK"},
+    {"num": 2, "name": "COGNOME NOME", "role": "DEF"}
+  ]
+}
+
+REGOLE IMPORTANTI:
+- "teamName": nome completo della squadra (es. "A.S.D. FIAMMA MONZA 1970" o "CITTA DI BRUGHERIO"). Pulisci eventuali caratteri spuri.
+- "num": numero di maglia (colonna N° del Ruolo, NON il numero della riga). Numero intero tra 1 e 99.
+- "name": cognome e nome in MAIUSCOLO, come scritto. Includi tutti i nomi (es. "PACI FRANCESCA ELEONORA"). Niente caratteri spuri.
+- "role": uno tra "GK" (portiere, se c'è "(P)" o "Portiere"), "DEF", "MID", "FWD", "LM". Se non chiaro dal contesto, usa stringa vuota "".
+- Includi SOLO le righe con calciatrici reali (con numero maglia e cognome). Salta le righe vuote in fondo.
+- Salta le righe di staff (allenatore, dirigente, massaggiatore, medico, assistente arbitro).
+- Se non riesci a determinare il numero di maglia, usa null.
+
+Restituisci SOLO il JSON, niente altro.`;
+
+  const requestBody = {
+    model: CLAUDE_MODEL,
+    max_tokens: 2000,
+    messages: [{
+      role: 'user',
+      content: [
+        {
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: mediaType,
+            data: imageData
+          }
+        },
+        {
+          type: 'text',
+          text: prompt
+        }
+      ]
+    }]
+  };
+  
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    payload: JSON.stringify(requestBody),
+    muteHttpExceptions: true
+  };
+  
+  try {
+    const response = UrlFetchApp.fetch(CLAUDE_API_URL, options);
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+    
+    if (responseCode !== 200) {
+      return jsonResponse({ 
+        ok: false, 
+        error: 'Claude API error ' + responseCode + ': ' + responseText.substring(0, 500) 
+      });
+    }
+    
+    const claudeResponse = JSON.parse(responseText);
+    const claudeText = claudeResponse.content[0].text.trim();
+    
+    let jsonText = claudeText;
+    const jsonMatch = claudeText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) jsonText = jsonMatch[0];
+    
+    const result = JSON.parse(jsonText);
+    
+    return jsonResponse({
+      ok: true,
+      teamName: result.teamName || '',
+      players: result.players || [],
+      usage: claudeResponse.usage
+    });
+    
+  } catch (err) {
+    return jsonResponse({ ok: false, error: 'Errore chiamata Claude: ' + err.toString() });
+  }
+}
