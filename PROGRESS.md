@@ -19,7 +19,7 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.2 — Rose a 4 colonne + distinte da Google Drive (12/09/2026)
+## Stato attuale: v3.3 / backend v4.2 — Rose a 4 colonne + distinte da Google Drive (13/09/2026)
 
 ### Novità v3.2 (12/09/2026)
 
@@ -73,13 +73,43 @@ Distinte (id 1FNK8xUBjx8RyjX5vBkW9e1eG9KLA8Ue0)`). Lo scope è dichiarato
 esplicitamente in `appsscript.json`, quindi va tenuto lì: senza quella riga
 `DriveApp` fallisce anche con il consenso concesso.
 
-**Deployment**: versione 11 pubblicata sui **3** deployment attivi il 12/09/2026
-alle 22:16, tutti rinominati "v4 Drive Distinte + OCR PDF (12/09/2026)".
+**Deployment**: versione 11 sui **3** deployment attivi il 12/09/2026 alle 22:16;
+versione **12 (v4.1)** alle 23:12; versione **13 (v4.2)** alle 23:25.
+
+### Correzione v4.1 — `teamName` dall'intestazione (12/09/2026, 23:12)
+Nel campo squadra arrivava `A.S.D. FIAMMA MONZA 1970 - C.S.D. UESSE SARNICO 1908
+(A)`: il modello leggeva la riga "Distinta dei/delle giocatori/trici partecipanti
+alla gara", che contiene **due** squadre. Il prompt ora dice dove guardare:
+- il nome squadra sta **in cima**, sotto "F.I.G.C. - LEGA NAZIONALE DILETTANTI",
+  preceduto dalla matricola (`953833 A.S.D. FIAMMA MONZA 1970`) → si toglie la
+  matricola
+- la riga della gara è vietata, con un **controllo finale**: due nomi separati da
+  trattino, o `(A)`/`(C)` in fondo, significano riga sbagliata
+
+### Correzione v4.2 — `num` = cella "N° del Ruolo" (13/09/2026, 23:25)
+Sulla rosa comparivano numeri di maglia **1, 2, 3, …** progressivi mentre sulla
+distinta quelle celle sono vuote. Ingrandendo la distinta si vede che il "1" e il
+"2" sono stampati **nel margine, FUORI dal bordo sinistro della tabella**: è il
+contatore di riga, non il numero di maglia. Il prompt ora:
+- descrive la colonnina del margine come elemento da ignorare
+- definisce `num` come il contenuto della cella intestata **"N° del Ruolo"**, la
+  prima **dentro** la tabella, "molto spesso vuota" → `null`
+- impone una **verifica finale**: se i numeri risultanti sono esattamente
+  1, 2, 3, … nell'ordine delle righe, è il contatore → `num = null` su tutte
+
+Test dopo le due correzioni, stesso PDF: `teamName` = `A.S.D. FIAMMA MONZA 1970`
+(una sola squadra), tutti e 20 i `num` = `null`, 20 nomi e 20 date di nascita
+corretti.
+
+### Correzione frontend v3.3 — nome squadra sovrascritto dall'OCR (13/09/2026)
+Il campo squadra veniva riempito solo se **vuoto**, quindi una lettura sbagliata
+salvata in precedenza restava lì per sempre. Ora il nome letto dalla distinta ha
+sempre la precedenza e aggiorna anche `state.currentMatch[side].name`.
 
 **Test end-to-end (12/09/2026, 22:20)** — `driveList` + `driveOcr` sul PDF
 "fiamma monza uesse sarnico.pdf" della cartella Drive: cartella elencata
 correttamente, `pdfReceived: true`, `rowsCounted: 20`, **20/20 calciatrici** con
-numero di maglia, cognome/nome e data di nascita corretti, `teamName` =
+cognome/nome e data di nascita corretti, `teamName` =
 "A.S.D. FIAMMA MONZA 1970". Nota: sulla distinta digitale il portiere non è
 marcato "(P)", quindi `role` torna vuoto per tutte — si imposta a partita in
 corso dalla modale Atleta.
@@ -153,6 +183,9 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 12/09/2026 | Creati PROGRESS.md e CLAUDE.md |
 | 12/09/2026 | v3.2 frontend: rose a 4 colonne (N° · Cognome e nome · Data nascita · ✕/M/✓), riga in sola lettura con modifica esplicita; colonna Ruolo rimossa dalla UI (campo mantenuto nel modello) |
 | 12/09/2026 | v3.2: "Carica file" apre l'elenco della cartella Drive "Distinte" (backend `driveList`/`driveOcr`), PDF letti direttamente dal backend; ripiego "Sfoglia dal dispositivo" |
+| 13/09/2026 | Backend v4.1 (versione 12): `teamName` dall'intestazione, non dalla riga della gara |
+| 13/09/2026 | Backend v4.2 (versione 13): `num` dalla cella "N° del Ruolo", mai il contatore di riga stampato nel margine |
+| 13/09/2026 | Frontend v3.3: il nome squadra letto dall'OCR sovrascrive sempre il campo |
 | 12/09/2026 | Backend v4 deployato (versione 11) sui 3 deployment attivi; scope `drive.readonly` aggiunto a `appsscript.json`; test end-to-end su PDF Drive: 20/20 |
 | 12/09/2026 | Mockup restyling UX pubblicato (5 artboard, 2 direzioni per il match live); palette di stato validata per daltonismo → colore sempre con icona + etichetta |
 
@@ -190,7 +223,9 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [x] `testDriveDistinte()` eseguita e accesso a Drive autorizzato (22:13)
 - [x] Versione 11 pubblicata sui 3 deployment attivi (22:16)
 - [x] Test end-to-end `driveList` + `driveOcr` su PDF reale: 20/20 (22:20)
-- [ ] **A carico di Max**: `git add -A && git commit && git push origin main` — finché non lo fai, il frontend v3.2 (rose a 4 colonne + pulsante Drive) non è online su GitHub Pages
+- [x] Frontend v3.2 pushato e online (rose a 4 colonne + pulsante Drive)
+- [x] Backend v4.1 (versione 12) e v4.2 (versione 13) sui 3 deployment, testate
+- [ ] **A carico di Max**: nuovo `git add -A && git commit && git push origin main` per il frontend v3.3
 - [ ] Dopo il push: sull'iPad chiudere e riaprire l'app, poi provare "Carica file" → deve comparire l'elenco delle distinte (GitHub Pages ridistribuisce in 1–2 minuti), poi sull'iPad chiudere e riaprire l'app
 - [ ] Test reale sull'iPad con la distinta cartacea del 13/09/2026 (foto in verticale, foglio che riempie il frame): confrontare i nomi con la distinta
 - [ ] Se un nome esce con `?`: è voluto (carattere ambiguo) — correggere inline, non è un errore dell'app

@@ -899,8 +899,12 @@ function applyOcrResult(result, side, progressEl) {
     const players = (result.players || []).filter(p => p.name && p.name.trim());
     const teamName = result.teamName || '';
 
-    if (teamName && !document.getElementById('team-' + side).value) {
-      document.getElementById('team-' + side).value = teamName;
+    // Il nome letto dalla distinta ha la precedenza su quello gia presente:
+    // se una lettura precedente aveva sbagliato riga, la nuova la corregge.
+    if (teamName) {
+      const teamEl = document.getElementById('team-' + side);
+      teamEl.value = teamName;
+      state.currentMatch[side].name = teamName;
     }
 
     if (players.length === 0) {

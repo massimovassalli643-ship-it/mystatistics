@@ -1,5 +1,6 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v4.2 (13/09/2026): num = cella "N del Ruolo", mai il contatore di riga nel margine
 // v4.1 (12/09/2026): teamName letto dall'intestazione (non dalla riga della gara)
 // v4 (12/09/2026): distinte dalla cartella Google Drive + OCR di PDF
 // v3 (12/09/2026): OCR multi-immagine (pagina intera + strisce ad alta risoluzione)
@@ -108,18 +109,21 @@ function handleOcrRequest(payload) {
   prompt += 'PIU SOTTO c\'e la riga "Distinta dei/delle giocatori/trici partecipanti alla gara" seguita da DUE squadre separate da un trattino (es. "A.S.D. FIAMMA MONZA 1970 - C.S.D. UESSE SARNICO 1908 (A)"): quella riga indica la PARTITA, NON e il nome squadra. NON usarla MAI.\n';
   prompt += 'CONTROLLO FINALE: se in teamName ti ritrovi due nomi separati da un trattino, oppure "(A)" o "(C)" in fondo, hai letto la riga sbagliata: torna in cima alla pagina e prendi la riga con la matricola.\n\n';
   prompt += 'STRUTTURA DISTINTA FIGC:\n';
-  prompt += 'Tabella con colonne (da sinistra a destra): N del Ruolo (numero maglia, spesso vuoto), Data di nascita, Cognome e nome, Capitano/V.Cap (lettera C o V se presente), N. Matricola FIGC, Tipo documento, Numero documento, Rilasciato da.\n';
+  prompt += 'Tabella con colonne (da sinistra a destra): N del Ruolo (numero di maglia, MOLTO SPESSO VUOTO), Data di nascita, Cognome e nome, Capitano/V.Cap (lettera C o V se presente), N. Matricola FIGC, Tipo documento, Numero documento, Rilasciato da.\n';
+  prompt += 'FUORI dalla tabella, nel margine sinistro, puo esserci una colonnina senza intestazione con la numerazione progressiva delle righe (1, 2, 3, ...): non fa parte della tabella e va ignorata.\n';
   prompt += 'Sotto la colonna "Cognome e nome" puo apparire "(P)" = Portiere.\n\n';
   prompt += 'OUTPUT - SOLO QUESTO JSON, niente altro:\n';
   prompt += '{\n';
   prompt += '  "teamName": "<una sola squadra, dall intestazione in alto, senza matricola e senza avversaria>",\n';
   prompt += '  "rowsCounted": <numero di righe con cognome contate nella pagina intera>,\n';
   prompt += '  "players": [\n';
-  prompt += '    {"num": <numero maglia colonna N del Ruolo, oppure null se vuoto>, "birthDate": "<GG/MM/AAAA come scritto>", "name": "<COGNOME NOME esatto>", "role": "<GK se (P), altrimenti stringa vuota>"}\n';
+  prompt += '    {"num": <contenuto della cella "N del Ruolo" DENTRO la tabella, null se la cella e vuota, mai il contatore di riga del margine>, "birthDate": "<GG/MM/AAAA come scritto>", "name": "<COGNOME NOME esatto>", "role": "<GK se (P), altrimenti stringa vuota>"}\n';
   prompt += '  ]\n';
   prompt += '}\n\n';
   prompt += 'NOTE:\n';
-  prompt += '- num = il valore scritto nella PRIMA colonna a sinistra, intestata "N del Ruolo": e il numero di maglia della calciatrice. Copialo esattamente come e scritto sulla sua riga. Se la cella e davvero vuota, null; non inventare una numerazione progressiva tua.\n';
+  prompt += '- ATTENZIONE AI NUMERI A SINISTRA. Molte distinte hanno un CONTATORE DI RIGA progressivo (1, 2, 3, 4, ...) stampato nel MARGINE, FUORI dal bordo sinistro della tabella. Quello NON e il numero di maglia: ignoralo completamente.\n';
+  prompt += '- num = SOLO il contenuto della cella intestata "N del Ruolo", cioe la prima colonna DENTRO la tabella, tra il bordo sinistro e la colonna "Data di nascita". Su molte distinte queste celle sono VUOTE: in quel caso num = null per tutte le righe.\n';
+  prompt += '- VERIFICA OBBLIGATORIA sui num: se i numeri che stai per scrivere sono esattamente 1, 2, 3, ... nell ordine delle righe, hai copiato il contatore di riga del margine: metti num = null su TUTTE le righe.\n';
   prompt += '- Includi SOLO righe con un cognome scritto, nell\'ordine della distinta. Salta righe completamente vuote.\n';
   prompt += '- Salta righe Assistente, Dirigente, Allenatore, Massaggiatore, Medico in fondo.\n';
   prompt += '- Non aggiungere ruoli DEF/MID/FWD/LM da te: la distinta FIGC non li indica, quindi role="" per chi non ha (P).\n';
