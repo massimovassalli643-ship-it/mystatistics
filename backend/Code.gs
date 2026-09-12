@@ -1,5 +1,6 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v5 (13/09/2026): action sendReport — invia il report per email con allegato
 // v4.2 (13/09/2026): num = cella "N del Ruolo", mai il contatore di riga nel margine
 // v4.1 (12/09/2026): teamName letto dall'intestazione (non dalla riga della gara)
 // v4 (12/09/2026): distinte dalla cartella Google Drive + OCR di PDF
@@ -44,6 +45,9 @@ function doPost(e) {
     if (payload.action === 'driveOcr') {
       return handleDriveOcr(payload);
     }
+    if (payload.action === 'sendReport') {
+      return handleSendReport(payload);
+    }
     return handleSyncRequest(payload);
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err) });
@@ -56,7 +60,7 @@ function doPost(e) {
 function doGet() {
   return jsonResponse({
     ok: true,
-    message: 'My Statistics endpoint attivo (v4: OCR multi-immagine + distinte da Drive)',
+    message: 'My Statistics endpoint attivo (v5: OCR, distinte da Drive, invio report via email)',
     timestamp: new Date().toISOString()
   });
 }
@@ -296,6 +300,42 @@ function handleDriveOcr(payload) {
 }
 
 // ============================================
+// INVIO REPORT VIA EMAIL (v5)
+// ============================================
+// Un'app web non puo' allegare un file a un'email: mailto: non supporta allegati.
+// Il report (PDF o Excel) viene quindi generato sul dispositivo, mandato qui in
+// base64 e spedito da MailApp, che usa l'account Google proprietario dello script.
+// Il mittente e' quindi la casella Gmail di Max.
+//   action 'sendReport' + { to, subject, body, filename, mimeType, dataBase64 }
+function handleSendReport(payload) {
+  try {
+    var to = String(payload.to || '').trim();
+    if (!to) return jsonResponse({ ok: false, error: 'Destinatario mancante' });
+    if (!payload.dataBase64) return jsonResponse({ ok: false, error: 'Allegato mancante' });
+    var blob = Utilities.newBlob(
+      Utilities.base64Decode(payload.dataBase64),
+      payload.mimeType || 'application/octet-stream',
+      payload.filename || 'report'
+    );
+    MailApp.sendEmail({
+      to: to,
+      subject: payload.subject || 'My Statistics - Report partita',
+      body: payload.body || 'In allegato il report generato con My Statistics.',
+      name: 'My Statistics',
+      attachments: [blob]
+    });
+    return jsonResponse({
+      ok: true,
+      sentTo: to,
+      filename: payload.filename || '',
+      remainingQuota: MailApp.getRemainingDailyQuota()
+    });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: String(err.message || err) });
+  }
+}
+
+// ============================================
 // SYNC partita su Google Sheets
 // ============================================
 function handleSyncRequest(payload) {
@@ -465,4 +505,22 @@ function testDriveDistinte() {
   }
   if (n === 0) Logger.log('Nessun file nella cartella.');
   return n;
+}
+
+// ============================================
+// TEST v5 - ESEGUIRE UNA VOLTA DALL'EDITOR
+// ============================================
+// Concede allo script il permesso di inviare email (scope script.send_mail)
+// PRIMA di pubblicare i deployment. Invia una mail di prova a se stessi.
+function testInvioEmail() {
+  var me = Session.getEffectiveUser().getEmail();
+  MailApp.sendEmail({
+    to: me,
+    subject: 'My Statistics - test invio report',
+    body: 'Se leggi questa email, il backend puo inviare i report come allegato.',
+    name: 'My Statistics'
+  });
+  Logger.log('Email di prova inviata a ' + me);
+  Logger.log('Email ancora inviabili oggi: ' + MailApp.getRemainingDailyQuota());
+  return me;
 }

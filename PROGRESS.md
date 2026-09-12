@@ -19,7 +19,7 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.4 / backend v4.2 — Cronometro, rose a 4 colonne, distinte da Drive (13/09/2026)
+## Stato attuale: v3.6 / backend v5 (in attesa di autorizzazione email) — Cronometro, rose a 4 colonne, distinte da Drive (13/09/2026)
 
 ### Novità v3.2 (12/09/2026)
 
@@ -100,6 +100,68 @@ contatore di riga, non il numero di maglia. Il prompt ora:
 Test dopo le due correzioni, stesso PDF: `teamName` = `A.S.D. FIAMMA MONZA 1970`
 (una sola squadra), tutti e 20 i `num` = `null`, 20 nomi e 20 date di nascita
 corretti.
+
+### v3.6 / backend v5 — Dashboard statistiche e Report via email (13/09/2026)
+
+**Dashboard** (pulsante `📊 Dashboard` in home, accanto a Impostazioni).
+Un solo schermo con un menu a tendina in testa: **"Tutta la stagione"** oppure
+una **singola partita**. La squadra di riferimento non si configura: è dedotta
+come il nome che ricorre più spesso nello storico (`detectOurTeam`), quindi ogni
+partita sa da sola se eravamo in casa o in trasferta.
+
+| Vista | Indicatori |
+|-------|-----------|
+| Stagione | partite, bilancio V–N–P, punti e media, gol fatti/subiti e media, differenza reti |
+| Partita | risultato, esito, gol fatti/subiti, cartellini |
+
+Sotto, tre grafici a barre orizzontali (⚽ marcatrici, 🅰️ assist, ⏱️ minuti
+giocati, primi 8) e la tabella completa delle calciatrici con presenze, minuti,
+gol, assist, gialli, rossi.
+
+*Scelte di visualizzazione*: ogni grafico rappresenta **una sola grandezza**,
+quindi usa **un solo colore** (blu `#5598e7`) — il colore non codifica identità,
+la posizione in classifica sì; niente palette categoriche da validare. I colori
+di stato (giallo/rosso) restano solo in tabella e viaggiano **sempre con icona ed
+etichetta**, mai da soli. Valori scritti in chiaro a fine barra.
+
+**Report** (pulsante `📄 Report` in home, accanto a Dashboard). Tre passi:
+1. scegli la partita dall'elenco (con data e risultato)
+2. scegli il formato: **PDF** (referto) o **Excel** (dati)
+3. destinatari + oggetto, poi **📧 Invia** — oppure **⬇️ Scarica** sul dispositivo
+
+**Perché l'email passa dal backend**: un'app web non può allegare un file a una
+mail (`mailto:` non supporta allegati). Il report viene generato sull'iPad,
+inviato al backend in base64 e spedito da `MailApp`, che gira con l'account
+Google proprietario dello script: **il mittente è la casella Gmail di Max**.
+Nuova action `sendReport`, nuovo scope `script.send_mail`, quota Gmail gratuita
+100 destinatari/giorno (la risposta riporta quante ne restano).
+
+**Refactoring abilitante**: `computePlayerStats(side, match)`, `exportMatchPdf`
+e `exportMatchXlsx` accettano ora una partita qualsiasi e, con `asBase64`,
+restituiscono `{filename, mimeType, dataBase64}` invece di scaricare il file.
+
+**Autorizzazione — passo a carico di Max, PRIMA di pubblicare**: nell'editor
+Apps Script eseguire una volta `testInvioEmail()` e concedere il permesso di
+inviare email; solo dopo pubblicare la nuova versione sui 3 deployment. Il
+codice v5 è già salvato nell'editor, i deployment sono ancora alla versione 13.
+
+24 test automatici sull'aggregazione (squadra dedotta, casa/trasferta, bilancio,
+gol nostri vs avversari, assist, presenze, minuti, ordinamento, stati vuoti,
+escape HTML): tutti verdi.
+
+### v3.5 — Messaggi d'errore leggibili a bordo campo (13/09/2026)
+L'OCR mostrava il JSON grezzo dell'API. `humanOcrError()` traduce ora i casi
+noti in una frase con la contromossa: credito API esaurito, rate limit, chiave
+rifiutata o mancante, cartella Drive non trovata, rete assente, URL backend non
+impostato. Quando l'OCR non è disponibile il messaggio ricorda che si può
+compilare la rosa a mano con "+ Aggiungi calciatrice".
+
+**Nota operativa (13/09/2026)**: il credito dell'account API Anthropic collegato
+a `CLAUDE_API_KEY` si è esaurito → `invalid_request_error: Your credit balance is
+too low`. È un fatto di fatturazione, non un difetto dell'app: si ricarica su
+console.anthropic.com → Plans & Billing (account **API**, diverso
+dall'abbonamento Claude). Costo indicativo: ~$0,04 per distinta da foto,
+sensibilmente meno da PDF.
 
 ### v3.4 — Cronometro: bug del blocco, conto alla rovescia, recupero (13/09/2026)
 
@@ -233,6 +295,9 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.3: il nome squadra letto dall'OCR sovrascrive sempre il campo |
 | 13/09/2026 | Frontend v3.3: safe-area iOS — l'indicatore Home non copre più "Termina partita" |
 | 13/09/2026 | Frontend v3.4: risolto il blocco del cronometro dopo ogni evento; aggiunti conto alla rovescia e minuti di recupero |
+| 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
+| 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
+| 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
 | 12/09/2026 | Backend v4 deployato (versione 11) sui 3 deployment attivi; scope `drive.readonly` aggiunto a `appsscript.json`; test end-to-end su PDF Drive: 20/20 |
 | 12/09/2026 | Mockup restyling UX pubblicato (5 artboard, 2 direzioni per il match live); palette di stato validata per daltonismo → colore sempre con icona + etichetta |
 
@@ -272,7 +337,9 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [x] Test end-to-end `driveList` + `driveOcr` su PDF reale: 20/20 (22:20)
 - [x] Frontend v3.2 pushato e online (rose a 4 colonne + pulsante Drive)
 - [x] Backend v4.1 (versione 12) e v4.2 (versione 13) sui 3 deployment, testate
-- [ ] **A carico di Max**: `git add -A && git commit && git push origin main` per il frontend v3.4 (safe-area + nome squadra + cronometro)
+- [ ] **A carico di Max**: ricaricare il credito API su console.anthropic.com → Settings → Billing (l'OCR è fermo finché non lo fai)
+- [ ] **A carico di Max**: eseguire `testInvioEmail()` nell'editor Apps Script e autorizzare l'invio email, **poi** pubblicare la versione 14 sui 3 deployment
+- [ ] **A carico di Max**: `git add -A && git commit && git push origin main` per il frontend v3.6
 - [ ] Prova sul campo: far girare il cronometro, registrare un goal, verificare che il tempo non si fermi; inserire 3' di recupero e controllare il conto alla rovescia
 - [ ] Dopo il push: sull'iPad chiudere e riaprire l'app, poi provare "Carica file" → deve comparire l'elenco delle distinte (GitHub Pages ridistribuisce in 1–2 minuti), poi sull'iPad chiudere e riaprire l'app
 - [ ] Test reale sull'iPad con la distinta cartacea del 13/09/2026 (foto in verticale, foglio che riempie il frame): confrontare i nomi con la distinta

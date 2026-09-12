@@ -935,10 +935,43 @@ async function handleOcr(input, side) {
 
     setTimeout(() => progressEl.classList.remove('active'), 8000);
   } catch (e) {
-    progressEl.innerHTML = '❌ ' + (e.message || e);
+    progressEl.innerHTML = '❌ ' + humanOcrError(e.message || e);
     setTimeout(() => progressEl.classList.remove('active'), 6000);
   }
   input.value = '';
+}
+
+/*
+ * Traduce gli errori tecnici (JSON dell'API, errori di rete) in un messaggio
+ * comprensibile a bordo campo, con la contromossa da fare subito.
+ */
+function humanOcrError(raw) {
+  const msg = String(raw && raw.message ? raw.message : raw || '');
+  const hint = t => '<br><span style="color:#b8d4ed;font-weight:600">' + t + '</span>';
+  const manuale = ' Intanto puoi inserire le calciatrici a mano con "+ Aggiungi calciatrice".';
+  if (/credit balance is too low|insufficient.*credit/i.test(msg)) {
+    return 'Credito API Anthropic esaurito: l\'OCR non puo\' funzionare.'
+      + hint('Ricarica il credito su console.anthropic.com → Plans & Billing.' + manuale);
+  }
+  if (/rate.?limit|429|overloaded|529/i.test(msg)) {
+    return 'API momentaneamente sovraccarica.' + hint('Aspetta una decina di secondi e riprova.');
+  }
+  if (/401|authentication_error|invalid x-api-key|permission_error/i.test(msg)) {
+    return 'Chiave API rifiutata.' + hint('Controlla CLAUDE_API_KEY nelle Script Properties del backend.' + manuale);
+  }
+  if (/API Key Claude non configurata/i.test(msg)) {
+    return 'Chiave API non configurata nel backend.' + hint('Impostala in Script Properties come CLAUDE_API_KEY.' + manuale);
+  }
+  if (/non trovata su Drive/i.test(msg)) {
+    return 'Cartella "Distinte" non trovata su Google Drive.' + hint('Usa "Sfoglia dal dispositivo" oppure controlla il percorso della cartella.');
+  }
+  if (/Failed to fetch|NetworkError|Load failed|network/i.test(msg)) {
+    return 'Nessuna risposta dal backend.' + hint('Controlla la connessione dell\'iPad.' + manuale);
+  }
+  if (/Configura prima l/i.test(msg)) {
+    return 'URL del backend non impostato.' + hint('Impostalo in ⚙️ Impostazioni.');
+  }
+  return escapeHtml(msg);
 }
 
 /* Applica al roster il JSON restituito dal backend (foto, file locale o Drive) */
@@ -1099,7 +1132,7 @@ async function pickDriveFile(fileId, fileName) {
     }
     setTimeout(() => progressEl.classList.remove('active'), 8000);
   } catch (e) {
-    progressEl.innerHTML = '❌ ' + (e.message || e);
+    progressEl.innerHTML = '❌ ' + humanOcrError(e.message || e);
     setTimeout(() => progressEl.classList.remove('active'), 6000);
   }
 }
@@ -1139,7 +1172,7 @@ async function handleLocalPick(input) {
     applyOcrResult(await res.json(), side, progressEl);
     setTimeout(() => progressEl.classList.remove('active'), 8000);
   } catch (e) {
-    progressEl.innerHTML = '❌ ' + (e.message || e);
+    progressEl.innerHTML = '❌ ' + humanOcrError(e.message || e);
     setTimeout(() => progressEl.classList.remove('active'), 6000);
   }
   input.value = '';
