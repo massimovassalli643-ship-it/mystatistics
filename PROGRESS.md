@@ -78,9 +78,34 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 12/09/2026 | Frontend: pre-elaborazione immagine (pagina intera + 4 strisce ad alta risoluzione, contrasto), dedup, costo aggiornato |
 | 12/09/2026 | Test end-to-end con distinta sintetica: 20/20 |
 | 12/09/2026 | Creati PROGRESS.md e CLAUDE.md |
+| 12/09/2026 | Mockup restyling UX pubblicato (5 artboard, 2 direzioni per il match live); palette di stato validata per daltonismo → colore sempre con icona + etichetta |
+
+## Restyling UX — in corso (12/09/2026)
+Max ha chiesto "migliorie ovunque nel look & feel". Mockup pubblicato come canvas
+Claude ("My Statistics Restyling") con 5 artboard 1180×820 (iPad landscape):
+- **Match live**, in DUE direzioni alternative da scegliere:
+  - A "Notturno da bordo campo": blu notte #0B1730, rosso Fiamma Monza #E0202F
+    come unico accento di comando, tipografia condensata (Barlow Condensed),
+    5 pulsanti azione a superficie piena colorata
+  - B "Referto di carta": fondo avorio #F4F1EA, struttura da documento federale,
+    colore solo come codifica sul bordo inferiore dei pulsanti
+- **Home**: card rossa con la prossima gara, 4 KPI di stagione, storico con
+  stato di sincronizzazione visibile per partita
+- **Setup**: indicatore di passo 1-2-3, "Scatta foto" con precedenza visiva,
+  nomi OCR incerti bordati di giallo con etichetta DA VERIFICARE
+- **Referto**: tabella statistiche con tabular-nums, marcatrici, cronologia,
+  4 export con gerarchia (Sincronizza Sheets come azione primaria)
+
+Palette di stato (gol/ammonizione/espulsione/cambio): verde #2ED573,
+giallo #FFD23F, rosso #FF4757, azzurro #4DA3FF. Verificata con il validatore
+colore: sotto protanopia verde e giallo hanno ΔE 7.1 (sotto la soglia 8), quindi
+**ogni colore deve sempre viaggiare con icona + etichetta testuale** — mai colore
+da solo. Nei mockup è già così.
+
+Nessuna modifica al codice finché Max non scegle la direzione.
 
 ## Roadmap / backlog
-- [ ] **Miglioramento UX** (richiesta 12/09/2026): mockup con la skill di design, poi implementazione — da definire con Max quali schermate/priorità
+- [ ] **Restyling UX**: scelta direzione A o B da parte di Max, poi implementazione in `index.html` (solo CSS + markup, nessuna modifica alla logica)
 - [ ] Dalla documentazione (2.10): statistiche stagionali aggregate, check-list pre-partita, confronto formazioni, sharing veloce PDF via WhatsApp/email dal Summary, multi-stagione, modalità coach
 - [ ] Valutare: selezione automatica del ritaglio colonne anche per foto orizzontali; anteprima delle strisce prima dell'invio
 
