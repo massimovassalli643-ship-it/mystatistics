@@ -67,7 +67,24 @@ che gira con l'account Google di Max:
 - La cartella è risolta per percorso (My Drive → From Dropbox → CI Fiamma monza
   prima squadra → Distinte) e l'ID viene messo in cache in `DISTINTE_FOLDER_ID`.
 
-**Autorizzazione Drive — passo a carico di Max, da fare PRIMA di pubblicare**:
+**Autorizzazione Drive — FATTA il 12/09/2026 alle 22:13** (`testDriveDistinte`
+eseguita da Max, consenso `drive.readonly` concesso; log: `Cartella trovata:
+Distinte (id 1FNK8xUBjx8RyjX5vBkW9e1eG9KLA8Ue0)`). Lo scope è dichiarato
+esplicitamente in `appsscript.json`, quindi va tenuto lì: senza quella riga
+`DriveApp` fallisce anche con il consenso concesso.
+
+**Deployment**: versione 11 pubblicata sui **3** deployment attivi il 12/09/2026
+alle 22:16, tutti rinominati "v4 Drive Distinte + OCR PDF (12/09/2026)".
+
+**Test end-to-end (12/09/2026, 22:20)** — `driveList` + `driveOcr` sul PDF
+"fiamma monza uesse sarnico.pdf" della cartella Drive: cartella elencata
+correttamente, `pdfReceived: true`, `rowsCounted: 20`, **20/20 calciatrici** con
+numero di maglia, cognome/nome e data di nascita corretti, `teamName` =
+"A.S.D. FIAMMA MONZA 1970". Nota: sulla distinta digitale il portiere non è
+marcato "(P)", quindi `role` torna vuoto per tutte — si imposta a partita in
+corso dalla modale Atleta.
+
+Nota storica (procedura da ripetere a ogni nuovo scope):
 il backend v4 aggiunge lo scope `drive.readonly`. Nell'editor Apps Script
 eseguire una volta `testDriveDistinte()` e accettare la richiesta di accesso a
 Drive; solo dopo pubblicare la nuova versione sui 3 deployment attivi. (Se si
@@ -136,6 +153,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 12/09/2026 | Creati PROGRESS.md e CLAUDE.md |
 | 12/09/2026 | v3.2 frontend: rose a 4 colonne (N° · Cognome e nome · Data nascita · ✕/M/✓), riga in sola lettura con modifica esplicita; colonna Ruolo rimossa dalla UI (campo mantenuto nel modello) |
 | 12/09/2026 | v3.2: "Carica file" apre l'elenco della cartella Drive "Distinte" (backend `driveList`/`driveOcr`), PDF letti direttamente dal backend; ripiego "Sfoglia dal dispositivo" |
+| 12/09/2026 | Backend v4 deployato (versione 11) sui 3 deployment attivi; scope `drive.readonly` aggiunto a `appsscript.json`; test end-to-end su PDF Drive: 20/20 |
 | 12/09/2026 | Mockup restyling UX pubblicato (5 artboard, 2 direzioni per il match live); palette di stato validata per daltonismo → colore sempre con icona + etichetta |
 
 ## Restyling UX — in corso (12/09/2026)
@@ -168,8 +186,11 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [ ] Valutare: selezione automatica del ritaglio colonne anche per foto orizzontali; anteprima delle strisce prima dell'invio
 
 ## Da verificare
-- [ ] **A carico di Max, nell'ordine**: 1) incollare `backend/Code.gs` v4 nell'editor Apps Script e salvare; 2) eseguire `testDriveDistinte()` e autorizzare l'accesso a Drive; 3) pubblicare la nuova versione sui **3** deployment attivi; 4) `git push origin main`
-- [ ] Test: "Carica file" → deve elencare le distinte della cartella Drive; scegliere un PDF e verificare i 3 campi estratti
-- [ ] **A carico di Max**: `git push origin main` (GitHub Pages ridistribuisce in 1–2 minuti), poi sull'iPad chiudere e riaprire l'app
+- [x] Backend v4 nell'editor, salvato (12/09/2026 22:10)
+- [x] `testDriveDistinte()` eseguita e accesso a Drive autorizzato (22:13)
+- [x] Versione 11 pubblicata sui 3 deployment attivi (22:16)
+- [x] Test end-to-end `driveList` + `driveOcr` su PDF reale: 20/20 (22:20)
+- [ ] **A carico di Max**: `git add -A && git commit && git push origin main` — finché non lo fai, il frontend v3.2 (rose a 4 colonne + pulsante Drive) non è online su GitHub Pages
+- [ ] Dopo il push: sull'iPad chiudere e riaprire l'app, poi provare "Carica file" → deve comparire l'elenco delle distinte (GitHub Pages ridistribuisce in 1–2 minuti), poi sull'iPad chiudere e riaprire l'app
 - [ ] Test reale sull'iPad con la distinta cartacea del 13/09/2026 (foto in verticale, foglio che riempie il frame): confrontare i nomi con la distinta
 - [ ] Se un nome esce con `?`: è voluto (carattere ambiguo) — correggere inline, non è un errore dell'app

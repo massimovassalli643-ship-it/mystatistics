@@ -1,5 +1,6 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v4.1 (12/09/2026): teamName letto dall'intestazione (non dalla riga della gara)
 // v4 (12/09/2026): distinte dalla cartella Google Drive + OCR di PDF
 // v3 (12/09/2026): OCR multi-immagine (pagina intera + strisce ad alta risoluzione)
 // ============================================
@@ -101,23 +102,28 @@ function handleOcrRequest(payload) {
   prompt += '3. NON correggere errori di battitura presunti. La distinta dice cio che dice.\n';
   prompt += '4. NON inventare nomi. Se non leggi una riga, scrivi "ILLEGGIBILE" nel campo name. Un nome inventato e un errore grave; un "?" e accettabile.\n';
   prompt += '5. Mantieni MAIUSCOLO esattamente come nella distinta.\n\n';
+  prompt += 'DOVE STA IL NOME DELLA SQUADRA (leggi con attenzione):\n';
+  prompt += 'In alto, sotto la scritta "F.I.G.C. - LEGA NAZIONALE DILETTANTI", c\'e una riga in grassetto con il numero di matricola della societa seguito dal nome della squadra che presenta la distinta, per esempio: "953833 A.S.D. FIAMMA MONZA 1970".\n';
+  prompt += 'teamName = SOLO quel nome, senza il numero di matricola iniziale, quindi "A.S.D. FIAMMA MONZA 1970".\n';
+  prompt += 'PIU SOTTO c\'e la riga "Distinta dei/delle giocatori/trici partecipanti alla gara" seguita da DUE squadre separate da un trattino (es. "A.S.D. FIAMMA MONZA 1970 - C.S.D. UESSE SARNICO 1908 (A)"): quella riga indica la PARTITA, NON e il nome squadra. NON usarla MAI.\n';
+  prompt += 'CONTROLLO FINALE: se in teamName ti ritrovi due nomi separati da un trattino, oppure "(A)" o "(C)" in fondo, hai letto la riga sbagliata: torna in cima alla pagina e prendi la riga con la matricola.\n\n';
   prompt += 'STRUTTURA DISTINTA FIGC:\n';
   prompt += 'Tabella con colonne (da sinistra a destra): N del Ruolo (numero maglia, spesso vuoto), Data di nascita, Cognome e nome, Capitano/V.Cap (lettera C o V se presente), N. Matricola FIGC, Tipo documento, Numero documento, Rilasciato da.\n';
   prompt += 'Sotto la colonna "Cognome e nome" puo apparire "(P)" = Portiere.\n\n';
   prompt += 'OUTPUT - SOLO QUESTO JSON, niente altro:\n';
   prompt += '{\n';
-  prompt += '  "teamName": "NOME SQUADRA ESATTO dal titolo della distinta",\n';
+  prompt += '  "teamName": "<una sola squadra, dall intestazione in alto, senza matricola e senza avversaria>",\n';
   prompt += '  "rowsCounted": <numero di righe con cognome contate nella pagina intera>,\n';
   prompt += '  "players": [\n';
   prompt += '    {"num": <numero maglia colonna N del Ruolo, oppure null se vuoto>, "birthDate": "<GG/MM/AAAA come scritto>", "name": "<COGNOME NOME esatto>", "role": "<GK se (P), altrimenti stringa vuota>"}\n';
   prompt += '  ]\n';
   prompt += '}\n\n';
   prompt += 'NOTE:\n';
-  prompt += '- num = numero maglia (colonna "N del Ruolo"), NON il numero di riga; se la cella e vuota, null.\n';
+  prompt += '- num = il valore scritto nella PRIMA colonna a sinistra, intestata "N del Ruolo": e il numero di maglia della calciatrice. Copialo esattamente come e scritto sulla sua riga. Se la cella e davvero vuota, null; non inventare una numerazione progressiva tua.\n';
   prompt += '- Includi SOLO righe con un cognome scritto, nell\'ordine della distinta. Salta righe completamente vuote.\n';
   prompt += '- Salta righe Assistente, Dirigente, Allenatore, Massaggiatore, Medico in fondo.\n';
   prompt += '- Non aggiungere ruoli DEF/MID/FWD/LM da te: la distinta FIGC non li indica, quindi role="" per chi non ha (P).\n';
-  prompt += '- teamName: prendi dal titolo in alto della distinta, es. "CITTA DI BRUGHERIO" o "A.S.D. FIAMMA MONZA 1970".\n\n';
+  prompt += '- teamName: UNA sola squadra, dalla riga con la matricola in cima alla pagina, es. "A.S.D. FIAMMA MONZA 1970" o "CITTA DI BRUGHERIO". Mai due nomi, mai con il trattino.\n\n';
   prompt += 'Restituisci SOLO il JSON valido, senza commenti, senza markdown, senza backtick.';
 
   var content = [];
