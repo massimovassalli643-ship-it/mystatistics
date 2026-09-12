@@ -121,14 +121,43 @@
   .ocr-progress { font-size: 12px; color: #ffb84d; margin-bottom: 10px; padding: 8px; background: rgba(255,184,77,0.1); border-radius: 6px; text-align: center; display: none; }
   .ocr-progress.active { display: block; }
   .roster-list { max-height: 320px; overflow-y: auto; margin-bottom: 10px; }
-  .roster-list-header { display: grid; grid-template-columns: 48px 1fr 70px 32px; gap: 6px; padding: 0 4px 6px; font-size: 10px; color: #5a7793; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-  .roster-row { display: grid; grid-template-columns: 48px 1fr 70px 32px; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .roster-list-header { display: grid; grid-template-columns: 56px 1fr 108px 104px; gap: 6px; padding: 0 4px 6px; font-size: 10px; color: #5a7793; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+  .roster-row { display: grid; grid-template-columns: 56px 1fr 108px 104px; gap: 6px; margin-bottom: 6px; align-items: center; }
   .roster-row input, .roster-row select { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 8px 8px; border-radius: 6px; font-size: 12px; width: 100%; }
   .roster-row select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='%237fb8ff' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 6px center; background-size: 8px; padding-right: 20px; font-weight: 700; }
   .roster-row input:focus, .roster-row select:focus { border-color: #7fb8ff; }
   .roster-row input.num { text-align: center; font-weight: 700; }
   .remove-row { background: rgba(220,53,69,0.2); color: #ff6b7a; border-radius: 6px; padding: 6px 0; font-size: 14px; font-weight: 700; }
   .add-row-btn { width: 100%; background: rgba(127,184,255,0.1); color: #7fb8ff; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600; border: 1px dashed rgba(127,184,255,0.3); }
+
+  /* Rose calciatrici: riga in sola lettura (X elimina, M modifica) o in modifica (X elimina, spunta conferma) */
+  .roster-row .cell { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 9px 10px; font-size: 12px; font-weight: 600; color: #e8f0f7; min-height: 36px; display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .roster-row .cell.num { justify-content: center; font-weight: 800; color: #ffb84d; }
+  .roster-row .cell.birth { justify-content: center; font-variant-numeric: tabular-nums; color: #b8d4ed; }
+  .roster-row .cell-empty { color: #5a7793; font-weight: 500; }
+  .roster-row.uncertain .cell.name { border-color: #f1c40f; }
+  .verify-tag { margin-left: auto; font-size: 9px; font-weight: 800; letter-spacing: 0.5px; color: #f1c40f; flex-shrink: 0; }
+  .roster-row.editing .cell-input { background: rgba(0,0,0,0.35); border: 1.5px solid #7fb8ff; color: #fff; border-radius: 6px; padding: 8px 10px; font-size: 12px; font-weight: 600; width: 100%; min-height: 36px; }
+  .roster-row.editing .cell-input.num { text-align: center; font-weight: 800; }
+  .row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .row-btn { border-radius: 6px; min-height: 36px; font-size: 14px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+  .row-btn.del { background: rgba(220,53,69,0.18); color: #ff6b7a; }
+  .row-btn.edit { background: rgba(241,196,15,0.18); color: #f1c40f; }
+  .row-btn.ok { background: rgba(46,204,113,0.20); color: #2ecc71; }
+  .row-btn:active { transform: scale(0.94); }
+
+  /* Elenco distinte su Google Drive */
+  .drive-path { font-size: 11px; color: #7a96b3; background: rgba(0,0,0,0.25); border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; word-break: break-all; }
+  .drive-status { font-size: 12px; color: #ffb84d; margin-bottom: 10px; }
+  .drive-list { display: flex; flex-direction: column; gap: 8px; max-height: 46vh; overflow-y: auto; }
+  .drive-item { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; text-align: left; width: 100%; color: #e8f0f7; }
+  .drive-item:active { background: rgba(255,255,255,0.1); }
+  .drive-item .kind { font-size: 10px; font-weight: 800; letter-spacing: 0.5px; padding: 4px 7px; border-radius: 4px; flex-shrink: 0; }
+  .drive-item .kind.pdf { background: rgba(231,76,60,0.18); color: #ff8a80; }
+  .drive-item .kind.img { background: rgba(127,184,255,0.18); color: #7fb8ff; }
+  .drive-item .meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .drive-item .fname { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .drive-item .fdate { font-size: 11px; color: #7a96b3; }
   .setup-footer { margin-top: 24px; display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; }
 
   #lineup-screen { flex-direction: column; padding: 20px 30px; overflow-y: auto; }
@@ -293,14 +322,13 @@
               <span><span class="icon-big">📷</span>Scatta foto</span>
               <input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleOcr(this, 'home')">
             </label>
-            <label class="ocr-upload">
-              <span><span class="icon-big">📁</span>Carica file</span>
-              <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp" style="display:none" onchange="handleOcr(this, 'home')">
-            </label>
+            <button class="ocr-upload" onclick="openDriveModal('home')">
+              <span><span class="icon-big">📁</span>Carica file<br><span style="font-size:10px;opacity:0.75">Drive · Distinte</span></span>
+            </button>
           </div>
           <div class="ocr-progress" id="ocr-progress-home"></div>
           <div class="roster-list-header">
-            <span>N°</span><span>COGNOME E NOME</span><span>RUOLO</span><span></span>
+            <span>N°</span><span>COGNOME E NOME</span><span style="text-align:center">DATA NASCITA</span><span style="text-align:center">AZIONI</span>
           </div>
           <div class="roster-list" id="roster-list-home"></div>
           <button class="add-row-btn" onclick="addRosterRow('home')">+ Aggiungi calciatrice</button>
@@ -315,14 +343,13 @@
               <span><span class="icon-big">📷</span>Scatta foto</span>
               <input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleOcr(this, 'away')">
             </label>
-            <label class="ocr-upload">
-              <span><span class="icon-big">📁</span>Carica file</span>
-              <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp" style="display:none" onchange="handleOcr(this, 'away')">
-            </label>
+            <button class="ocr-upload" onclick="openDriveModal('away')">
+              <span><span class="icon-big">📁</span>Carica file<br><span style="font-size:10px;opacity:0.75">Drive · Distinte</span></span>
+            </button>
           </div>
           <div class="ocr-progress" id="ocr-progress-away"></div>
           <div class="roster-list-header">
-            <span>N°</span><span>COGNOME E NOME</span><span>RUOLO</span><span></span>
+            <span>N°</span><span>COGNOME E NOME</span><span style="text-align:center">DATA NASCITA</span><span style="text-align:center">AZIONI</span>
           </div>
           <div class="roster-list" id="roster-list-away"></div>
           <button class="add-row-btn" onclick="addRosterRow('away')">+ Aggiungi calciatrice</button>
@@ -494,6 +521,21 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="drive-modal">
+  <div class="modal" style="max-width: 620px;">
+    <div class="modal-title">📁 Distinte su Google Drive</div>
+    <div class="drive-path" id="drive-path">My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte</div>
+    <div class="drive-status" id="drive-status"></div>
+    <div class="drive-list" id="drive-list"></div>
+    <div class="modal-footer">
+      <button class="modal-btn cancel" onclick="closeModal('drive-modal')">Annulla</button>
+      <label class="modal-btn confirm" style="cursor:pointer">Sfoglia dal dispositivo
+        <input type="file" id="drive-local-input" accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf" style="display:none" onchange="handleLocalPick(this)">
+      </label>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="settings-modal">
   <div class="modal">
     <div class="modal-title">⚙️ Impostazioni</div>
@@ -525,7 +567,10 @@ const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
 
 let state = {
   currentMatch: null,
-  timer: { running: false, elapsedMs: 0, periodIndex: 0, startTimestamp: null, intervalId: null }
+  timer: { running: false, elapsedMs: 0, periodIndex: 0, startTimestamp: null, intervalId: null },
+  // Righe rosa in modifica: { home: { <indice>: {num, name, birthDate} }, away: {...} }
+  rosterEdit: { home: {}, away: {} },
+  driveSide: 'home'
 };
 
 function loadMatches() {
@@ -584,8 +629,8 @@ function openMatch(id) {
   const m = loadMatches().find(x => x.id === id);
   if (!m) return;
   if (!m.lineup) m.lineup = { home: [], away: [] };
-  m.home.roster.forEach(p => { if (!p.role) p.role = ''; });
-  m.away.roster.forEach(p => { if (!p.role) p.role = ''; });
+  m.home.roster.forEach(p => { if (!p.role) p.role = ''; if (p.birthDate == null) p.birthDate = ''; });
+  m.away.roster.forEach(p => { if (!p.role) p.role = ''; if (p.birthDate == null) p.birthDate = ''; });
   state.currentMatch = m;
   if (m.completed) renderSummary();
   else { renderMatchScreen(); showScreen('match-screen'); }
@@ -609,33 +654,95 @@ function startNewMatch() {
   showScreen('setup-screen');
 }
 
+/*
+ * Rosa calciatrici (v3.2, 12/09/2026) — 4 colonne:
+ *   N° maglia · Cognome e nome · Data di nascita · azioni
+ * La riga è in SOLA LETTURA per default (niente modifiche accidentali a bordo campo):
+ *   ✕ rossa   elimina la riga
+ *   M gialla  apre la riga in modifica (i 3 campi diventano testo libero)
+ *   ✓ verde   conferma l'inserimento manuale o la modifica
+ * Il ruolo (GK/DEF/MID/FWD/LM) non è più una colonna della rosa — la distinta FIGC
+ * non lo riporta — ma resta nel modello dati: lo imposta l'OCR per i portieri "(P)"
+ * e la modale "Atleta" durante la partita, e continua ad alimentare l'ordinamento
+ * della formazione e la colonna Ruolo negli export.
+ */
+function isRosterRowEditing(side, idx) {
+  return Object.prototype.hasOwnProperty.call(state.rosterEdit[side], String(idx));
+}
+function rosterRowHtml(side, i, p) {
+  if (isRosterRowEditing(side, i)) {
+    const d = state.rosterEdit[side][String(i)];
+    return `
+    <div class="roster-row editing">
+      <input class="cell-input num" type="text" inputmode="numeric" value="${escapeHtml(d.num == null ? '' : String(d.num))}" placeholder="N°" oninput="updateRosterDraft('${side}', ${i}, 'num', this.value)">
+      <input class="cell-input" type="text" value="${escapeHtml(d.name || '')}" placeholder="COGNOME E NOME" oninput="updateRosterDraft('${side}', ${i}, 'name', this.value)">
+      <input class="cell-input" type="text" inputmode="numeric" value="${escapeHtml(d.birthDate || '')}" placeholder="GG/MM/AAAA" oninput="updateRosterDraft('${side}', ${i}, 'birthDate', this.value)">
+      <div class="row-actions">
+        <button class="row-btn del" title="Elimina riga" onclick="removeRosterRow('${side}', ${i})">✕</button>
+        <button class="row-btn ok" title="Conferma" onclick="confirmRosterRow('${side}', ${i})">✓</button>
+      </div>
+    </div>`;
+  }
+  const uncertain = /\?|ILLEGGIBILE/.test(p.name || '');
+  const nameCell = p.name
+    ? escapeHtml(p.name) + (uncertain ? '<span class="verify-tag">DA VERIFICARE</span>' : '')
+    : '<span class="cell-empty">— da compilare —</span>';
+  return `
+    <div class="roster-row${uncertain ? ' uncertain' : ''}">
+      <div class="cell num">${p.num == null || p.num === '' ? '—' : escapeHtml(String(p.num))}</div>
+      <div class="cell name">${nameCell}</div>
+      <div class="cell birth">${p.birthDate ? escapeHtml(p.birthDate) : '<span class="cell-empty">—</span>'}</div>
+      <div class="row-actions">
+        <button class="row-btn del" title="Elimina riga" onclick="removeRosterRow('${side}', ${i})">✕</button>
+        <button class="row-btn edit" title="Modifica i 3 campi" onclick="editRosterRow('${side}', ${i})">M</button>
+      </div>
+    </div>`;
+}
 function renderRoster(side) {
   const roster = state.currentMatch[side].roster;
   const list = document.getElementById('roster-list-' + side);
-  list.innerHTML = roster.map((p, i) => `
-    <div class="roster-row">
-      <input type="number" class="num" value="${p.num ?? ''}" onchange="updateRoster('${side}', ${i}, 'num', this.value)" placeholder="N°">
-      <input type="text" value="${escapeHtml(p.name || '')}" onchange="updateRoster('${side}', ${i}, 'name', this.value)" placeholder="Cognome Nome">
-      <select onchange="updateRoster('${side}', ${i}, 'role', this.value)">
-        <option value="" ${!p.role ? 'selected' : ''}>—</option>
-        ${ROLES.map(r => `<option value="${r}" ${p.role === r ? 'selected' : ''}>${r}</option>`).join('')}
-      </select>
-      <button class="remove-row" onclick="removeRosterRow('${side}', ${i})">×</button>
-    </div>
-  `).join('');
+  list.innerHTML = roster.map((p, i) => rosterRowHtml(side, i, p)).join('');
   document.getElementById('roster-' + side + '-count').textContent = roster.length + ' atlet' + (roster.length === 1 ? 'a' : 'e');
 }
-function updateRoster(side, idx, field, value) {
-  state.currentMatch[side].roster[idx][field] = field === 'num'
-    ? (value === '' ? null : parseInt(value))
-    : value;
+function editRosterRow(side, idx) {
+  const p = state.currentMatch[side].roster[idx];
+  if (!p) return;
+  state.rosterEdit[side][String(idx)] = { num: p.num, name: p.name || '', birthDate: p.birthDate || '' };
+  renderRoster(side);
+}
+function updateRosterDraft(side, idx, field, value) {
+  const d = state.rosterEdit[side][String(idx)];
+  if (!d) return;
+  d[field] = value;
+}
+function confirmRosterRow(side, idx) {
+  const d = state.rosterEdit[side][String(idx)];
+  const p = state.currentMatch[side].roster[idx];
+  if (!d || !p) return;
+  const rawNum = String(d.num == null ? '' : d.num).replace(/\D/g, '');
+  p.num = rawNum === '' ? null : parseInt(rawNum, 10);
+  p.name = (d.name || '').trim();
+  p.birthDate = (d.birthDate || '').trim();
+  delete state.rosterEdit[side][String(idx)];
+  persistCurrent();
+  renderRoster(side);
 }
 function addRosterRow(side) {
-  state.currentMatch[side].roster.push({ num: null, name: '', role: '' });
+  const roster = state.currentMatch[side].roster;
+  roster.push({ num: null, name: '', role: '', birthDate: '' });
+  // La riga nuova nasce già in modifica: l'inserimento manuale parte subito
+  state.rosterEdit[side][String(roster.length - 1)] = { num: null, name: '', birthDate: '' };
   renderRoster(side);
 }
 function removeRosterRow(side, idx) {
+  const p = state.currentMatch[side].roster[idx];
+  const hasContent = p && ((p.name && p.name.trim()) || p.num != null || (p.birthDate && p.birthDate.trim()));
+  const draft = state.rosterEdit[side][String(idx)];
+  const draftHasContent = draft && ((draft.name && draft.name.trim()) || (draft.num != null && String(draft.num) !== '') || (draft.birthDate && String(draft.birthDate).trim()));
+  if ((hasContent || draftHasContent) && !confirm('Eliminare questa riga dalla rosa?')) return;
   state.currentMatch[side].roster.splice(idx, 1);
+  state.rosterEdit[side] = {};
+  persistCurrent();
   renderRoster(side);
 }
 
@@ -773,9 +880,20 @@ async function handleOcr(input, side) {
     });
 
     const result = await response.json();
+    applyOcrResult(result, side, progressEl);
 
-    if (!result.ok) {
-      throw new Error(result.error || 'Errore sconosciuto dal backend');
+    setTimeout(() => progressEl.classList.remove('active'), 8000);
+  } catch (e) {
+    progressEl.innerHTML = '❌ ' + (e.message || e);
+    setTimeout(() => progressEl.classList.remove('active'), 6000);
+  }
+  input.value = '';
+}
+
+/* Applica al roster il JSON restituito dal backend (foto, file locale o Drive) */
+function applyOcrResult(result, side, progressEl) {
+    if (!result || !result.ok) {
+      throw new Error((result && result.error) || 'Errore sconosciuto dal backend');
     }
 
     const players = (result.players || []).filter(p => p.name && p.name.trim());
@@ -798,12 +916,15 @@ async function handleOcr(input, side) {
         formatted.push({
           num: p.num != null && p.num !== '' ? parseInt(p.num) : null,
           name: (p.name || '').trim(),
+          birthDate: (p.birthDate || '').trim(),
           role: ['GK', 'DEF', 'MID', 'FWD', 'LM'].includes(p.role) ? p.role : ''
         });
       });
 
       const existing = state.currentMatch[side].roster.filter(p => p.num || p.name);
       state.currentMatch[side].roster = [...existing, ...formatted];
+      state.rosterEdit[side] = {};   // le righe dall'OCR nascono in sola lettura
+      persistCurrent();
       renderRoster(side);
 
       let costInfo = '';
@@ -819,7 +940,148 @@ async function handleOcr(input, side) {
         + (dubbi ? ' • ⚠️ ' + dubbi + ' da verificare' : '')
         + costInfo;
     }
+}
 
+/* ==================== Distinte da Google Drive ==================== */
+/*
+ * Un'app web non può aprire una cartella locale (né G:\My Drive\... su Windows,
+ * che sull'iPad non esiste): il browser non consente di scegliere la cartella di
+ * partenza del selettore file. La cartella Drive viene quindi letta dal backend
+ * Apps Script, che gira con l'account di Max e ha accesso al suo Drive:
+ *   action 'driveList' → elenco dei file in "Distinte" (dal più recente)
+ *   action 'driveOcr'  → PDF letto direttamente dal backend (distinta digitale FIGC),
+ *                        immagine restituita al client per il ritaglio in strisce
+ */
+const DRIVE_PATH_LABEL = 'My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte';
+
+function openDriveModal(side) {
+  state.driveSide = side;
+  document.getElementById('drive-path').textContent = DRIVE_PATH_LABEL;
+  document.getElementById('drive-list').innerHTML = '';
+  document.getElementById('drive-status').textContent = '⏳ Lettura della cartella su Drive...';
+  document.getElementById('drive-modal').classList.add('active');
+  fetchDriveList();
+}
+
+async function fetchDriveList() {
+  const statusEl = document.getElementById('drive-status');
+  const listEl = document.getElementById('drive-list');
+  const sheetsUrl = getSheetsUrl();
+  if (!sheetsUrl) {
+    statusEl.innerHTML = '⚠️ Configura prima l\'URL del backend in ⚙️ Impostazioni';
+    return;
+  }
+  try {
+    const res = await fetch(sheetsUrl, {
+      method: 'POST', mode: 'cors', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'driveList' })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Errore dal backend');
+    const files = data.files || [];
+    if (data.folderPath) document.getElementById('drive-path').textContent = data.folderPath;
+    if (files.length === 0) {
+      statusEl.textContent = 'La cartella Distinte è vuota (o non contiene PDF/immagini).';
+      return;
+    }
+    statusEl.textContent = files.length + ' distinte trovate · tocca quella da caricare';
+    listEl.innerHTML = files.map(f => {
+      const isPdf = (f.mimeType || '').indexOf('pdf') >= 0;
+      return `
+        <button class="drive-item" onclick="pickDriveFile('${f.id}', ${JSON.stringify(f.name).replace(/"/g, '&quot;')})">
+          <span class="kind ${isPdf ? 'pdf' : 'img'}">${isPdf ? 'PDF' : 'FOTO'}</span>
+          <span class="meta">
+            <span class="fname">${escapeHtml(f.name)}</span>
+            <span class="fdate">${escapeHtml(f.modified || '')}${f.sizeKb ? ' · ' + f.sizeKb + ' KB' : ''}</span>
+          </span>
+        </button>`;
+    }).join('');
+  } catch (e) {
+    statusEl.innerHTML = '❌ ' + (e.message || e) + '<br><span style="color:#7a96b3">Se è la prima volta: autorizza l\'accesso a Drive nello script (vedi PROGRESS.md), oppure usa "Sfoglia dal dispositivo".</span>';
+  }
+}
+
+/* base64 → File, per riusare la pipeline a strisce sulle immagini */
+function base64ToFile(b64, mimeType, name) {
+  const bin = atob(b64);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return new File([u8], name || 'distinta', { type: mimeType || 'image/jpeg' });
+}
+
+async function pickDriveFile(fileId, fileName) {
+  const side = state.driveSide;
+  closeModal('drive-modal');
+  const progressEl = document.getElementById('ocr-progress-' + side);
+  progressEl.classList.add('active');
+  const sheetsUrl = getSheetsUrl();
+  try {
+    progressEl.textContent = '⏳ Lettura di ' + fileName + ' da Drive...';
+    const res = await fetch(sheetsUrl, {
+      method: 'POST', mode: 'cors', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'driveOcr', fileId: fileId })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Errore dal backend');
+
+    if (data.needsClient) {
+      // immagine: stesso trattamento della foto scattata (insieme + strisce)
+      progressEl.textContent = '⏳ Preparazione immagine (ritaglio e contrasto)...';
+      const file = base64ToFile(data.dataBase64, data.mediaType, fileName);
+      const images = await prepareOcrImages(file);
+      progressEl.textContent = '🤖 Analisi distinta con Claude AI...';
+      const res2 = await fetch(sheetsUrl, {
+        method: 'POST', mode: 'cors', redirect: 'follow',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'ocr', images: images })
+      });
+      applyOcrResult(await res2.json(), side, progressEl);
+    } else {
+      // PDF: già letto e interpretato dal backend
+      applyOcrResult(data, side, progressEl);
+    }
+    setTimeout(() => progressEl.classList.remove('active'), 8000);
+  } catch (e) {
+    progressEl.innerHTML = '❌ ' + (e.message || e);
+    setTimeout(() => progressEl.classList.remove('active'), 6000);
+  }
+}
+
+/* Ripiego: file scelto dal dispositivo (foto in galleria, PDF in File) */
+async function handleLocalPick(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const side = state.driveSide;
+  closeModal('drive-modal');
+  const progressEl = document.getElementById('ocr-progress-' + side);
+  progressEl.classList.add('active');
+  const sheetsUrl = getSheetsUrl();
+  try {
+    if (!sheetsUrl) throw new Error('Configura prima l\'URL del backend in Impostazioni');
+    let body;
+    if ((file.type || '').indexOf('pdf') >= 0) {
+      progressEl.textContent = '⏳ Lettura del PDF...';
+      const b64 = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(',')[1]);
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(file);
+      });
+      body = JSON.stringify({ action: 'ocr', pdfBase64: b64 });
+    } else {
+      progressEl.textContent = '⏳ Preparazione immagine (ritaglio e contrasto)...';
+      const images = await prepareOcrImages(file);
+      body = JSON.stringify({ action: 'ocr', images: images });
+    }
+    progressEl.textContent = '🤖 Analisi distinta con Claude AI...';
+    const res = await fetch(sheetsUrl, {
+      method: 'POST', mode: 'cors', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: body
+    });
+    applyOcrResult(await res.json(), side, progressEl);
     setTimeout(() => progressEl.classList.remove('active'), 8000);
   } catch (e) {
     progressEl.innerHTML = '❌ ' + (e.message || e);

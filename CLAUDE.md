@@ -16,6 +16,12 @@ by hand. After ANY change to Code.gs: paste it in the editor, save, then
 Deploy → Gestisci deployment → (Modifica) → Nuova versione → Implementa —
 for EVERY active deployment (there are three; the iPad may use any of them).
 
+Since v4 the backend also reads Google Drive (`DriveApp`). Adding a new OAuth
+scope means the deployments must be re-authorized: run `testDriveDistinte()`
+once from the editor and accept the Drive consent screen BEFORE publishing the
+new version, otherwise the live web app can start asking for re-authorization
+and both OCR and Sheets sync stop working mid-match.
+
 Full functional/technical documentation: PDF "MyStatistics_Documentazione"
 (25/05/2026). Living status: `PROGRESS.md`.
 
@@ -27,8 +33,8 @@ Full functional/technical documentation: PDF "MyStatistics_Documentazione"
   Impostazioni, Utility) — add code inside the matching block
 - Frontend → backend requests use `Content-Type: text/plain;charset=utf-8`
   (avoids CORS preflight, which Apps Script cannot answer)
-- The Windows checkout uses CRLF line endings: edit with tools that preserve
-  them (python read/modify/write), never re-type the file
+- Files in the repo are normalized to LF: edit with tools that read/modify/write
+  the file (python, sed), never re-type it from tool output (truncation risk)
 
 ## OCR (critical path)
 
@@ -36,7 +42,11 @@ Full functional/technical documentation: PDF "MyStatistics_Documentazione"
   ~1568 px / 1.15 MP and small names get hallucinated. `prepareOcrImages()`
   sends one low-res overview + 4 high-res overlapping strips of the left
   62% of the page (N. ruolo, data di nascita, cognome e nome), contrast-enhanced
-- Backend `handleOcrRequest` accepts `images[]` (new) and `imageBase64` (legacy)
+- Backend `handleOcrRequest` accepts `images[]` (new), `pdfBase64` (v4: PDF read
+  at full resolution via the Anthropic `document` block) and `imageBase64` (legacy)
+- Drive distinte: the browser cannot open a given folder, so `driveList` /
+  `driveOcr` do it server-side; PDFs are OCR'd in the backend, images are sent
+  back to the client for the strip pipeline
 - Test protocol: synthetic 3024×4032 distinta drawn on a canvas in the browser
   console → must return 20/20 names (see PROGRESS.md, 12/09/2026)
 

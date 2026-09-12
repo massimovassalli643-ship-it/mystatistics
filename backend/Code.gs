@@ -1,5 +1,6 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v4 (12/09/2026): distinte dalla cartella Google Drive + OCR di PDF
 // v3 (12/09/2026): OCR multi-immagine (pagina intera + strisce ad alta risoluzione)
 // ============================================
 //
@@ -7,12 +8,24 @@
 // (progetto "MyStatisticsBackend"). Il file che conta e' quello nell'editor
 // Apps Script: dopo ogni modifica, Deploy > Gestisci deployment > Modifica >
 // Nuova versione > Implementa (per OGNI deployment attivo).
+//
+// ATTENZIONE v4: questa versione legge Google Drive, quindi richiede un nuovo
+// consenso. PRIMA di pubblicare i deployment, eseguire una volta nell'editor la
+// funzione testDriveDistinte() e accettare la richiesta di accesso a Drive.
+// Se si pubblica senza aver autorizzato, la web app puo' chiedere la
+// ri-autorizzazione e OCR/sincronizzazione si fermano.
 
 const SHEET_PARTITE = 'Partite';
 const SHEET_STATISTICHE = 'Statistiche';
 const SHEET_EVENTI = 'Eventi';
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 const CLAUDE_MODEL = 'claude-sonnet-4-5';
+
+// Cartella delle distinte su Google Drive di Max:
+//   My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte
+// (sul PC e' G:\My Drive\From Dropbox\CI Fiamma monza prima squadra\Distinte)
+const DISTINTE_PATH = ['From Dropbox', 'CI Fiamma monza prima squadra', 'Distinte'];
+const DISTINTE_MAX_FILES = 60;
 
 // ============================================
 // ENDPOINT POST
@@ -22,6 +35,12 @@ function doPost(e) {
     const payload = JSON.parse(e.postData.contents);
     if (payload.action === 'ocr') {
       return handleOcrRequest(payload);
+    }
+    if (payload.action === 'driveList') {
+      return handleDriveList();
+    }
+    if (payload.action === 'driveOcr') {
+      return handleDriveOcr(payload);
     }
     return handleSyncRequest(payload);
   } catch (err) {
@@ -35,7 +54,7 @@ function doPost(e) {
 function doGet() {
   return jsonResponse({
     ok: true,
-    message: 'My Statistics endpoint attivo (v3 con OCR Claude multi-immagine)',
+    message: 'My Statistics endpoint attivo (v4: OCR multi-immagine + distinte da Drive)',
     timestamp: new Date().toISOString()
   });
 }
@@ -55,14 +74,17 @@ function handleOcrRequest(payload) {
   }
 
   var images = [];
+  var pdfBase64 = payload.pdfBase64 || null;
   if (Array.isArray(payload.images) && payload.images.length > 0) {
     images = payload.images;
   } else if (payload.imageBase64) {
     images = [{ data: payload.imageBase64, mediaType: payload.mediaType || 'image/jpeg', kind: 'overview' }];
   }
-  if (images.length === 0) {
-    return jsonResponse({ ok: false, error: 'Immagine mancante' });
+  if (images.length === 0 && !pdfBase64) {
+    return jsonResponse({ ok: false, error: 'Immagine o PDF mancante' });
   }
+  // Un PDF (distinta digitale FIGC) viaggia come blocco 'document': Claude lo
+  // legge alla risoluzione originale, quindi niente strisce e niente contrasto.
   var multi = images.length > 1;
 
   var prompt = 'Sei un OCR specializzato in distinte calcio FIGC (Federazione Italiana Gioco Calcio - Lega Nazionale Dilettanti). Devi ESTRARRE LETTERALMENTE i dati dalla distinta, senza interpretare, senza correggere, senza indovinare.\n\n';
@@ -99,6 +121,10 @@ function handleOcrRequest(payload) {
   prompt += 'Restituisci SOLO il JSON valido, senza commenti, senza markdown, senza backtick.';
 
   var content = [];
+  if (pdfBase64) {
+    content.push({ type: 'text', text: 'DOCUMENTO - distinta FIGC in PDF (leggi la tabella delle calciatrici)' });
+    content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } });
+  }
   images.forEach(function (im, i) {
     var label;
     if (im.kind === 'strip') {
@@ -144,10 +170,118 @@ function handleOcrRequest(payload) {
       rowsCounted: result.rowsCounted || null,
       players: result.players || [],
       usage: claudeResponse.usage,
-      imagesReceived: images.length
+      imagesReceived: images.length,
+      pdfReceived: pdfBase64 ? true : false
     });
   } catch (err) {
     return jsonResponse({ ok: false, error: 'Errore chiamata Claude: ' + err.toString() });
+  }
+}
+
+// ============================================
+// DISTINTE SU GOOGLE DRIVE (v4)
+// ============================================
+// Il browser non puo' aprire una cartella specifica del disco o di Drive:
+// la cartella viene letta qui, con l'account Google del proprietario dello script.
+//
+//   action 'driveList'            -> elenco dei file (piu' recenti prima)
+//   action 'driveOcr' + fileId    -> PDF: letto e interpretato direttamente qui
+//                                    immagine: restituita al client in base64,
+//                                    che applica la pipeline a strisce e richiama 'ocr'
+
+// Risolve My Drive > From Dropbox > CI Fiamma monza prima squadra > Distinte.
+// L'ID viene messo in cache nella Script Property DISTINTE_FOLDER_ID.
+function resolveDistinteFolder() {
+  var props = PropertiesService.getScriptProperties();
+  var cached = props.getProperty('DISTINTE_FOLDER_ID');
+  if (cached) {
+    try {
+      return DriveApp.getFolderById(cached);
+    } catch (e) {
+      props.deleteProperty('DISTINTE_FOLDER_ID');   // cartella spostata o rimossa
+    }
+  }
+  var folder = DriveApp.getRootFolder();
+  for (var i = 0; i < DISTINTE_PATH.length; i++) {
+    var it = folder.getFoldersByName(DISTINTE_PATH[i]);
+    if (!it.hasNext()) {
+      folder = null;
+      break;
+    }
+    folder = it.next();
+  }
+  // Ripiego: cartella "Distinte" ovunque nel Drive (es. se il percorso cambia)
+  if (!folder) {
+    var any = DriveApp.getFoldersByName(DISTINTE_PATH[DISTINTE_PATH.length - 1]);
+    if (!any.hasNext()) {
+      throw new Error('Cartella "' + DISTINTE_PATH.join(' / ') + '" non trovata su Drive');
+    }
+    folder = any.next();
+  }
+  props.setProperty('DISTINTE_FOLDER_ID', folder.getId());
+  return folder;
+}
+
+function isDistintaFile(mime) {
+  return mime === MimeType.PDF ||
+         mime === MimeType.JPEG ||
+         mime === MimeType.PNG ||
+         mime === 'image/webp' ||
+         mime === 'image/heic';
+}
+
+function handleDriveList() {
+  try {
+    var folder = resolveDistinteFolder();
+    var it = folder.getFiles();
+    var files = [];
+    while (it.hasNext() && files.length < DISTINTE_MAX_FILES * 3) {
+      var f = it.next();
+      var mime = f.getMimeType();
+      if (!isDistintaFile(mime)) continue;
+      files.push({
+        id: f.getId(),
+        name: f.getName(),
+        mimeType: mime,
+        sizeKb: Math.round(f.getSize() / 1024),
+        modifiedMs: f.getLastUpdated().getTime(),
+        modified: formatDateTime(f.getLastUpdated())
+      });
+    }
+    files.sort(function (a, b) { return b.modifiedMs - a.modifiedMs; });   // piu' recenti prima
+    if (files.length > DISTINTE_MAX_FILES) files = files.slice(0, DISTINTE_MAX_FILES);
+    return jsonResponse({
+      ok: true,
+      folderPath: 'My Drive / ' + DISTINTE_PATH.join(' / '),
+      files: files
+    });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: String(err.message || err) });
+  }
+}
+
+function handleDriveOcr(payload) {
+  try {
+    if (!payload.fileId) return jsonResponse({ ok: false, error: 'fileId mancante' });
+    var file = DriveApp.getFileById(payload.fileId);
+    var mime = file.getMimeType();
+    var blob = file.getBlob();
+    var b64 = Utilities.base64Encode(blob.getBytes());
+
+    if (mime === MimeType.PDF) {
+      // PDF: nessuna perdita di risoluzione, lo legge direttamente Claude
+      return handleOcrRequest({ pdfBase64: b64 });
+    }
+    // Immagine: torna al client, che ritaglia in strisce e richiama 'ocr'
+    return jsonResponse({
+      ok: true,
+      needsClient: true,
+      dataBase64: b64,
+      mediaType: mime,
+      name: file.getName()
+    });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: String(err.message || err) });
   }
 }
 
@@ -302,4 +436,23 @@ function testOcrDiretto() {
   });
   Logger.log('HTTP: ' + response.getResponseCode());
   Logger.log('Risposta: ' + response.getContentText().substring(0, 300));
+}
+
+// ============================================
+// TEST v4 - ESEGUIRE UNA VOLTA DALL'EDITOR
+// ============================================
+// Serve a concedere allo script l'accesso a Google Drive (scope drive.readonly)
+// PRIMA di pubblicare i deployment. Nel log devono comparire le distinte.
+function testDriveDistinte() {
+  var folder = resolveDistinteFolder();
+  Logger.log('Cartella trovata: ' + folder.getName() + ' (id ' + folder.getId() + ')');
+  var it = folder.getFiles();
+  var n = 0;
+  while (it.hasNext() && n < 20) {
+    var f = it.next();
+    Logger.log((n + 1) + '. ' + f.getName() + '  [' + f.getMimeType() + ']  ' + formatDateTime(f.getLastUpdated()));
+    n++;
+  }
+  if (n === 0) Logger.log('Nessun file nella cartella.');
+  return n;
 }
