@@ -101,6 +101,15 @@ Test dopo le due correzioni, stesso PDF: `teamName` = `A.S.D. FIAMMA MONZA 1970`
 (una sola squadra), tutti e 20 i `num` = `null`, 20 nomi e 20 date di nascita
 corretti.
 
+### Correzione frontend v3.3 — barra Home dell'iPad (13/09/2026)
+Sull'iPad in standalone l'**indicatore Home** (la barra bianca in fondo allo
+schermo) sta SOPRA la pagina e copriva il pulsante "Termina partita". Il meta
+`viewport-fit=cover` c'era già, ma nessuna regola CSS usava
+`env(safe-area-inset-*)`. Ora il margine di sicurezza inferiore è applicato a:
+`.events-sidebar` (che contiene "Termina partita"), `.match-main`,
+`#home-screen`, `#setup-screen`, `#lineup-screen`, `#summary-screen`.
+Su desktop e Android `env()` vale 0, quindi il layout non cambia.
+
 ### Correzione frontend v3.3 — nome squadra sovrascritto dall'OCR (13/09/2026)
 Il campo squadra veniva riempito solo se **vuoto**, quindi una lettura sbagliata
 salvata in precedenza restava lì per sempre. Ora il nome letto dalla distinta ha
@@ -186,6 +195,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Backend v4.1 (versione 12): `teamName` dall'intestazione, non dalla riga della gara |
 | 13/09/2026 | Backend v4.2 (versione 13): `num` dalla cella "N° del Ruolo", mai il contatore di riga stampato nel margine |
 | 13/09/2026 | Frontend v3.3: il nome squadra letto dall'OCR sovrascrive sempre il campo |
+| 13/09/2026 | Frontend v3.3: safe-area iOS — l'indicatore Home non copre più "Termina partita" |
 | 12/09/2026 | Backend v4 deployato (versione 11) sui 3 deployment attivi; scope `drive.readonly` aggiunto a `appsscript.json`; test end-to-end su PDF Drive: 20/20 |
 | 12/09/2026 | Mockup restyling UX pubblicato (5 artboard, 2 direzioni per il match live); palette di stato validata per daltonismo → colore sempre con icona + etichetta |
 
