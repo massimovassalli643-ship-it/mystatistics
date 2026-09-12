@@ -640,6 +640,111 @@ function removeRosterRow(side, idx) {
 }
 
 /* ==================== OCR via Claude API (Apps Script proxy) ==================== */
+/*
+ * OCR v2 (12/09/2026) — pre-elaborazione dell'immagine lato client.
+ *
+ * L'API Anthropic riduce ogni immagine a ~1568 px sul lato lungo (~1,15 MP):
+ * una pagina A4 intera arriva al modello con caratteri alti ~10 px e i nomi
+ * vengono "indovinati" invece che letti. Per questo inviamo:
+ *   1) la pagina intera a bassa risoluzione (contesto, nome squadra, n. righe)
+ *   2) OCR_STRIPS strisce ad alta risoluzione della parte SINISTRA della
+ *      distinta (N. ruolo, data di nascita, cognome e nome), sovrapposte tra
+ *      loro, in scala di grigi con contrasto migliorato.
+ * Ogni striscia sta dentro i limiti dell'API, quindi non viene ridotta
+ * ulteriormente: il testo arriva al modello ~2 volte più grande per lato.
+ */
+const OCR_MAX_EDGE = 1568;          // lato lungo massimo accettato senza riduzione
+const OCR_MAX_PIXELS = 1150000;     // ~1,15 MP: oltre, l'API riduce comunque
+const OCR_STRIPS = 4;               // strisce orizzontali
+const OCR_STRIP_OVERLAP = 0.08;     // sovrapposizione (frazione dell'altezza pagina)
+const OCR_LEFT_CROP = 0.62;         // frazione di larghezza tenuta (colonne utili)
+const OCR_JPEG_QUALITY = 0.9;
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Immagine non leggibile')); };
+    img.src = url;
+  });
+}
+
+// Scala di grigi + stretch dei livelli (2°/98° percentile): il testo resta
+// nero, la carta grigia o con riflessi diventa bianca.
+function enhanceContrast(ctx, w, h) {
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const d = imgData.data;
+  const n = w * h;
+  const gray = new Uint8ClampedArray(n);
+  const hist = new Uint32Array(256);
+  for (let i = 0, p = 0; i < n; i++, p += 4) {
+    const g = (d[p] * 299 + d[p + 1] * 587 + d[p + 2] * 114) / 1000;
+    gray[i] = g;
+    hist[g | 0]++;
+  }
+  let lo = 0, hi = 255, acc = 0;
+  const loT = n * 0.02, hiT = n * 0.98;
+  for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= loT) { lo = v; break; } }
+  acc = 0;
+  for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= hiT) { hi = v; break; } }
+  const range = Math.max(1, hi - lo);
+  for (let i = 0, p = 0; i < n; i++, p += 4) {
+    let v = ((gray[i] - lo) * 255) / range;
+    v = v < 0 ? 0 : (v > 255 ? 255 : v);
+    d[p] = d[p + 1] = d[p + 2] = v;
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+// Ritaglio (sx, sy, sw, sh) → ridimensionamento entro i limiti API → JPEG base64
+function renderOcrTile(img, sx, sy, sw, sh, enhance) {
+  const scaleEdge = OCR_MAX_EDGE / Math.max(sw, sh);
+  const scalePix = Math.sqrt(OCR_MAX_PIXELS / (sw * sh));
+  const scale = Math.min(1, scaleEdge, scalePix);
+  const w = Math.max(1, Math.round(sw * scale));
+  const h = Math.max(1, Math.round(sh * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+  if (enhance) enhanceContrast(ctx, w, h);
+  const dataUrl = canvas.toDataURL('image/jpeg', OCR_JPEG_QUALITY);
+  return { data: dataUrl.split(',')[1], mediaType: 'image/jpeg', width: w, height: h };
+}
+
+async function prepareOcrImages(file) {
+  const img = await loadImageFromFile(file);
+  const W = img.naturalWidth, H = img.naturalHeight;
+  const images = [];
+
+  // 1) pagina intera: contesto, nome squadra, conteggio righe
+  images.push(Object.assign(renderOcrTile(img, 0, 0, W, H, false), { kind: 'overview' }));
+
+  // 2) strisce ad alta risoluzione. Il ritaglio della parte sinistra si applica
+  //    solo a foto verticali: una distinta fotografata di lato non ha una
+  //    "sinistra" prevedibile, meglio la striscia intera.
+  const portrait = H >= W;
+  const cropW = portrait ? Math.round(W * OCR_LEFT_CROP) : W;
+  const stripH = H / OCR_STRIPS;
+  const ov = H * OCR_STRIP_OVERLAP;
+  for (let i = 0; i < OCR_STRIPS; i++) {
+    const y0 = Math.max(0, Math.round(i * stripH - (i > 0 ? ov : 0)));
+    const y1 = Math.min(H, Math.round((i + 1) * stripH + (i < OCR_STRIPS - 1 ? ov : 0)));
+    images.push(Object.assign(renderOcrTile(img, 0, y0, cropW, y1 - y0, true), {
+      kind: 'strip', index: i + 1, total: OCR_STRIPS
+    }));
+  }
+  return images;
+}
+
+function normalizeOcrName(name) {
+  return (name || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+}
+
 async function handleOcr(input, side) {
   const file = input.files[0];
   if (!file) return;
@@ -655,9 +760,8 @@ async function handleOcr(input, side) {
   }
 
   try {
-    progressEl.textContent = '⏳ Conversione foto in corso...';
-    const base64Data = await fileToBase64(file);
-    const mediaType = file.type || 'image/jpeg';
+    progressEl.textContent = '⏳ Preparazione immagine (ritaglio e contrasto)...';
+    const images = await prepareOcrImages(file);
 
     progressEl.textContent = '🤖 Analisi distinta con Claude AI...';
     const response = await fetch(sheetsUrl, {
@@ -665,11 +769,7 @@ async function handleOcr(input, side) {
       mode: 'cors',
       redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({
-        action: 'ocr',
-        imageBase64: base64Data,
-        mediaType: mediaType
-      })
+      body: JSON.stringify({ action: 'ocr', images: images })
     });
 
     const result = await response.json();
@@ -688,11 +788,19 @@ async function handleOcr(input, side) {
     if (players.length === 0) {
       progressEl.innerHTML = '⚠️ Nessuna calciatrice riconosciuta. Inserisci manualmente.';
     } else {
-      const formatted = players.map(p => ({
-        num: p.num != null ? parseInt(p.num) : null,
-        name: (p.name || '').trim(),
-        role: ['GK','DEF','MID','FWD','LM'].includes(p.role) ? p.role : ''
-      })).filter(p => p.name);
+      // Le strisce si sovrappongono: una riga può arrivare due volte
+      const seen = new Set();
+      const formatted = [];
+      players.forEach(p => {
+        const key = normalizeOcrName(p.name);
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        formatted.push({
+          num: p.num != null && p.num !== '' ? parseInt(p.num) : null,
+          name: (p.name || '').trim(),
+          role: ['GK', 'DEF', 'MID', 'FWD', 'LM'].includes(p.role) ? p.role : ''
+        });
+      });
 
       const existing = state.currentMatch[side].roster.filter(p => p.num || p.name);
       state.currentMatch[side].roster = [...existing, ...formatted];
@@ -702,10 +810,14 @@ async function handleOcr(input, side) {
       if (result.usage) {
         const inTok = result.usage.input_tokens || 0;
         const outTok = result.usage.output_tokens || 0;
-        const cost = (inTok * 0.000001 + outTok * 0.000005).toFixed(4);
+        const cost = (inTok * 0.000003 + outTok * 0.000015).toFixed(4);
         costInfo = ' • ' + (inTok + outTok) + ' token (~$' + cost + ')';
       }
-      progressEl.innerHTML = '✅ ' + formatted.length + ' atlete riconosciute' + (teamName ? ' • ' + teamName : '') + costInfo;
+      const dubbi = formatted.filter(p => /\?|ILLEGGIBILE/.test(p.name)).length;
+      progressEl.innerHTML = '✅ ' + formatted.length + ' atlete riconosciute'
+        + (teamName ? ' • ' + teamName : '')
+        + (dubbi ? ' • ⚠️ ' + dubbi + ' da verificare' : '')
+        + costInfo;
     }
 
     setTimeout(() => progressEl.classList.remove('active'), 8000);
@@ -714,19 +826,6 @@ async function handleOcr(input, side) {
     setTimeout(() => progressEl.classList.remove('active'), 6000);
   }
   input.value = '';
-}
-
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result;
-      const base64 = dataUrl.split(',')[1];
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
 
 function goToLineup() {
