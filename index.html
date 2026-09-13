@@ -249,6 +249,8 @@
   .modal { background: linear-gradient(135deg, #1a3556, #122a44); border: 1px solid rgba(255,255,255,0.1); border-radius: 18px; padding: 28px; width: 90%; max-width: 520px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
   .modal-title { font-size: 22px; font-weight: 800; margin-bottom: 18px; color: #fff; }
   .modal-field { margin-bottom: 16px; }
+  .modal-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .modal-field-row .modal-field { margin-bottom: 0; }
   .modal-label { display: block; font-size: 12px; font-weight: 700; color: #7fb8ff; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
   .modal-select, .modal-input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 12px 14px; border-radius: 8px; font-size: 15px; font-weight: 600; }
   .modal-select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='%237fb8ff' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; background-size: 10px; padding-right: 36px; }
@@ -1580,7 +1582,8 @@ let currentEventDraft = null;
 
 function openEventModal(type) {
   if (!state.currentMatch) return;
-  currentEventDraft = { type, team: 'home', minute: getCurrentMatchMinute(), period: state.timer.periodIndex };
+  const periodMinute = Math.floor(currentElapsedMs() / 60000);
+  currentEventDraft = { type, team: 'home', periodMinute, period: state.timer.periodIndex };
   const titles = { goal: '⚽ Goal', yellow: '🟨 Ammonizione', red: '🟥 Espulsione', sub: '🔄 Sostituzione' };
   document.getElementById('event-modal-title').textContent = titles[type];
   renderEventModalBody();
@@ -1596,10 +1599,20 @@ function renderEventModalBody() {
       <div class="radio-option ${currentEventDraft.team==='away'?'selected':''}" onclick="setEventField('team','away')">${escapeHtml(state.currentMatch.away.name)}</div>
     </div>`;
 
+  const periodBtns = ['1° T', '2° T'].map((label, i) => `
+    <div class="radio-option ${currentEventDraft.period===i?'selected':''}" onclick="setEventField('period',${i})">${label}</div>
+  `).join('');
+
   const minuteField = `
-    <div class="modal-field">
-      <label class="modal-label">Minuto</label>
-      <input type="number" class="modal-input" id="event-minute" value="${currentEventDraft.minute}" min="0" max="130">
+    <div class="modal-field-row">
+      <div class="modal-field">
+        <label class="modal-label">Minuto</label>
+        <input type="number" class="modal-input" id="event-minute" value="${currentEventDraft.periodMinute}" min="0" max="60">
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Tempo</label>
+        <div class="modal-radio-group">${periodBtns}</div>
+      </div>
     </div>`;
 
   let body = `
@@ -1670,14 +1683,26 @@ function playerSelect(id, team, optional = false) {
 }
 
 function setEventField(field, value) {
+  // Il campo minuto non è collegato allo stato del draft ad ogni tasto:
+  // prima di ridisegnare il modal (che rigenera anche l'input) ne salviamo
+  // il valore corrente, altrimenti cliccare 1°T/2°T o cambiare squadra/tipo
+  // farebbe perdere quanto digitato.
+  const minuteInput = document.getElementById('event-minute');
+  if (minuteInput) {
+    const v = parseInt(minuteInput.value);
+    if (!isNaN(v)) currentEventDraft.periodMinute = v;
+  }
   currentEventDraft[field] = value;
   renderEventModalBody();
 }
 
 function confirmEvent() {
-  const minute = parseInt(document.getElementById('event-minute').value);
-  if (isNaN(minute)) { alert('Inserisci un minuto valido'); return; }
-  currentEventDraft.minute = minute;
+  const periodMinute = parseInt(document.getElementById('event-minute').value);
+  if (isNaN(periodMinute)) { alert('Inserisci un minuto valido'); return; }
+  currentEventDraft.periodMinute = periodMinute;
+  // Il minuto di partita (assoluto, usato per ordinamento/esportazioni) è il
+  // minuto del tempo scelto + l'offset del tempo stesso (es. 5° del 2° tempo = 50).
+  currentEventDraft.minute = periodMinute + (PERIOD_OFFSETS[currentEventDraft.period] || 0);
 
   const { type, team } = currentEventDraft;
   if (type === 'goal') {

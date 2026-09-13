@@ -19,7 +19,32 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.9 — Rimosso il badge ruolo dalla formazione iniziale (13/09/2026)
+## Stato attuale: v3.10 — Minuto ed evento diviso in "tempo" (13/09/2026)
+
+### Novità v3.10 (13/09/2026)
+
+Nella schermata di inserimento evento (goal, ammonizione, espulsione,
+sostituzione), la riga "Minuto" ora è divisa in due metà:
+- **a sinistra**: campo minuto, editabile, che rappresenta il minuto **nel
+  tempo scelto** (es. "5" e non più "50");
+- **a destra**: due pulsanti **1° T** / **2° T** per scegliere a quale tempo
+  appartiene l'evento (comportamento identico alla selezione squadra/tipo già
+  presente nello stesso modal).
+
+Il minuto assoluto di partita (usato per l'ordinamento cronologico degli
+eventi e per le esportazioni, es. "50'") si calcola sommando il minuto
+digitato all'offset del tempo selezionato (1° T = +0, 2° T = +45). All'apertura
+del modal il tempo è precompilato in base al cronometro in corso, ma resta
+liberamente modificabile per correggere un evento inserito in ritardo, senza
+dover fare il calcolo a mente. Se l'evento cade in un eventuale supplementare
+(1°/2° supplementare, gestiti dal cronometro ma non esposti come pulsanti
+qui) il tempo pre-impostato viene comunque rispettato finché non si tocca uno
+dei due pulsanti 1° T / 2° T.
+
+Corretto anche un piccolo difetto preesistente nello stesso modal: cambiare
+squadra o tipo goal dopo aver digitato il minuto ne azzerava il valore al
+successivo ridisegno del pannello (ora il valore digitato viene sempre
+salvato prima di ridisegnare).
 
 ### Novità v3.9 (13/09/2026)
 
