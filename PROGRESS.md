@@ -19,7 +19,77 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.6 / backend v5 (in attesa di autorizzazione email) — Cronometro, rose a 4 colonne, distinte da Drive (13/09/2026)
+## Stato attuale: v3.8 — Svuota rosa/formazione, niente più duplicati OCR (13/09/2026)
+
+### Novità v3.8 (13/09/2026)
+
+**1) Pulsante "svuota tutta la rosa" per squadra**
+
+Nella schermata "Rose calciatrici", accanto al contatore "X atlete" di ogni
+pannello (Casa/Ospiti), un pulsante 🗑️ chiede conferma e cancella l'intero
+elenco di quella squadra in un tocco — prima si poteva eliminare solo una
+riga alla volta con la ✕.
+
+**2) Pulsante "deseleziona tutte" nella formazione iniziale**
+
+Segnalato un contatore "1/11" già valorizzato all'ingresso nella schermata
+"Formazione iniziale" pur senza alcuna titolare selezionata a video. Il
+contatore riflette fedelmente `lineup[side].length`: uno stato del genere può
+comparire riprendendo una partita già salvata in precedenza (es. una prova
+fatta prima della gara) con una selezione parziale rimasta in memoria, oppure
+tornando indietro e avanti nel flusso di setup dopo aver già toccato una
+titolare (comportamento voluto, per non perdere le scelte già fatte se si
+torna a correggere la rosa). In entrambi i casi ora c'è un pulsante 🗑️
+accanto al contatore di ciascuna squadra per azzerare la selezione con un
+tocco, invece di dover deselezionare una per una.
+
+**3) Corretto: la lettura OCR duplicava le atlete invece di correggerle**
+
+Segnalato che, passando da "Rose calciatrici" a "Formazione iniziale", il
+numero di maglia di alcune atlete della squadra ospite risultava diverso
+(es. "9" diventato "90"). Causa individuata in `applyOcrResult`: ogni
+scansione della distinta veniva **accodata** alla rosa esistente senza
+controllare se un'atleta con lo stesso nome fosse già presente — un secondo
+scatto/scansione (es. dopo una foto sfocata, o rifacendo l'inquadratura)
+aggiungeva una riga in più invece di correggere quella già letta, lasciando
+in rosa sia il numero vecchio sia quello nuovo per la stessa persona. Il
+commento nel codice dichiarava già questa intenzione ("il nome letto ha la
+precedenza, corregge una lettura precedente") ma non era mai stata
+implementata per le singole atlete, solo per il nome squadra.
+
+Corretto: la nuova lettura ora viene confrontata per nome (stessa
+normalizzazione usata per scartare le righe duplicate tra le strisce
+sovrapposte) con le atlete già in rosa — se il nome coincide, il numero di
+maglia/data di nascita/ruolo vengono aggiornati sulla riga esistente invece
+di crearne una nuova; solo un nome mai visto genera una riga aggiuntiva. Il
+messaggio di esito ora distingue "N nuove" da "M corrette". Vale per tutte
+e tre le vie di caricamento (fotocamera, libreria foto, Drive/PDF), che
+condividono la stessa funzione di merge.
+
+### Novità v3.7 (13/09/2026)
+
+**Caricamento distinta: tre sorgenti esplicite, non più due**
+
+Prima la riga sopra ogni rosa (Casa/Ospiti) mostrava solo due pulsanti,
+"Scatta foto" (apre subito la fotocamera) e "Carica file" (sfoglia la
+cartella Drive "Distinte"); la possibilità di scegliere una foto già
+presente in libreria/rullino esisteva già, ma solo come link secondario
+"Sfoglia dal dispositivo" nel footer della modale Drive — poco visibile.
+
+- Aggiunto un terzo pulsante di pari livello, **"🖼️ Libreria foto"**, tra
+  "Scatta foto" e "Carica file": apre un normale selettore file
+  (`<input type="file">` senza `capture`, quindi il sistema operativo
+  propone la libreria foto/rullino insieme alle altre opzioni), per foto o
+  PDF già salvati sul dispositivo — non solo dalla cartella Drive fissa.
+- La riga dei tre pulsanti (`.ocr-upload-row`) è passata da 2 a 3 colonne;
+  ridotti leggermente padding/font per restare leggibile in orizzontale su
+  iPad.
+- Nessuna nuova logica di invio: la gestione file (immagine → ritaglio a
+  strisce ad alta risoluzione; PDF → invio diretto in base64) è stata
+  estratta dalla vecchia `handleLocalPick` in una funzione condivisa
+  `handleFilePick(input, side)`, richiamata sia dal nuovo pulsante sia dal
+  vecchio "Sfoglia dal dispositivo" nella modale Drive (che resta, come
+  ripiego, se la cartella Drive non si apre).
 
 ### Novità v3.2 (12/09/2026)
 
@@ -337,10 +407,12 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [x] Test end-to-end `driveList` + `driveOcr` su PDF reale: 20/20 (22:20)
 - [x] Frontend v3.2 pushato e online (rose a 4 colonne + pulsante Drive)
 - [x] Backend v4.1 (versione 12) e v4.2 (versione 13) sui 3 deployment, testate
+- [x] Frontend v3.6 pushato e online (dashboard statistiche + report, verificato via fetch sul sito live 13/09/2026 mattina)
+- [x] `testInvioEmail()` eseguita: errore "Specified permissions are not sufficient... userinfo.email" — causa: `Session.getEffectiveUser()` richiede uno scope non dichiarato in `appsscript.json`. Fix v5.1: la funzione ora invia a un indirizzo fisso (`massimo.vassalli643@gmail.com`) invece di leggere l'utente effettivo — non serve più quello scope (13/09/2026 07:42)
+- [x] `testInvioEmail()` rieseguita dopo il fix: email inviata correttamente, nessuna nuova autorizzazione richiesta (il permesso `script.send_mail` era già concesso) — quota residua 99/giorno (13/09/2026 07:42)
+- [x] Backend v5.1 (versione 14) pubblicato su tutti e 3 i deployment attivi (13/09/2026 07:43-07:47)
 - [ ] **A carico di Max**: ricaricare il credito API su console.anthropic.com → Settings → Billing (l'OCR è fermo finché non lo fai)
-- [ ] **A carico di Max**: eseguire `testInvioEmail()` nell'editor Apps Script e autorizzare l'invio email, **poi** pubblicare la versione 14 sui 3 deployment
-- [ ] **A carico di Max**: `git add -A && git commit && git push origin main` per il frontend v3.6
+- [ ] Test reale: dalla Dashboard aprire Report per una partita, scegliere PDF o Excel, inviare a se stessi via email e verificare l'allegato ricevuto
 - [ ] Prova sul campo: far girare il cronometro, registrare un goal, verificare che il tempo non si fermi; inserire 3' di recupero e controllare il conto alla rovescia
-- [ ] Dopo il push: sull'iPad chiudere e riaprire l'app, poi provare "Carica file" → deve comparire l'elenco delle distinte (GitHub Pages ridistribuisce in 1–2 minuti), poi sull'iPad chiudere e riaprire l'app
-- [ ] Test reale sull'iPad con la distinta cartacea del 13/09/2026 (foto in verticale, foglio che riempie il frame): confrontare i nomi con la distinta
+- [ ] Test reale sull'iPad con la distinta cartacea: confrontare i nomi con la distinta
 - [ ] Se un nome esce con `?`: è voluto (carattere ambiguo) — correggere inline, non è un errore dell'app

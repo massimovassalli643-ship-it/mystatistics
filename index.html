@@ -118,9 +118,9 @@
     gap: 8px; cursor: pointer;
   }
   .ocr-upload:active { background: rgba(127,184,255,0.2); }
-  .ocr-upload-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-  .ocr-upload-row .ocr-upload { margin-bottom: 0; padding: 12px 8px; font-size: 12px; text-align: center; }
-  .ocr-upload-row .ocr-upload .icon-big { font-size: 22px; display: block; margin-bottom: 4px; }
+  .ocr-upload-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .ocr-upload-row .ocr-upload { margin-bottom: 0; padding: 12px 6px; font-size: 11px; text-align: center; }
+  .ocr-upload-row .ocr-upload .icon-big { font-size: 20px; display: block; margin-bottom: 4px; }
   .ocr-progress { font-size: 12px; color: #ffb84d; margin-bottom: 10px; padding: 8px; background: rgba(255,184,77,0.1); border-radius: 6px; text-align: center; display: none; }
   .ocr-progress.active { display: block; }
   .roster-list { max-height: 320px; overflow-y: auto; margin-bottom: 10px; }
@@ -409,6 +409,10 @@
               <span><span class="icon-big">📷</span>Scatta foto</span>
               <input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleOcr(this, 'home')">
             </label>
+            <label class="ocr-upload">
+              <span><span class="icon-big">🖼️</span>Libreria foto</span>
+              <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf" style="display:none" onchange="handleFilePick(this, 'home')">
+            </label>
             <button class="ocr-upload" onclick="openDriveModal('home')">
               <span><span class="icon-big">📁</span>Carica file<br><span style="font-size:10px;opacity:0.75">Drive · Distinte</span></span>
             </button>
@@ -429,6 +433,10 @@
             <label class="ocr-upload">
               <span><span class="icon-big">📷</span>Scatta foto</span>
               <input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleOcr(this, 'away')">
+            </label>
+            <label class="ocr-upload">
+              <span><span class="icon-big">🖼️</span>Libreria foto</span>
+              <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf" style="display:none" onchange="handleFilePick(this, 'away')">
             </label>
             <button class="ocr-upload" onclick="openDriveModal('away')">
               <span><span class="icon-big">📁</span>Carica file<br><span style="font-size:10px;opacity:0.75">Drive · Distinte</span></span>
@@ -1244,12 +1252,12 @@ async function pickDriveFile(fileId, fileName) {
   }
 }
 
-/* Ripiego: file scelto dal dispositivo (foto in galleria, PDF in File) */
-async function handleLocalPick(input) {
+/* File scelto dal dispositivo: foto in libreria/rullino, o PDF in File/Drive.
+   Usata sia dal pulsante "Libreria foto" (accanto a "Scatta foto"/"Carica
+   file") sia dal ripiego "Sfoglia dal dispositivo" dentro la modale Drive. */
+async function handleFilePick(input, side) {
   const file = input.files[0];
   if (!file) return;
-  const side = state.driveSide;
-  closeModal('drive-modal');
   const progressEl = document.getElementById('ocr-progress-' + side);
   progressEl.classList.add('active');
   const sheetsUrl = getSheetsUrl();
@@ -1283,6 +1291,13 @@ async function handleLocalPick(input) {
     setTimeout(() => progressEl.classList.remove('active'), 6000);
   }
   input.value = '';
+}
+
+/* Ripiego dentro la modale Drive: stesso gestore, side preso dallo stato aperto. */
+async function handleLocalPick(input) {
+  const side = state.driveSide;
+  closeModal('drive-modal');
+  await handleFilePick(input, side);
 }
 
 function goToLineup() {
