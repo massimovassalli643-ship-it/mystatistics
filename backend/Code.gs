@@ -1,5 +1,8 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v5.1 (13/09/2026): fix testInvioEmail (Session.getEffectiveUser richiedeva uno
+//   scope non dichiarato: 'Specified permissions are not sufficient') - ora
+//   invia a un indirizzo fisso. DEPLOYATO su tutti e 3 i deployment (versione 14)
 // v5 (13/09/2026): action sendReport — invia il report per email con allegato
 // v4.2 (13/09/2026): num = cella "N del Ruolo", mai il contatore di riga nel margine
 // v4.1 (12/09/2026): teamName letto dall'intestazione (non dalla riga della gara)
@@ -511,16 +514,19 @@ function testDriveDistinte() {
 // TEST v5 - ESEGUIRE UNA VOLTA DALL'EDITOR
 // ============================================
 // Concede allo script il permesso di inviare email (scope script.send_mail)
-// PRIMA di pubblicare i deployment. Invia una mail di prova a se stessi.
+// PRIMA di pubblicare i deployment. Invia una mail di prova a un indirizzo fisso
+// (NON usare Session.getEffectiveUser(): richiede lo scope userinfo.email, non
+// dichiarato in appsscript.json, e fallisce con "Specified permissions are not
+// sufficient" - vedi PROGRESS.md 13/09/2026).
 function testInvioEmail() {
-  var me = Session.getEffectiveUser().getEmail();
+  var to = 'massimo.vassalli643@gmail.com';
   MailApp.sendEmail({
-    to: me,
+    to: to,
     subject: 'My Statistics - test invio report',
     body: 'Se leggi questa email, il backend puo inviare i report come allegato.',
     name: 'My Statistics'
   });
-  Logger.log('Email di prova inviata a ' + me);
+  Logger.log('Email di prova inviata a ' + to);
   Logger.log('Email ancora inviabili oggi: ' + MailApp.getRemainingDailyQuota());
-  return me;
+  return to;
 }

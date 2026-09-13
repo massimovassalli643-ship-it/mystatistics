@@ -261,6 +261,57 @@
   .modal-btn.confirm { background: linear-gradient(135deg, #ff6b35, #ff8c42); color: white; }
 
   #summary-screen { flex-direction: column; padding: 20px 30px calc(40px + env(safe-area-inset-bottom)); overflow-y: auto; }
+
+  /* ============ DASHBOARD STATISTICHE ============
+     Grafici a barre orizzontali: una sola grandezza per grafico, quindi UN SOLO
+     colore (blu, scala sequenziale) — il colore non codifica identita', la
+     posizione nella classifica si'. I colori di stato (gol/assist/giallo/rosso)
+     compaiono solo in tabella, sempre accompagnati da icona ed etichetta. */
+  #dashboard-screen { flex-direction: column; padding: 20px 30px calc(40px + env(safe-area-inset-bottom)); overflow-y: auto; }
+  .dash-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+  .dash-filter { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .dash-filter-label { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #7a96b3; }
+  .dash-select { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 8px; padding: 10px 12px; font-size: 14px; font-weight: 600; min-width: 320px; max-width: 100%; }
+  .dash-select:focus { border-color: #7fb8ff; }
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .kpi { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 16px; }
+  .kpi-label { font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #7a96b3; margin-bottom: 6px; }
+  .kpi-value { font-size: 30px; font-weight: 900; line-height: 1; color: #fff; font-variant-numeric: tabular-nums; }
+  .kpi-sub { font-size: 11px; color: #7a96b3; margin-top: 6px; }
+  .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .dash-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 18px; min-width: 0; }
+  .dash-card.wide { grid-column: 1 / -1; }
+  .dash-card-title { font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #7fb8ff; margin-bottom: 14px; }
+  .bar-row { display: grid; grid-template-columns: 1fr 100px 44px; gap: 10px; align-items: center; margin-bottom: 8px; }
+  .bar-name { font-size: 12px; font-weight: 600; color: #e8f0f7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track { height: 10px; background: rgba(255,255,255,0.07); border-radius: 5px; overflow: hidden; }
+  .bar-fill { height: 100%; background: #5598e7; border-radius: 0 4px 4px 0; min-width: 3px; }
+  .bar-value { font-size: 13px; font-weight: 800; color: #b8d4ed; text-align: right; font-variant-numeric: tabular-nums; }
+  .dash-empty { color: #5a7793; font-size: 13px; padding: 18px 0; text-align: center; }
+  .dash-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .dash-table th { text-align: left; font-size: 10px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #7a96b3; padding: 8px 8px; border-bottom: 1px solid rgba(255,255,255,0.12); white-space: nowrap; }
+  .dash-table td { padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #e8f0f7; }
+  .dash-table td.n { text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .dash-table td.dim { color: #5a7793; }
+  .dash-scroll { overflow-x: auto; }
+
+  /* ============ REPORT ============ */
+  .report-step-title { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #7a96b3; margin: 4px 0 10px; }
+  .report-list { display: flex; flex-direction: column; gap: 8px; max-height: 40vh; overflow-y: auto; margin-bottom: 6px; }
+  .report-item { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px 14px; text-align: left; width: 100%; color: #e8f0f7; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .report-item:active, .report-item.selected { background: rgba(127,184,255,0.18); border-color: #7fb8ff; }
+  .report-item .rm { font-size: 13px; font-weight: 700; }
+  .report-item .rd { font-size: 11px; color: #7a96b3; }
+  .report-item .rs { font-size: 15px; font-weight: 900; color: #ffb84d; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .report-format { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .report-fmt-btn { background: rgba(255,255,255,0.05); border: 1.5px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 16px 10px; color: #e8f0f7; font-size: 13px; font-weight: 700; }
+  .report-fmt-btn.selected { border-color: #7fb8ff; background: rgba(127,184,255,0.18); }
+  .report-fmt-btn .big { display: block; font-size: 26px; margin-bottom: 4px; }
+  .report-status { font-size: 12px; margin-top: 10px; padding: 10px; border-radius: 8px; display: none; line-height: 1.5; }
+  .report-status.active { display: block; }
+  .report-status.ok { background: rgba(46,204,113,0.15); color: #7ee2a8; }
+  .report-status.err { background: rgba(231,76,60,0.15); color: #ff8a80; }
+  .report-status.wait { background: rgba(255,184,77,0.12); color: #ffb84d; }
   .summary-header { text-align: center; margin-bottom: 24px; padding: 20px; background: rgba(0,0,0,0.3); border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); }
   .summary-teams { font-size: 22px; font-weight: 800; margin-bottom: 10px; }
   .summary-score { font-size: 48px; font-weight: 900; color: #ffb84d; font-variant-numeric: tabular-nums; }
@@ -310,9 +361,27 @@
       <button class="secondary-btn" onclick="exportAllData()">📤 Backup completo</button>
       <button class="secondary-btn" onclick="importData()">📥 Importa</button>
       <button class="secondary-btn" onclick="openSettingsModal()">⚙️ Impostazioni</button>
+      <button class="secondary-btn" onclick="openDashboard()">📊 Dashboard</button>
+      <button class="secondary-btn" onclick="openReportModal()">📄 Report</button>
     </div>
     <h2 class="history-title">Storico</h2>
     <div class="history-list" id="history-list"></div>
+  </div>
+
+  <div class="screen" id="dashboard-screen">
+    <div class="dash-head">
+      <div>
+        <h1 class="home-title" style="margin-bottom: 4px;">Dashboard</h1>
+        <p class="home-subtitle" id="dash-scope">—</p>
+      </div>
+      <button class="secondary-btn" onclick="goHome()">← Home</button>
+    </div>
+    <div class="dash-filter">
+      <span class="dash-filter-label">Vista</span>
+      <select class="dash-select" id="dash-match-select" onchange="renderDashboard()"></select>
+    </div>
+    <div class="kpi-row" id="dash-kpis"></div>
+    <div class="dash-grid" id="dash-grid"></div>
   </div>
 
   <div class="screen" id="setup-screen">
@@ -568,6 +637,42 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="report-modal">
+  <div class="modal" style="max-width: 640px;">
+    <div class="modal-title">📄 Report partita</div>
+
+    <div id="report-step-match">
+      <div class="report-step-title">1 · Scegli la partita</div>
+      <div class="report-list" id="report-match-list"></div>
+    </div>
+
+    <div id="report-step-format" style="display:none">
+      <div class="report-step-title">2 · Formato del report</div>
+      <div class="report-format">
+        <button class="report-fmt-btn" id="report-fmt-pdf" onclick="setReportFormat('pdf')"><span class="big">📕</span>PDF — referto da leggere</button>
+        <button class="report-fmt-btn" id="report-fmt-xlsx" onclick="setReportFormat('xlsx')"><span class="big">📗</span>Excel — dati da rielaborare</button>
+      </div>
+      <div class="report-step-title">3 · Invio via email</div>
+      <div class="modal-field">
+        <label class="modal-label">Destinatari (separa con la virgola)</label>
+        <input type="text" class="modal-input" id="report-to" placeholder="nome@dominio.it">
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Oggetto</label>
+        <input type="text" class="modal-input" id="report-subject">
+      </div>
+      <div style="font-size:11px;color:#7a96b3;line-height:1.5;">L'email parte dal tuo account Google collegato al backend, con il report in allegato.</div>
+      <div class="report-status" id="report-status"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="modal-btn cancel" onclick="closeModal('report-modal')">Chiudi</button>
+      <button class="modal-btn cancel" id="report-download" style="display:none" onclick="downloadReport()">⬇️ Scarica</button>
+      <button class="modal-btn confirm" id="report-send" style="display:none" onclick="sendReportByEmail()">📧 Invia</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="settings-modal">
   <div class="modal">
     <div class="modal-title">⚙️ Impostazioni</div>
@@ -598,6 +703,8 @@ const PERIODS = ['1° tempo', '2° tempo', '1° supplementare', '2° supplementa
 const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
 // Durata regolamentare di ogni periodo, in minuti: serve al conto alla rovescia
 const PERIOD_DURATIONS = [45, 45, 15, 15, 0];
+// Destinatario predefinito dei report (modificabile nella modale prima dell'invio)
+const REPORT_DEFAULT_TO = 'massimo.vassalli643@gmail.com';
 
 let state = {
   currentMatch: null,
@@ -1635,8 +1742,10 @@ function confirmAddPlayer() {
   closeModal('add-player-modal');
 }
 
-function computePlayerStats(side) {
-  const m = state.currentMatch;
+/* side = 'home'|'away'; match opzionale: se assente usa la partita in corso.
+   Il parametro serve alla dashboard e ai report, che lavorano su partite dello storico. */
+function computePlayerStats(side, match) {
+  const m = match || state.currentMatch;
   const roster = m[side].roster;
   const lineup = m.lineup[side] || [];
 
@@ -1827,13 +1936,16 @@ function importData() {
   input.click();
 }
 
-function exportMatchXlsx() {
-  if (!state.currentMatch) return;
+/* match: partita da esportare (default: quella in corso).
+   asBase64: se true non scarica il file ma restituisce { filename, mimeType, dataBase64 },
+   che e' cio' che serve per allegarlo a un'email. */
+function exportMatchXlsx(match, asBase64) {
+  const m = match || state.currentMatch;
+  if (!m) return null;
   if (typeof XLSX === 'undefined') {
-    alert('Libreria Excel non caricata.');
-    return;
+    if (!asBase64) alert('Libreria Excel non caricata.');
+    throw new Error('Libreria Excel non caricata');
   }
-  const m = state.currentMatch;
   const wb = XLSX.utils.book_new();
   const matchDate = new Date(m.endedAt || m.createdAt);
 
@@ -1856,8 +1968,8 @@ function exportMatchXlsx() {
   ws1['!cols'] = [{ wch: 25 }, { wch: 35 }];
   XLSX.utils.book_append_sheet(wb, ws1, 'Riepilogo');
 
-  const statsHome = computePlayerStats('home');
-  const statsAway = computePlayerStats('away');
+  const statsHome = computePlayerStats('home', m);
+  const statsAway = computePlayerStats('away', m);
   const statsHeaders = ['Squadra', 'N° Maglia', 'Ruolo', 'Cognome e Nome', 'Goal', 'Assist', 'Ammonizioni', 'Espulsioni', 'Minuti giocati', 'Titolare'];
   const statsRows = [statsHeaders];
   statsHome.forEach(s => statsRows.push([m.home.name, s.num ?? '', s.role || '', s.name, s.goals, s.assists, s.yellows, s.reds, s.minutesPlayed || (s.minutesIn != null ? 0 : ''), s.starter ? 'Sì' : 'No']));
@@ -1905,14 +2017,22 @@ function exportMatchXlsx() {
   }
   const dateStr = matchDate.toISOString().slice(0, 10);
   const fname = `MyStatistics_${m.home.name}_vs_${m.away.name}_${dateStr}.xlsx`.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+  if (asBase64) {
+    return {
+      filename: fname,
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      dataBase64: XLSX.write(wb, { type: 'base64', bookType: 'xlsx' })
+    };
+  }
   XLSX.writeFile(wb, fname);
+  return { filename: fname };
 }
 
-function exportMatchPdf() {
-  if (!state.currentMatch) return;
+function exportMatchPdf(match, asBase64) {
+  const m = match || state.currentMatch;
+  if (!m) return null;
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const m = state.currentMatch;
   doc.setFillColor(10, 25, 41); doc.rect(0, 0, 210, 35, 'F');
   doc.setTextColor(255, 184, 77); doc.setFontSize(22); doc.setFont('helvetica', 'bold');
   doc.text('MY STATISTICS', 105, 14, { align: 'center' });
@@ -1923,8 +2043,8 @@ function exportMatchPdf() {
   doc.setTextColor(0, 0, 0); doc.setFontSize(16); doc.setFont('helvetica', 'bold');
   doc.text(`${m.home.name}  ${m.home.score} – ${m.away.score}  ${m.away.name}`, 105, 48, { align: 'center' });
   let y = 60;
-  const statsHome = computePlayerStats('home');
-  const statsAway = computePlayerStats('away');
+  const statsHome = computePlayerStats('home', m);
+  const statsAway = computePlayerStats('away', m);
   function drawTeamStats(teamName, stats, yStart) {
     doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 107, 53);
     doc.text(teamName.toUpperCase(), 14, yStart);
@@ -1979,7 +2099,311 @@ function exportMatchPdf() {
     doc.text(`Pagina ${i} di ${pageCount} — Generato da My Statistics`, 105, 293, { align: 'center' });
   }
   const fname = `referto_${m.home.name}_vs_${m.away.name}_${new Date(m.endedAt || m.createdAt).toISOString().slice(0,10)}.pdf`.replace(/\s+/g, '_');
+  if (asBase64) {
+    return {
+      filename: fname,
+      mimeType: 'application/pdf',
+      dataBase64: String(doc.output('datauristring')).split(',')[1]
+    };
+  }
   doc.save(fname);
+  return { filename: fname };
+}
+
+/* ==================== DASHBOARD STATISTICHE ==================== */
+/*
+ * Due viste nello stesso schermo, scelte dal menu a tendina:
+ *   - "Tutta la stagione": aggrega TUTTE le partite concluse
+ *   - una singola partita: gli stessi indicatori, limitati a quella gara
+ *
+ * La squadra di riferimento (la nostra) non e' configurata da nessuna parte:
+ * viene dedotta come il nome squadra che ricorre piu' spesso nello storico.
+ * Con un campionato e' sempre la propria, e non c'e' un'impostazione in piu'
+ * da ricordarsi di mettere a posto.
+ */
+
+function normTeam(name) {
+  return String(name == null ? '' : name).trim().toUpperCase().replace(/\s+/g, ' ');
+}
+
+function detectOurTeam(matches) {
+  const count = {};
+  matches.forEach(m => {
+    [m.home && m.home.name, m.away && m.away.name].forEach(n => {
+      const k = normTeam(n);
+      if (k) count[k] = (count[k] || 0) + 1;
+    });
+  });
+  let best = '', bestN = 0;
+  Object.keys(count).forEach(k => { if (count[k] > bestN) { bestN = count[k]; best = k; } });
+  return best;
+}
+
+function ourSideOf(m, ourKey) {
+  if (normTeam(m.away && m.away.name) === ourKey) return 'away';
+  return 'home';
+}
+
+function matchLabel(m) {
+  const d = new Date(m.endedAt || m.createdAt);
+  return d.toLocaleDateString('it-IT') + ' · ' + (m.home.name || 'Casa') + ' – ' + (m.away.name || 'Ospiti');
+}
+
+/* Aggrega squadra e calciatrici su un insieme di partite */
+function buildDashboardStats(matches, ourKey) {
+  const team = { played: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, yellows: 0, reds: 0 };
+  const players = {};
+  matches.forEach(m => {
+    const side = ourSideOf(m, ourKey);
+    const opp = side === 'home' ? 'away' : 'home';
+    const gf = m[side].score || 0;
+    const ga = m[opp].score || 0;
+    team.played++;
+    team.gf += gf;
+    team.ga += ga;
+    if (gf > ga) team.win++; else if (gf === ga) team.draw++; else team.loss++;
+    computePlayerStats(side, m).forEach(st => {
+      const key = normTeam(st.name);
+      if (!key) return;
+      if (!players[key]) players[key] = { name: st.name, num: st.num, goals: 0, assists: 0, yellows: 0, reds: 0, minutes: 0, apps: 0 };
+      const p = players[key];
+      if (st.num != null) p.num = st.num;
+      p.goals += st.goals;
+      p.assists += st.assists;
+      p.yellows += st.yellows;
+      p.reds += st.reds;
+      p.minutes += st.minutesPlayed || 0;
+      if (st.minutesIn != null) p.apps++;
+      team.yellows += st.yellows;
+      team.reds += st.reds;
+    });
+  });
+  return { team, players: Object.values(players) };
+}
+
+/* Barre orizzontali: una sola grandezza, un solo colore, valore in chiaro a destra */
+function barChartHtml(rows, unit) {
+  const top = rows.filter(r => r.value > 0).sort((a, b) => b.value - a.value).slice(0, 8);
+  if (top.length === 0) return '<div class="dash-empty">Nessun dato da mostrare</div>';
+  const max = top[0].value;
+  return top.map(r => {
+    const pct = Math.max(3, Math.round((r.value / max) * 100));
+    const label = escapeHtml(r.label);
+    const val = r.value + (unit || '');
+    return '<div class="bar-row" title="' + label + ': ' + val + '">'
+      + '<div class="bar-name">' + label + '</div>'
+      + '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%"></div></div>'
+      + '<div class="bar-value">' + val + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function playersTableHtml(players) {
+  if (players.length === 0) return '<div class="dash-empty">Nessuna calciatrice con dati registrati</div>';
+  const rows = players.slice().sort((a, b) => {
+    if (b.goals !== a.goals) return b.goals - a.goals;
+    if (b.assists !== a.assists) return b.assists - a.assists;
+    if (b.minutes !== a.minutes) return b.minutes - a.minutes;
+    return String(a.name).localeCompare(String(b.name));
+  });
+  const body = rows.map(p => '<tr>'
+    + '<td class="n' + (p.num == null ? ' dim' : '') + '">' + (p.num == null ? '—' : p.num) + '</td>'
+    + '<td>' + escapeHtml(p.name) + '</td>'
+    + '<td class="n">' + p.apps + '</td>'
+    + '<td class="n">' + p.minutes + "'" + '</td>'
+    + '<td class="n' + (p.goals ? '' : ' dim') + '">' + p.goals + '</td>'
+    + '<td class="n' + (p.assists ? '' : ' dim') + '">' + p.assists + '</td>'
+    + '<td class="n' + (p.yellows ? '' : ' dim') + '">' + p.yellows + '</td>'
+    + '<td class="n' + (p.reds ? '' : ' dim') + '">' + p.reds + '</td>'
+    + '</tr>').join('');
+  return '<div class="dash-scroll"><table class="dash-table">'
+    + '<thead><tr><th>N°</th><th>Cognome e nome</th><th>Presenze</th><th>Minuti</th>'
+    + '<th>⚽ Gol</th><th>🅰️ Assist</th><th>🟨 Gialli</th><th>🟥 Rossi</th></tr></thead>'
+    + '<tbody>' + body + '</tbody></table></div>';
+}
+
+function kpiHtml(label, value, sub) {
+  return '<div class="kpi"><div class="kpi-label">' + label + '</div>'
+    + '<div class="kpi-value">' + value + '</div>'
+    + (sub ? '<div class="kpi-sub">' + sub + '</div>' : '') + '</div>';
+}
+
+function openDashboard() {
+  const matches = loadMatches().filter(m => m.completed);
+  const sel = document.getElementById('dash-match-select');
+  const opts = ['<option value="__all__">Tutta la stagione (' + matches.length + ' partite concluse)</option>'];
+  matches.forEach(m => opts.push('<option value="' + m.id + '">' + escapeHtml(matchLabel(m)) + '</option>'));
+  sel.innerHTML = opts.join('');
+  sel.value = '__all__';
+  renderDashboard();
+  showScreen('dashboard-screen');
+}
+
+function renderDashboard() {
+  const all = loadMatches().filter(m => m.completed);
+  const ourKey = detectOurTeam(loadMatches());
+  const sel = document.getElementById('dash-match-select');
+  const choice = sel ? sel.value : '__all__';
+  const single = choice !== '__all__' ? all.find(m => m.id === choice) : null;
+  const matches = single ? [single] : all;
+
+  const scopeEl = document.getElementById('dash-scope');
+  const kpiEl = document.getElementById('dash-kpis');
+  const gridEl = document.getElementById('dash-grid');
+
+  if (matches.length === 0) {
+    scopeEl.textContent = 'Nessuna partita conclusa: la dashboard si popola dopo il primo "Termina partita".';
+    kpiEl.innerHTML = '';
+    gridEl.innerHTML = '<div class="dash-card wide"><div class="dash-empty">Ancora nessun dato.</div></div>';
+    return;
+  }
+
+  const st = buildDashboardStats(matches, ourKey);
+  const t = st.team;
+  const diff = t.gf - t.ga;
+
+  if (single) {
+    const side = ourSideOf(single, ourKey);
+    const opp = side === 'home' ? 'away' : 'home';
+    scopeEl.textContent = matchLabel(single) + ' · ' + (side === 'home' ? 'in casa' : 'in trasferta');
+    kpiEl.innerHTML =
+      kpiHtml('Risultato', single.home.score + ' – ' + single.away.score, escapeHtml(single[side].name) + ' vs ' + escapeHtml(single[opp].name))
+      + kpiHtml('Esito', t.win ? 'Vittoria' : (t.draw ? 'Pareggio' : 'Sconfitta'), '')
+      + kpiHtml('Gol fatti', t.gf, '')
+      + kpiHtml('Gol subiti', t.ga, '')
+      + kpiHtml('Cartellini', t.yellows + t.reds, '🟨 ' + t.yellows + ' gialli · 🟥 ' + t.reds + ' rossi');
+  } else {
+    scopeEl.textContent = (ourKey ? ourKey + ' · ' : '') + t.played + ' partite concluse';
+    const ptsPerMatch = t.played ? ((t.win * 3 + t.draw) / t.played).toFixed(2) : '0';
+    kpiEl.innerHTML =
+      kpiHtml('Partite', t.played, '')
+      + kpiHtml('Bilancio', t.win + '–' + t.draw + '–' + t.loss, 'vinte · pari · perse')
+      + kpiHtml('Punti', t.win * 3 + t.draw, ptsPerMatch + ' a partita')
+      + kpiHtml('Gol fatti', t.gf, (t.played ? (t.gf / t.played).toFixed(1) : '0') + ' a partita')
+      + kpiHtml('Gol subiti', t.ga, (t.played ? (t.ga / t.played).toFixed(1) : '0') + ' a partita')
+      + kpiHtml('Differenza reti', (diff > 0 ? '+' : '') + diff, '');
+  }
+
+  const goals = st.players.map(p => ({ label: p.name, value: p.goals }));
+  const assists = st.players.map(p => ({ label: p.name, value: p.assists }));
+  const minutes = st.players.map(p => ({ label: p.name, value: p.minutes }));
+
+  gridEl.innerHTML =
+    '<div class="dash-card"><div class="dash-card-title">⚽ Marcatrici</div>' + barChartHtml(goals, '') + '</div>'
+    + '<div class="dash-card"><div class="dash-card-title">🅰️ Assist</div>' + barChartHtml(assists, '') + '</div>'
+    + '<div class="dash-card"><div class="dash-card-title">⏱️ Minuti giocati</div>' + barChartHtml(minutes, "'") + '</div>'
+    + '<div class="dash-card wide"><div class="dash-card-title">Tutte le calciatrici</div>' + playersTableHtml(st.players) + '</div>';
+}
+
+/* ==================== REPORT PARTITA ==================== */
+/*
+ * Tre passi: partita -> formato (PDF/Excel) -> invio via email.
+ * L'email parte dal backend Apps Script, che gira con l'account Google di Max:
+ * il browser non puo' allegare file a una mail, mailto: non supporta allegati.
+ */
+let reportSel = { matchId: null, format: null };
+
+function openReportModal() {
+  const matches = loadMatches();
+  reportSel = { matchId: null, format: null };
+  const list = document.getElementById('report-match-list');
+  if (matches.length === 0) {
+    list.innerHTML = '<div class="dash-empty">Nessuna partita in archivio.</div>';
+  } else {
+    list.innerHTML = matches.map(m => {
+      const d = new Date(m.endedAt || m.createdAt);
+      return '<button class="report-item" data-id="' + m.id + '" onclick="setReportMatch(\'' + m.id + '\')">'
+        + '<span><span class="rm">' + escapeHtml((m.home.name || 'Casa') + ' – ' + (m.away.name || 'Ospiti')) + '</span><br>'
+        + '<span class="rd">' + d.toLocaleDateString('it-IT') + (m.completed ? '' : ' · in corso') + '</span></span>'
+        + '<span class="rs">' + m.home.score + '–' + m.away.score + '</span></button>';
+    }).join('');
+  }
+  document.getElementById('report-step-format').style.display = 'none';
+  document.getElementById('report-send').style.display = 'none';
+  document.getElementById('report-download').style.display = 'none';
+  setReportStatus('', '');
+  document.getElementById('report-modal').classList.add('active');
+}
+
+function setReportMatch(id) {
+  reportSel.matchId = id;
+  document.querySelectorAll('#report-match-list .report-item').forEach(b => {
+    b.className = 'report-item' + (b.getAttribute('data-id') === id ? ' selected' : '');
+  });
+  const m = loadMatches().find(x => x.id === id);
+  document.getElementById('report-step-format').style.display = '';
+  document.getElementById('report-to').value = REPORT_DEFAULT_TO;
+  document.getElementById('report-subject').value = m
+    ? 'Report partita ' + m.home.name + ' – ' + m.away.name + ' (' + new Date(m.endedAt || m.createdAt).toLocaleDateString('it-IT') + ')'
+    : 'Report partita';
+  setReportStatus('', '');
+}
+
+function setReportFormat(fmt) {
+  reportSel.format = fmt;
+  document.getElementById('report-fmt-pdf').className = 'report-fmt-btn' + (fmt === 'pdf' ? ' selected' : '');
+  document.getElementById('report-fmt-xlsx').className = 'report-fmt-btn' + (fmt === 'xlsx' ? ' selected' : '');
+  document.getElementById('report-send').style.display = '';
+  document.getElementById('report-download').style.display = '';
+}
+
+function setReportStatus(text, kind) {
+  const el = document.getElementById('report-status');
+  if (!el) return;
+  el.innerHTML = text;
+  el.className = 'report-status' + (text ? ' active ' + (kind || '') : '');
+}
+
+function buildReportFile(asBase64) {
+  const m = loadMatches().find(x => x.id === reportSel.matchId);
+  if (!m) throw new Error('Partita non trovata');
+  if (!reportSel.format) throw new Error('Scegli il formato del report');
+  return reportSel.format === 'pdf' ? exportMatchPdf(m, asBase64) : exportMatchXlsx(m, asBase64);
+}
+
+function downloadReport() {
+  try {
+    buildReportFile(false);
+    setReportStatus('✅ Report generato: cerca il file tra i download del dispositivo.', 'ok');
+  } catch (e) {
+    setReportStatus('❌ ' + humanOcrError(e.message || e), 'err');
+  }
+}
+
+async function sendReportByEmail() {
+  const to = document.getElementById('report-to').value.trim();
+  const subject = document.getElementById('report-subject').value.trim();
+  if (!to) { setReportStatus('❌ Inserisci almeno un destinatario.', 'err'); return; }
+  const sheetsUrl = getSheetsUrl();
+  if (!sheetsUrl) { setReportStatus('❌ URL del backend non impostato: vai in ⚙️ Impostazioni.', 'err'); return; }
+  const btn = document.getElementById('report-send');
+  btn.disabled = true;
+  try {
+    setReportStatus('⏳ Generazione del report...', 'wait');
+    const file = buildReportFile(true);
+    setReportStatus('⏳ Invio dell\'email in corso...', 'wait');
+    const res = await fetch(sheetsUrl, {
+      method: 'POST', mode: 'cors', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'sendReport',
+        to: to,
+        subject: subject || 'Report partita',
+        body: 'In allegato il report generato con My Statistics.\n\n— A.S.D. Fiamma Monza 1970',
+        filename: file.filename,
+        mimeType: file.mimeType,
+        dataBase64: file.dataBase64
+      })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Errore dal backend');
+    setReportStatus('✅ Email inviata a ' + escapeHtml(to) + '.'
+      + (data.remainingQuota != null ? '<br><span style="color:#7a96b3">Email ancora inviabili oggi: ' + data.remainingQuota + '</span>' : ''), 'ok');
+  } catch (e) {
+    setReportStatus('❌ ' + humanOcrError(e.message || e), 'err');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
