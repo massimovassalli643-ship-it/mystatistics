@@ -19,7 +19,7 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.6 / backend v5.1 (deployato, email funzionante) — Cronometro, rose a 4 colonne, distinte da Drive, dashboard + report via email (13/09/2026)
+## Stato attuale: v3.6 / backend v5 (in attesa di autorizzazione email) — Cronometro, rose a 4 colonne, distinte da Drive (13/09/2026)
 
 ### Novità v3.2 (12/09/2026)
 
@@ -337,12 +337,10 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [x] Test end-to-end `driveList` + `driveOcr` su PDF reale: 20/20 (22:20)
 - [x] Frontend v3.2 pushato e online (rose a 4 colonne + pulsante Drive)
 - [x] Backend v4.1 (versione 12) e v4.2 (versione 13) sui 3 deployment, testate
-- [x] Frontend v3.6 pushato e online (dashboard statistiche + report, verificato via fetch sul sito live 13/09/2026 mattina)
-- [x] `testInvioEmail()` eseguita: errore "Specified permissions are not sufficient... userinfo.email" — causa: `Session.getEffectiveUser()` richiede uno scope non dichiarato in `appsscript.json`. Fix v5.1: la funzione ora invia a un indirizzo fisso (`massimo.vassalli643@gmail.com`) invece di leggere l'utente effettivo — non serve più quello scope (13/09/2026 07:42)
-- [x] `testInvioEmail()` rieseguita dopo il fix: email inviata correttamente, nessuna nuova autorizzazione richiesta (il permesso `script.send_mail` era già concesso) — quota residua 99/giorno (13/09/2026 07:42)
-- [x] Backend v5.1 (versione 14) pubblicato su tutti e 3 i deployment attivi (13/09/2026 07:43-07:47)
 - [ ] **A carico di Max**: ricaricare il credito API su console.anthropic.com → Settings → Billing (l'OCR è fermo finché non lo fai)
-- [ ] Test reale: dalla Dashboard aprire Report per una partita, scegliere PDF o Excel, inviare a se stessi via email e verificare l'allegato ricevuto
+- [ ] **A carico di Max**: eseguire `testInvioEmail()` nell'editor Apps Script e autorizzare l'invio email, **poi** pubblicare la versione 14 sui 3 deployment
+- [ ] **A carico di Max**: `git add -A && git commit && git push origin main` per il frontend v3.6
 - [ ] Prova sul campo: far girare il cronometro, registrare un goal, verificare che il tempo non si fermi; inserire 3' di recupero e controllare il conto alla rovescia
-- [ ] Test reale sull'iPad con la distinta cartacea: confrontare i nomi con la distinta
+- [ ] Dopo il push: sull'iPad chiudere e riaprire l'app, poi provare "Carica file" → deve comparire l'elenco delle distinte (GitHub Pages ridistribuisce in 1–2 minuti), poi sull'iPad chiudere e riaprire l'app
+- [ ] Test reale sull'iPad con la distinta cartacea del 13/09/2026 (foto in verticale, foglio che riempie il frame): confrontare i nomi con la distinta
 - [ ] Se un nome esce con `?`: è voluto (carattere ambiguo) — correggere inline, non è un errore dell'app
