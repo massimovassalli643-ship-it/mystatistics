@@ -19,7 +19,17 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.8 — Svuota rosa/formazione, niente più duplicati OCR (13/09/2026)
+## Stato attuale: v3.9 — Rimosso il badge ruolo dalla formazione iniziale (13/09/2026)
+
+### Novità v3.9 (13/09/2026)
+
+Rimosso il badge di ruolo (GK/DEF/MID/FWD/LM, o "—" se assente) dalle righe
+della schermata "Formazione iniziale", per entrambe le squadre: confermato
+in precedenza che il ruolo non è un campo utile per chi usa l'app (era stato
+tolto già come colonna dalla rosa). Il campo `role` resta comunque nel
+modello dati — lo imposta l'OCR per i portieri "(P)" — perché continua ad
+alimentare l'ordinamento della lista (portieri in cima) e la colonna Ruolo
+negli export; è stato tolto solo dalla visualizzazione di questa schermata.
 
 ### Novità v3.8 (13/09/2026)
 

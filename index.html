@@ -109,6 +109,8 @@
   .roster-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
   .roster-name { font-size: 16px; font-weight: 700; }
   .roster-count { font-size: 13px; color: #7a96b3; background: rgba(255,255,255,0.08); padding: 4px 10px; border-radius: 12px; }
+  .roster-clear-btn { background: rgba(231,76,60,0.15); border: 1px solid rgba(231,76,60,0.35); color: #ff8a80; border-radius: 8px; padding: 4px 8px; font-size: 13px; cursor: pointer; line-height: 1; }
+  .roster-clear-btn:active { background: rgba(231,76,60,0.3); }
   .ocr-upload {
     width: 100%;
     background: linear-gradient(135deg, rgba(127,184,255,0.15), rgba(127,184,255,0.05));
@@ -402,7 +404,10 @@
         <div class="roster-panel">
           <div class="roster-header">
             <div class="roster-name" id="roster-home-name">Casa</div>
-            <div class="roster-count" id="roster-home-count">0 atlete</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div class="roster-count" id="roster-home-count">0 atlete</div>
+              <button class="roster-clear-btn" title="Svuota tutta la rosa" onclick="clearRoster('home')">🗑️</button>
+            </div>
           </div>
           <div class="ocr-upload-row">
             <label class="ocr-upload">
@@ -427,7 +432,10 @@
         <div class="roster-panel">
           <div class="roster-header">
             <div class="roster-name" id="roster-away-name">Ospiti</div>
-            <div class="roster-count" id="roster-away-count">0 atlete</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div class="roster-count" id="roster-away-count">0 atlete</div>
+              <button class="roster-clear-btn" title="Svuota tutta la rosa" onclick="clearRoster('away')">🗑️</button>
+            </div>
           </div>
           <div class="ocr-upload-row">
             <label class="ocr-upload">
@@ -465,14 +473,20 @@
       <div class="lineup-panel">
         <div class="lineup-header">
           <div class="roster-name" id="lineup-home-name">Casa</div>
-          <div class="lineup-counter" id="lineup-home-counter">0 / 11</div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="roster-clear-btn" title="Deseleziona tutte" onclick="clearLineup('home')">🗑️</button>
+            <div class="lineup-counter" id="lineup-home-counter">0 / 11</div>
+          </div>
         </div>
         <div id="lineup-home-list"></div>
       </div>
       <div class="lineup-panel">
         <div class="lineup-header">
           <div class="roster-name" id="lineup-away-name">Ospiti</div>
-          <div class="lineup-counter" id="lineup-away-counter">0 / 11</div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="roster-clear-btn" title="Deseleziona tutte" onclick="clearLineup('away')">🗑️</button>
+            <div class="lineup-counter" id="lineup-away-counter">0 / 11</div>
+          </div>
         </div>
         <div id="lineup-away-list"></div>
       </div>
@@ -893,6 +907,16 @@ function confirmRosterRow(side, idx) {
   persistCurrent();
   renderRoster(side);
 }
+function clearRoster(side) {
+  const roster = state.currentMatch[side].roster;
+  if (roster.length === 0) return;
+  const teamName = state.currentMatch[side].name || (side === 'home' ? 'Casa' : 'Ospiti');
+  if (!confirm(`Svuotare tutta la rosa di ${teamName}? Le ${roster.length} atlete inserite andranno perse.`)) return;
+  state.currentMatch[side].roster = [];
+  state.rosterEdit[side] = {};
+  persistCurrent();
+  renderRoster(side);
+}
 function addRosterRow(side) {
   const roster = state.currentMatch[side].roster;
   roster.push({ num: null, name: '', role: '', birthDate: '' });
@@ -1124,8 +1148,29 @@ function applyOcrResult(result, side, progressEl) {
         });
       });
 
+      // Unione con la rosa esistente per NOME (non semplice accodamento):
+      // se una calciatrice è già in rosa, questa lettura la corregge invece
+      // di creare una riga duplicata con un numero diverso — un secondo
+      // scatto/scansione della stessa distinta (es. dopo una foto sfocata)
+      // non deve raddoppiare le atlete già presenti.
       const existing = state.currentMatch[side].roster.filter(p => p.num || p.name);
-      state.currentMatch[side].roster = [...existing, ...formatted];
+      const byName = new Map(existing.map(p => [normalizeOcrName(p.name), p]));
+      let corrette = 0, nuove = 0;
+      formatted.forEach(np => {
+        const key = normalizeOcrName(np.name);
+        const prev = key ? byName.get(key) : null;
+        if (prev) {
+          prev.num = np.num;
+          if (np.birthDate) prev.birthDate = np.birthDate;
+          if (np.role) prev.role = np.role;
+          corrette++;
+        } else {
+          existing.push(np);
+          if (key) byName.set(key, np);
+          nuove++;
+        }
+      });
+      state.currentMatch[side].roster = existing;
       state.rosterEdit[side] = {};   // le righe dall'OCR nascono in sola lettura
       persistCurrent();
       renderRoster(side);
@@ -1138,7 +1183,8 @@ function applyOcrResult(result, side, progressEl) {
         costInfo = ' • ' + (inTok + outTok) + ' token (~$' + cost + ')';
       }
       const dubbi = formatted.filter(p => /\?|ILLEGGIBILE/.test(p.name)).length;
-      progressEl.innerHTML = '✅ ' + formatted.length + ' atlete riconosciute'
+      progressEl.innerHTML = '✅ ' + nuove + ' nuove'
+        + (corrette ? ' • ' + corrette + ' corrette' : '')
         + (teamName ? ' • ' + teamName : '')
         + (dubbi ? ' • ⚠️ ' + dubbi + ' da verificare' : '')
         + costInfo;
@@ -1328,11 +1374,13 @@ function renderLineupPanel(side) {
   });
   list.innerHTML = sorted.map(p => {
     const isSelected = lineup.some(l => l.num === p.num && l.name === p.name);
-    const roleClass = p.role ? p.role.toLowerCase() : '';
+    // Il ruolo non è un campo utile per chi usa l'app (la distinta FIGC non
+    // lo riporta se non per i portieri): non va mostrato qui. Resta comunque
+    // nel modello dati, dove alimenta l'ordinamento sopra e la colonna Ruolo
+    // negli export.
     return `
       <div class="player-toggle ${isSelected ? 'selected' : ''}" onclick="toggleLineup('${side}', ${p.num}, ${JSON.stringify(p.name).replace(/"/g,'&quot;')})">
         <div class="player-num">${p.num ?? '?'}</div>
-        <div class="player-role-badge ${roleClass}">${p.role || '—'}</div>
         <div class="player-name">${escapeHtml(p.name || 'Senza nome')}</div>
         ${isSelected ? '<div style="color:#2ecc71;font-size:18px;">✓</div>' : ''}
       </div>
@@ -1349,6 +1397,17 @@ function toggleLineup(side, num, name) {
   if (idx >= 0) lineup.splice(idx, 1);
   else if (lineup.length < 11) lineup.push({ num, name });
   else { alert('Hai già selezionato 11 titolari'); return; }
+  renderLineupPanel(side);
+}
+
+/* Azzera la formazione titolare di una squadra con un tocco: serve sia per
+   correggere una selezione sbagliata, sia perché una partita ripresa da uno
+   stato salvato in precedenza (es. una prova fatta prima della gara) può
+   arrivare qui con una formazione già parzialmente compilata. */
+function clearLineup(side) {
+  if (state.currentMatch.lineup[side].length === 0) return;
+  if (!confirm('Deselezionare tutte le titolari di questa squadra?')) return;
+  state.currentMatch.lineup[side] = [];
   renderLineupPanel(side);
 }
 
