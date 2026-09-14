@@ -240,9 +240,15 @@
   .event-type { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; color: #b8d4ed; }
   .event-detail { color: #e8f0f7; font-weight: 600; }
   .event-sub-detail { color: #7a96b3; font-size: 11px; margin-top: 2px; }
-  .event-delete { background: rgba(220,53,69,0.2); color: #ff6b7a; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700; align-self: center; }
+  .event-actions { display: flex; gap: 4px; align-self: center; }
+  .event-delete { background: rgba(220,53,69,0.2); color: #ff6b7a; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700; }
+  .event-edit { background: rgba(127,184,255,0.2); color: #7fb8ff; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700; }
   .events-empty { text-align: center; padding: 40px 20px; color: #5a7793; font-size: 13px; }
   .end-match-btn { margin: 12px 16px; background: linear-gradient(135deg, #e74c3c, #c0392b); color: white; padding: 14px; border-radius: 10px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+  .end-match-btn.back-to-summary { background: linear-gradient(135deg, #3d6fa8, #2a5080); }
+  .edit-mode-banner { background: rgba(255,184,77,0.15); border: 1px solid rgba(255,184,77,0.4); color: #ffb84d; padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; text-align: center; margin: 0 20px 14px; }
+  .primary-btn.needs-sync { box-shadow: 0 0 0 3px rgba(255,184,77,0.55); animation: pulseSync 1.6s ease-in-out infinite; }
+  @keyframes pulseSync { 0%, 100% { box-shadow: 0 0 0 3px rgba(255,184,77,0.55); } 50% { box-shadow: 0 0 0 6px rgba(255,184,77,0.25); } }
 
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
   .modal-overlay.active { display: flex; }
@@ -321,6 +327,10 @@
   .summary-score { font-size: 48px; font-weight: 900; color: #ffb84d; font-variant-numeric: tabular-nums; }
   .summary-section { margin-bottom: 22px; }
   .summary-event-list .event-item { animation: none; }
+  /* Nel riepilogo la cronologia resta di sola lettura: modifica/elimina sugli
+     eventi passano solo dalla match-screen, raggiungibile col tasto "✏️
+     Modifica" e la relativa conferma esplicita (vedi enterMatchEditMode). */
+  .summary-event-list .event-actions { display: none; }
   .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   .stats-panel { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; }
   .stats-panel-title { font-size: 14px; font-weight: 700; color: #ffb84d; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -516,6 +526,8 @@
         </div>
       </div>
 
+      <div class="edit-mode-banner" id="edit-mode-banner" style="display:none;">✏️ Modalità modifica — partita conclusa, cronometro disattivato</div>
+
       <div class="timer-section">
         <div class="timer-display">
           <div class="timer-unit">
@@ -568,7 +580,8 @@
       <div class="events-list" id="events-list">
         <div class="events-empty">Nessun evento registrato</div>
       </div>
-      <button class="end-match-btn" onclick="endMatch()">🏁 Termina partita</button>
+      <button class="end-match-btn" id="end-match-btn" onclick="endMatch()">🏁 Termina partita</button>
+      <button class="end-match-btn back-to-summary" id="back-to-summary-btn" style="display:none;" onclick="exitMatchEditMode()">↩️ Torna al riepilogo</button>
     </div>
   </div>
 
@@ -577,6 +590,7 @@
       <div class="summary-teams" id="summary-teams"></div>
       <div class="summary-score" id="summary-score"></div>
       <div style="color: #7a96b3; margin-top: 8px; font-size: 14px;" id="summary-date"></div>
+      <div style="color: #ffb84d; margin-top: 4px; font-size: 13px;" id="summary-edited"></div>
     </div>
 
     <div class="summary-section">
@@ -598,10 +612,11 @@
 
     <div class="setup-footer">
       <button class="secondary-btn" onclick="goHome()">← Home</button>
+      <button class="secondary-btn" onclick="enterMatchEditMode()">✏️ Modifica</button>
       <button class="secondary-btn" onclick="exportCurrentMatch()">📤 JSON</button>
       <button class="secondary-btn" onclick="exportMatchXlsx()">📊 Excel</button>
       <button class="secondary-btn" onclick="exportMatchPdf()">📄 PDF</button>
-      <button class="primary-btn" onclick="syncToSheets()">☁️ Sincronizza su Sheets</button>
+      <button class="primary-btn" id="sync-btn" onclick="syncToSheets()">☁️ Sincronizza su Sheets</button>
     </div>
   </div>
 
@@ -1448,6 +1463,40 @@ function renderMatchScreen() {
   syncStoppageInput();
   renderMatchInfo();
   updateTimerDisplay();
+  applyMatchScreenMode();
+}
+
+/* Una partita già completata può essere riaperta qui (vedi enterMatchEditMode)
+   per correggere eventi/formazione: in quel caso il cronometro e i suoi
+   controlli vanno nascosti (non deve poter ripartire su una gara finita) e
+   "Termina partita" va sostituito da "Torna al riepilogo". */
+function applyMatchScreenMode() {
+  const m = state.currentMatch;
+  const editing = !!(m && m.completed);
+  const banner = document.getElementById('edit-mode-banner');
+  const stoppageBox = document.querySelector('#match-screen .stoppage-box');
+  const timerControls = document.querySelector('#match-screen .timer-controls');
+  const endBtn = document.getElementById('end-match-btn');
+  const backBtn = document.getElementById('back-to-summary-btn');
+  if (banner) banner.style.display = editing ? 'block' : 'none';
+  if (stoppageBox) stoppageBox.style.display = editing ? 'none' : '';
+  if (timerControls) timerControls.style.display = editing ? 'none' : '';
+  if (endBtn) endBtn.style.display = editing ? 'none' : '';
+  if (backBtn) backBtn.style.display = editing ? '' : 'none';
+}
+
+function enterMatchEditMode() {
+  if (!state.currentMatch) return;
+  if (!confirm('Stai per modificare una partita già conclusa.\n\nLe correzioni restano solo su questo dispositivo finché non premi di nuovo "☁️ Sincronizza su Sheets" dal riepilogo.\n\nContinuare?')) return;
+  renderMatchScreen();
+  showScreen('match-screen');
+}
+
+function exitMatchEditMode() {
+  if (!state.currentMatch) return;
+  state.currentMatch.editedAt = Date.now();
+  persistCurrent();
+  renderSummary();
 }
 
 /* Aggiornamento dopo un evento: punteggio, nomi, cronologia. Mai il cronometro. */
@@ -1584,8 +1633,27 @@ function openEventModal(type) {
   if (!state.currentMatch) return;
   const periodMinute = Math.floor(currentElapsedMs() / 60000);
   currentEventDraft = { type, team: 'home', periodMinute, period: state.timer.periodIndex };
+  showEventModal(type);
+}
+
+/* Riapre il modal su un evento già registrato, precompilato con i suoi dati,
+   per correggerlo senza doverlo cancellare e reinserire da capo. Copia
+   profonda: l'evento originale in state.currentMatch.events resta intatto
+   finché non si conferma, così confirmEvent può ancora consultarlo per
+   annullare correttamente l'effetto sul punteggio di un goal modificato. */
+function editEvent(id) {
+  if (!state.currentMatch) return;
+  const ev = state.currentMatch.events.find(e => e.id === id);
+  if (!ev) return;
+  currentEventDraft = JSON.parse(JSON.stringify(ev));
+  currentEventDraft.editingId = ev.id;
+  showEventModal(ev.type);
+}
+
+function showEventModal(type) {
   const titles = { goal: '⚽ Goal', yellow: '🟨 Ammonizione', red: '🟥 Espulsione', sub: '🔄 Sostituzione' };
-  document.getElementById('event-modal-title').textContent = titles[type];
+  const isEdit = !!currentEventDraft.editingId;
+  document.getElementById('event-modal-title').textContent = (isEdit ? 'Modifica · ' : '') + titles[type];
   renderEventModalBody();
   document.getElementById('event-modal-confirm').onclick = confirmEvent;
   document.getElementById('event-modal').classList.add('active');
@@ -1624,14 +1692,16 @@ function renderEventModalBody() {
   `;
 
   if (type === 'goal') {
+    const scorerSel = currentEventDraft.scorer ? `${currentEventDraft.scorer.num}|${currentEventDraft.scorer.name}` : null;
+    const assistSel = currentEventDraft.assist ? `${currentEventDraft.assist.num}|${currentEventDraft.assist.name}` : null;
     body += `
       <div class="modal-field">
         <label class="modal-label">Marcatrice</label>
-        ${playerSelect('event-scorer', currentEventDraft.team)}
+        ${playerSelect('event-scorer', currentEventDraft.team, false, scorerSel)}
       </div>
       <div class="modal-field">
         <label class="modal-label">Assist (opzionale)</label>
-        ${playerSelect('event-assist', currentEventDraft.team, true)}
+        ${playerSelect('event-assist', currentEventDraft.team, true, assistSel)}
       </div>
       <div class="modal-field">
         <label class="modal-label">Tipo</label>
@@ -1642,20 +1712,23 @@ function renderEventModalBody() {
         </div>
       </div>`;
   } else if (type === 'yellow' || type === 'red') {
+    const playerSel = currentEventDraft.player ? `${currentEventDraft.player.num}|${currentEventDraft.player.name}` : null;
     body += `
       <div class="modal-field">
         <label class="modal-label">Calciatrice</label>
-        ${playerSelect('event-player', currentEventDraft.team)}
+        ${playerSelect('event-player', currentEventDraft.team, false, playerSel)}
       </div>`;
   } else if (type === 'sub') {
+    const outSel = currentEventDraft.playerOut ? `${currentEventDraft.playerOut.num}|${currentEventDraft.playerOut.name}` : null;
+    const inSel = currentEventDraft.playerIn ? `${currentEventDraft.playerIn.num}|${currentEventDraft.playerIn.name}` : null;
     body += `
       <div class="modal-field">
         <label class="modal-label">Esce</label>
-        ${playerSelect('event-out', currentEventDraft.team)}
+        ${playerSelect('event-out', currentEventDraft.team, false, outSel)}
       </div>
       <div class="modal-field">
         <label class="modal-label">Entra</label>
-        ${playerSelect('event-in', currentEventDraft.team)}
+        ${playerSelect('event-in', currentEventDraft.team, false, inSel)}
       </div>
       <div class="modal-field">
         <label class="modal-label">Motivo</label>
@@ -1669,12 +1742,14 @@ function renderEventModalBody() {
   document.getElementById('event-modal-body').innerHTML = body;
 }
 
-function playerSelect(id, team, optional = false) {
+function playerSelect(id, team, optional = false, selectedVal = null) {
   const roster = state.currentMatch[team].roster;
   const sorted = [...roster].sort((a, b) => (a.num || 99) - (b.num || 99));
   const opts = sorted.map(p => {
     const roleStr = p.role ? `[${p.role}] ` : '';
-    return `<option value="${p.num}|${escapeHtml(p.name)}">${p.num ?? '?'} - ${roleStr}${escapeHtml(p.name || 'Senza nome')}</option>`;
+    const val = `${p.num}|${p.name}`;
+    const sel = selectedVal === val ? ' selected' : '';
+    return `<option value="${p.num}|${escapeHtml(p.name)}"${sel}>${p.num ?? '?'} - ${roleStr}${escapeHtml(p.name || 'Senza nome')}</option>`;
   }).join('');
   return `<select class="modal-select" id="${id}">
     <option value="">${optional ? '— Nessuno —' : '— Seleziona —'}</option>
@@ -1705,13 +1780,27 @@ function confirmEvent() {
   currentEventDraft.minute = periodMinute + (PERIOD_OFFSETS[currentEventDraft.period] || 0);
 
   const { type, team } = currentEventDraft;
+  const isEdit = !!currentEventDraft.editingId;
+  // L'evento originale (se stiamo modificando) è ancora intatto nell'array:
+  // currentEventDraft è una copia separata, mutata solo qui in memoria finché
+  // non si conferma.
+  const originalEvent = isEdit ? state.currentMatch.events.find(e => e.id === currentEventDraft.editingId) : null;
+
   if (type === 'goal') {
     const scorerVal = document.getElementById('event-scorer').value;
     if (!scorerVal) { alert('Seleziona la marcatrice'); return; }
     if (!currentEventDraft.goalType) currentEventDraft.goalType = 'azione';
     currentEventDraft.scorer = parsePlayer(scorerVal);
     const assistVal = document.getElementById('event-assist').value;
-    if (assistVal) currentEventDraft.assist = parsePlayer(assistVal);
+    currentEventDraft.assist = assistVal ? parsePlayer(assistVal) : null;
+    // Prima si annulla l'effetto sul punteggio dell'evento originale (se lo
+    // stiamo correggendo), poi si applica quello nuovo: così cambiare
+    // squadra o tipo (es. autogol ↔ goal normale) in fase di modifica non
+    // sballa il risultato.
+    if (originalEvent && originalEvent.type === 'goal') {
+      if (originalEvent.goalType === 'autogol') state.currentMatch[originalEvent.team === 'home' ? 'away' : 'home'].score--;
+      else state.currentMatch[originalEvent.team].score--;
+    }
     if (currentEventDraft.goalType === 'autogol') {
       state.currentMatch[team === 'home' ? 'away' : 'home'].score++;
     } else {
@@ -1730,9 +1819,15 @@ function confirmEvent() {
     if (!currentEventDraft.subReason) currentEventDraft.subReason = 'tattica';
   }
 
-  currentEventDraft.id = 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-  currentEventDraft.timestamp = Date.now();
-  state.currentMatch.events.push(currentEventDraft);
+  if (isEdit) {
+    const idx = state.currentMatch.events.findIndex(e => e.id === currentEventDraft.editingId);
+    delete currentEventDraft.editingId;
+    if (idx !== -1) state.currentMatch.events[idx] = currentEventDraft;
+  } else {
+    currentEventDraft.id = 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    currentEventDraft.timestamp = Date.now();
+    state.currentMatch.events.push(currentEventDraft);
+  }
   persistCurrent();
   renderMatchInfo();   // NON renderMatchScreen: il cronometro deve continuare a correre
   closeModal('event-modal');
@@ -1796,7 +1891,10 @@ function eventCardHtml(e) {
         <div class="event-detail">${detail}</div>
         ${subDetail ? `<div class="event-sub-detail">${subDetail}</div>` : ''}
       </div>
-      <button class="event-delete" onclick="deleteEvent('${e.id}')">×</button>
+      <div class="event-actions">
+        <button class="event-edit" onclick="editEvent('${e.id}')" title="Modifica">✏️</button>
+        <button class="event-delete" onclick="deleteEvent('${e.id}')" title="Elimina">×</button>
+      </div>
     </div>
   `;
 }
@@ -1923,6 +2021,18 @@ function renderSummary() {
   document.getElementById('summary-score').textContent = `${m.home.score} – ${m.away.score}`;
   const d = new Date(m.endedAt || m.createdAt).toLocaleString('it-IT');
   document.getElementById('summary-date').textContent = d;
+  const editedEl = document.getElementById('summary-edited');
+  if (editedEl) {
+    editedEl.textContent = m.editedAt ? ('✏️ Ultima modifica: ' + new Date(m.editedAt).toLocaleString('it-IT')) : '';
+  }
+  const syncBtn = document.getElementById('sync-btn');
+  if (syncBtn) {
+    // Se è stata corretta dopo l'ultima sincronizzazione (o non è mai stata
+    // sincronizzata), il tasto lampeggia per ricordare di rimandare i dati
+    // aggiornati su Sheets.
+    const needsSync = !m.syncedAt || (m.editedAt && m.editedAt > m.syncedAt);
+    syncBtn.classList.toggle('needs-sync', !!needsSync);
+  }
 
   const statsHome = computePlayerStats('home');
   const statsAway = computePlayerStats('away');
@@ -2614,6 +2724,7 @@ async function syncToSheets() {
       if (btn) {
         btn.innerHTML = '✅ Sincronizzato!';
         btn.style.background = 'linear-gradient(135deg, #27ae60, #2ecc71)';
+        btn.classList.remove('needs-sync');
       }
       setTimeout(() => {
         alert(`✅ Partita sincronizzata su Google Sheets!\n\n${result.home} vs ${result.away} (${result.score})\n${result.statsRows} righe statistiche\n${result.eventiRows} eventi\nSalvato il ${result.savedAt}`);

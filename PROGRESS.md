@@ -19,9 +19,43 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.10 — Minuto ed evento diviso in "tempo" (13/09/2026)
+## Stato attuale: v3.11 — Partite concluse modificabili (14/09/2026)
 
-### Novità v3.10 (13/09/2026)
+### Novità v3.11 (14/09/2026)
+
+**Correzione dati dopo la fine della partita.** Finora una partita marcata
+"Completata" si apriva solo sul riepilogo di sola lettura: per correggere un
+errore (un goal segnato dalla giocatrice sbagliata, un cartellino attribuito
+al tempo sbagliato, ecc.) non c'era alternativa a cancellare la partita e
+rifarla da capo. Ora:
+
+- Sul riepilogo, un nuovo pulsante **"✏️ Modifica"** (accanto a Home) chiede
+  conferma esplicita ("le correzioni restano solo su questo dispositivo
+  finché non premi di nuovo Sincronizza") e riapre la partita nella
+  schermata di gara normale, ma con il cronometro e i suoi controlli
+  nascosti (sostituiti da un banner "Modalità modifica") — non deve poter
+  ripartire un tempo su una gara già finita. Da lì rosa, formazione ed
+  eventi sono modificabili con gli strumenti già esistenti; un pulsante
+  "↩️ Torna al riepilogo" chiude la modifica.
+- **Modifica diretta di un evento**: ogni evento in cronologia ha ora,
+  oltre alla ×, anche una ✏️ che riapre il modal precompilato con marcatrice,
+  assist, tipo, minuto/tempo ecc. già impostati — non serve più cancellare e
+  reinserire un evento per correggerlo. Il punteggio resta coerente anche
+  se si cambia squadra o tipo di un goal (autogol ↔ regolare): l'effetto
+  del goal originale viene prima annullato, poi riapplicato con i nuovi dati.
+  Nel riepilogo la cronologia resta invece di sola lettura (le azioni di
+  modifica/elimina compaiono solo nella match-screen), per evitare tocchi
+  accidentali su dati già consolidati fuori dal percorso guidato sopra.
+- La partita registra ora anche **`editedAt`** (quando si chiude la
+  modifica): il riepilogo mostra "✏️ Ultima modifica: ..." sotto la data, e
+  il pulsante "☁️ Sincronizza su Sheets" lampeggia quando ci sono modifiche
+  non ancora inviate (mai sincronizzata, oppure modificata dopo l'ultimo
+  invio) — per non dimenticarsi di rimandare la correzione online. Nessuna
+  modifica al backend: la sincronizzazione già sostituiva le righe esistenti
+  per `match.id` invece di accodarle, quindi correggere e ri-sincronizzare
+  non crea doppioni su Sheets.
+
+### Novità v3.10 — Minuto ed evento diviso in "tempo" (13/09/2026)
 
 Nella schermata di inserimento evento (goal, ammonizione, espulsione,
 sostituzione), la riga "Minuto" ora è divisa in due metà:
