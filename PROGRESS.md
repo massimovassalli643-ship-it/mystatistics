@@ -36,7 +36,11 @@ stampato piccolo *fuori* dalla tabella (1, 2, 3…) e i **numeri di maglia** a
 mano *dentro* la tabella.
 
 - **Backend v5.3 (solo prompt, nessun nuovo scope)**: descrive i due tipi di
-  numeri e dice di leggere sempre quello a mano nella cella; `null` solo se la
+  numeri e dice di leggere sempre quello a mano nella cella. Il numero di maglia
+  è **solo** la colonna con il titolo "N° del Ruolo" (regola già della v4.2),
+  con un punto di riferimento fisso: è la cella subito a sinistra della data di
+  nascita; la colonnina senza titolo più a sinistra non è mai il numero, anche
+  se una cifra a penna la sfiora (nella foto il "13" tocca il contatore). `null` solo se la
   cella è vuota (distinta digitale non compilata) o la cifra è davvero
   ambigua ("meglio vuoto che sbagliato"); numeri di una squadra tutti diversi,
   se ne legge due uguali ricontrolla. Resta la protezione contro il contatore:
