@@ -19,7 +19,39 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.13 — Verifica versioni app/backend (20/09/2026)
+## Stato attuale: v3.14 — Correzione atlete che segue eventi e formazione (20/09/2026)
+
+### Novità v3.14 (20/09/2026)
+
+**Problema emerso alla prima partita reale**: il nome importato dall'OCR era
+sbagliato (SOLINZI invece di SGUINZI). In partita l'unico strumento sulla rosa
+era "➕ Atleta", che serve solo ad aggiungere; correggere un nome era possibile
+solo nella schermata rose, prima del fischio. In più, un'atleta è identificata
+ovunque dalla coppia **numero + nome** (formazione, eventi, statistiche) e gli
+eventi ne memorizzano una copia: cambiando nome o numero dopo un goal, il goal
+restava legato al nome vecchio e spariva da statistiche e marcatrici, e le
+titolari perdevano lo stato "titolare" (quindi i minuti).
+
+- **`relinkPlayerRefs(side, oldP, newP)`**: quando si cambia nome o numero di
+  un'atleta, formazione ed eventi (marcatrice, assist, cartellino, cambi) della
+  **stessa squadra** vengono aggiornati. Una squadra avversaria con un nome
+  uguale non viene toccata. Usata da `confirmRosterRow` (schermata rose, ✓) e
+  dalla nuova modale sotto. Nessun cambio al modello dati né agli export.
+- **Correzione in partita**: la modale "➕ Atleta" (ora "Aggiungi o correggi
+  calciatrice") ha un menu **"Correggi una calciatrice già in rosa"**. Scelta
+  un'atleta, i campi si precompilano e il pulsante diventa **"Salva
+  correzione"**; senza scelta resta "Aggiungi" come prima. Anche l'aggiunta
+  ora crea `birthDate: ''` come le altre righe.
+- **Partita già giocata con il problema**: da riepilogo → ✏️ Modifica → ✏️
+  sull'evento → riselezionare l'atleta giusta; oppure correggere l'atleta con la
+  nuova modale. Farlo prima di "Sincronizza su Sheets".
+
+**Provato** (browser): rinomina + numero dalla rosa e dalla modale; goal,
+assist, giallo, cambio e formazione seguono; goal della squadra avversaria con
+lo stesso nome intatto; statistiche (goal, assist, titolare) corrette; nuova
+atleta ancora aggiungibile e salvata.
+
+## Versione precedente: v3.13 — Verifica versioni app/backend (20/09/2026)
 
 ### Novità v3.13 + backend v5.2 (20/09/2026)
 
@@ -492,7 +524,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `OCR_STRIP_OVERLAP` | 0.08 | sovrapposizione tra strisce (frazione dell'altezza) |
 | `OCR_LEFT_CROP` | 0.62 | frazione di larghezza tenuta per le strisce (foto verticali) |
 | `OCR_JPEG_QUALITY` | 0.9 | qualità JPEG delle immagini inviate |
-| `APP_VERSION` | 3.13 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
+| `APP_VERSION` | 3.14 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
 | `BACKEND_MIN_VERSION` | 5.2 | versione minima di backend richiesta dal frontend (Verifica versioni) |
 | `BACKEND_VERSION` (`Code.gs`) | 5.2 | versione del backend, restituita dal ping GET |
 | `WAKE_SCREENS` | setup, lineup, match | schermate su cui lo schermo resta acceso (Wake Lock) |
@@ -518,6 +550,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 20/09/2026 | Frontend v3.14: correggere nome/numero di un'atleta aggiorna formazione ed eventi (`relinkPlayerRefs`); nuova correzione di un'atleta in rosa dalla modale "➕ Atleta" a partita in corso |
 | 20/09/2026 | Frontend v3.13: `APP_VERSION`, versione in Home e Impostazioni, pulsante "Verifica versioni" (app online vs in esecuzione + versione del backend) |
 | 20/09/2026 | Backend v5.2: `BACKEND_VERSION`, il ping GET restituisce `version` (nessun nuovo scope). Pubblicato come versione 16 sul deployment "Senza titolo", verificato dall'iPad; gli altri 2 deployment ancora da allineare (vedi "Da verificare") |
 | 20/09/2026 | Frontend v3.12: Screen Wake Lock (schermo sempre acceso da setup a fine partita) + badge di stato; cronometro ripristinato alla riapertura (`timer.runningSince`) |

@@ -640,11 +640,15 @@
 
 <div class="modal-overlay" id="add-player-modal">
   <div class="modal">
-    <div class="modal-title">Aggiungi calciatrice</div>
+    <div class="modal-title">Aggiungi o correggi calciatrice</div>
     <div>
       <div class="modal-field">
         <label class="modal-label">Squadra</label>
         <div class="modal-radio-group" id="add-player-team-choice"></div>
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Correggi una calciatrice già in rosa</label>
+        <select class="modal-select" id="add-player-existing" onchange="onAddPlayerExistingChange()"></select>
       </div>
       <div class="modal-field">
         <label class="modal-label">Numero maglia</label>
@@ -661,7 +665,7 @@
     </div>
     <div class="modal-footer">
       <button class="modal-btn cancel" onclick="closeModal('add-player-modal')">Annulla</button>
-      <button class="modal-btn confirm" onclick="confirmAddPlayer()">Aggiungi</button>
+      <button class="modal-btn confirm" id="add-player-confirm-btn" onclick="confirmAddPlayer()">Aggiungi</button>
     </div>
   </div>
 </div>
@@ -748,7 +752,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.13';
+const APP_VERSION = '3.14';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '5.2';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -988,14 +992,35 @@ function updateRosterDraft(side, idx, field, value) {
   if (!d) return;
   d[field] = value;
 }
+/*
+ * Un'atleta è identificata ovunque dalla coppia "numero + nome" (formazione,
+ * eventi, statistiche). Se in rosa si cambia il nome o il numero, i riferimenti
+ * già salvati devono seguirla, altrimenti un goal registrato prima della
+ * correzione resta legato al nome vecchio e sparisce dalle statistiche.
+ * `side` = 'home'|'away'; oldP/newP = { num, name }.
+ */
+function relinkPlayerRefs(side, oldP, newP) {
+  if (oldP.num === newP.num && oldP.name === newP.name) return;
+  const m = state.currentMatch;
+  const same = r => r && r.num === oldP.num && r.name === oldP.name;
+  const follow = r => { r.num = newP.num; r.name = newP.name; };
+  (m.lineup[side] || []).forEach(l => { if (same(l)) follow(l); });
+  // Negli eventi `team` e' sempre la squadra dell'atleta (anche per l'autogol)
+  m.events.forEach(e => {
+    if (e.team !== side) return;
+    ['scorer', 'assist', 'player', 'playerOut', 'playerIn'].forEach(k => { if (same(e[k])) follow(e[k]); });
+  });
+}
 function confirmRosterRow(side, idx) {
   const d = state.rosterEdit[side][String(idx)];
   const p = state.currentMatch[side].roster[idx];
   if (!d || !p) return;
+  const oldP = { num: p.num, name: p.name };
   const rawNum = String(d.num == null ? '' : d.num).replace(/\D/g, '');
   p.num = rawNum === '' ? null : parseInt(rawNum, 10);
   p.name = (d.name || '').trim();
   p.birthDate = (d.birthDate || '').trim();
+  relinkPlayerRefs(side, oldP, p);
   delete state.rosterEdit[side][String(idx)];
   persistCurrent();
   renderRoster(side);
@@ -2018,14 +2043,34 @@ function openAddPlayerModal() {
   ).join('');
   roleChoice.dataset.selected = '';
 
-  document.getElementById('new-player-num').value = '';
-  document.getElementById('new-player-name').value = '';
+  refreshAddPlayerExisting();
   document.getElementById('add-player-modal').classList.add('active');
 }
 function selectAddPlayerTeam(el, team) {
   document.querySelectorAll('#add-player-team-choice .radio-option').forEach(x => x.classList.remove('selected'));
   el.classList.add('selected');
   document.getElementById('add-player-team-choice').dataset.selected = team;
+  refreshAddPlayerExisting();
+}
+/* Elenco delle atlete della squadra scelta: sceglierne una passa da "aggiungi" a "correggi" */
+function refreshAddPlayerExisting() {
+  const team = document.getElementById('add-player-team-choice').dataset.selected;
+  const sel = document.getElementById('add-player-existing');
+  const opts = state.currentMatch[team].roster
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => (a.p.num || 99) - (b.p.num || 99))
+    .map(({ p, i }) => `<option value="${i}">${p.num ?? '?'} - ${escapeHtml(p.name || 'Senza nome')}</option>`);
+  sel.innerHTML = '<option value="">— Nuova calciatrice —</option>' + opts.join('');
+  sel.value = '';
+  onAddPlayerExistingChange();
+}
+function onAddPlayerExistingChange() {
+  const team = document.getElementById('add-player-team-choice').dataset.selected;
+  const v = document.getElementById('add-player-existing').value;
+  const p = v === '' ? null : state.currentMatch[team].roster[parseInt(v, 10)];
+  document.getElementById('new-player-num').value = p && p.num != null ? p.num : '';
+  document.getElementById('new-player-name').value = p ? (p.name || '') : '';
+  document.getElementById('add-player-confirm-btn').textContent = p ? 'Salva correzione' : 'Aggiungi';
 }
 function selectAddPlayerRole(el, role) {
   document.querySelectorAll('#new-player-role-choice .radio-option').forEach(x => x.classList.remove('selected'));
@@ -2038,7 +2083,22 @@ function confirmAddPlayer() {
   const num = parseInt(document.getElementById('new-player-num').value);
   const name = document.getElementById('new-player-name').value.trim();
   if (!name) { alert('Inserisci cognome e nome'); return; }
-  state.currentMatch[team].roster.push({ num: isNaN(num) ? null : num, name, role });
+  const newNum = isNaN(num) ? null : num;
+  const existingIdx = document.getElementById('add-player-existing').value;
+  if (existingIdx !== '') {
+    // Correzione di un'atleta gia' in rosa: formazione ed eventi la seguono
+    const p = state.currentMatch[team].roster[parseInt(existingIdx, 10)];
+    if (!p) return;
+    const oldP = { num: p.num, name: p.name };
+    p.num = newNum;
+    p.name = name;
+    relinkPlayerRefs(team, oldP, p);
+    persistCurrent();
+    renderMatchInfo();
+    closeModal('add-player-modal');
+    return;
+  }
+  state.currentMatch[team].roster.push({ num: newNum, name, role, birthDate: '' });
   persistCurrent();
   closeModal('add-player-modal');
 }
