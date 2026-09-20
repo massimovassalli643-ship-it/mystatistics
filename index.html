@@ -742,9 +742,9 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.15';
+const APP_VERSION = '3.16';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
-const BACKEND_MIN_VERSION = '5.2';
+const BACKEND_MIN_VERSION = '5.3';
 const STORAGE_KEY = 'mystatistics_matches_v2';
 const PERIODS = ['1° tempo', '2° tempo', '1° supplementare', '2° supplementare', 'Partita conclusa'];
 const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
@@ -1246,8 +1246,9 @@ function applyOcrResult(result, side, progressEl) {
         const key = normalizeOcrName(p.name);
         if (!key || seen.has(key)) return;
         seen.add(key);
+        const n = parseInt(p.num, 10);
         formatted.push({
-          num: p.num != null && p.num !== '' ? parseInt(p.num) : null,
+          num: Number.isFinite(n) ? n : null,
           name: (p.name || '').trim(),
           birthDate: (p.birthDate || '').trim(),
           role: ['GK', 'DEF', 'MID', 'FWD', 'LM'].includes(p.role) ? p.role : ''
@@ -1266,7 +1267,13 @@ function applyOcrResult(result, side, progressEl) {
         const key = normalizeOcrName(np.name);
         const prev = key ? byName.get(key) : null;
         if (prev) {
-          prev.num = np.num;
+          // Una lettura senza numero (cella illeggibile o vuota) non deve
+          // cancellare quello gia' presente, ad esempio inserito a mano.
+          if (np.num != null) {
+            const oldP = { num: prev.num, name: prev.name };
+            prev.num = np.num;
+            relinkPlayerRefs(side, oldP, prev);
+          }
           if (np.birthDate) prev.birthDate = np.birthDate;
           if (np.role) prev.role = np.role;
           corrette++;

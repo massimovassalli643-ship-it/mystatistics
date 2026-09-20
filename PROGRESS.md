@@ -19,7 +19,43 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.15 — Niente più tag ruolo (GK) a video (20/09/2026)
+## Stato attuale: v3.16 + backend v5.3 — Numeri di maglia scritti a mano (20/09/2026)
+
+### Novità v3.16 + backend v5.3 (20/09/2026)
+
+**Problema emerso alla prima partita reale**: caricata la distinta, tutti i
+numeri di maglia risultavano vuoti e sono stati inseriti a mano dalla foto.
+**Causa**: sulle distinte della Fiamma Monza i numeri di maglia non sono
+stampati: si scrivono **a mano con il pennarello** nella cella "N° del Ruolo"
+poco prima della chiamata dell'arbitro (cifre grandi, che sconfinano verso il
+margine). Il prompt del backend (v4.2, scritto per un PDF digitale con celle
+vuote) diceva che quella cella è "MOLTO SPESSO VUOTA" e imponeva `null` se i
+numeri sembravano il contatore di riga: il modello scartava i numeri veri.
+Sulla foto ci sono due tipi di numeri a sinistra: il **contatore di riga**
+stampato piccolo *fuori* dalla tabella (1, 2, 3…) e i **numeri di maglia** a
+mano *dentro* la tabella.
+
+- **Backend v5.3 (solo prompt, nessun nuovo scope)**: descrive i due tipi di
+  numeri e dice di leggere sempre quello a mano nella cella; `null` solo se la
+  cella è vuota (distinta digitale non compilata) o la cifra è davvero
+  ambigua ("meglio vuoto che sbagliato"); numeri di una squadra tutti diversi,
+  se ne legge due uguali ricontrolla. Resta la protezione contro il contatore:
+  se le uniche cifre viste sono quelle stampate nel margine e sono esattamente
+  1, 2, 3… → `null` (caso del PDF digitale su cui era nata la v4.2).
+- **Frontend v3.16** (`applyOcrResult`): (1) una nuova scansione che non
+  legge il numero **non cancella** più quello già presente, es. inserito a
+  mano; (2) se la nuova lettura cambia un numero, formazione ed eventi seguono
+  (`relinkPlayerRefs`, v3.14); (3) il numero letto è sempre un intero valido
+  o vuoto, mai `NaN`. **`BACKEND_MIN_VERSION` = 5.3**: finché un deployment non
+  è alla v5.3, "Verifica versioni" mostra l'avviso.
+- **Non ancora provato con l'API reale**: il prompt non si può eseguire da
+  questo ambiente (la chiave è nelle Script Properties). Provato solo che il
+  prompt si costruisce e che la fusione frontend funziona con risposte
+  simulate. Prova da fare dopo la pubblicazione: caricare questa stessa foto
+  ("Libreria foto") e verificare i numeri attesi 13, 14, 10, 7, 6, 3, 15, 16,
+  1, 9, 5, 4, 12, 11, 2, 17, 18, 8 (riga per riga, ARNESE → VASSALLI).
+
+## Versione precedente: v3.15 — Niente più tag ruolo (GK) a video (20/09/2026)
 
 ### Novità v3.15 (20/09/2026)
 
@@ -546,9 +582,9 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `OCR_STRIP_OVERLAP` | 0.08 | sovrapposizione tra strisce (frazione dell'altezza) |
 | `OCR_LEFT_CROP` | 0.62 | frazione di larghezza tenuta per le strisce (foto verticali) |
 | `OCR_JPEG_QUALITY` | 0.9 | qualità JPEG delle immagini inviate |
-| `APP_VERSION` | 3.15 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
-| `BACKEND_MIN_VERSION` | 5.2 | versione minima di backend richiesta dal frontend (Verifica versioni) |
-| `BACKEND_VERSION` (`Code.gs`) | 5.2 | versione del backend, restituita dal ping GET |
+| `APP_VERSION` | 3.16 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
+| `BACKEND_MIN_VERSION` | 5.3 | versione minima di backend richiesta dal frontend (Verifica versioni) |
+| `BACKEND_VERSION` (`Code.gs`) | 5.3 | versione del backend, restituita dal ping GET |
 | `WAKE_SCREENS` | setup, lineup, match | schermate su cui lo schermo resta acceso (Wake Lock) |
 | `TIMER_RECOVERY_MAX_MS` | 2 h | oltre questo intervallo un cronometro "in marcia" salvato non viene ripristinato |
 
@@ -572,6 +608,8 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 20/09/2026 | Backend v5.3: OCR legge i numeri di maglia scritti a mano nella cella "N° del Ruolo" (prima scartati come cella vuota/contatore di riga); resta ignorato il contatore stampato nel margine. Da pubblicare sui 3 deployment |
+| 20/09/2026 | Frontend v3.16: una nuova scansione OCR senza numero non cancella quello già presente; il numero letto è sempre intero o vuoto; `BACKEND_MIN_VERSION` = 5.3 |
 | 20/09/2026 | Frontend v3.15: tag ruolo (GK) rimosso da menu atleta, riepilogo e modale "➕ Atleta" (campo `role` mantenuto nel modello e negli export) |
 | 20/09/2026 | Frontend v3.14: correggere nome/numero di un'atleta aggiorna formazione ed eventi (`relinkPlayerRefs`); nuova correzione di un'atleta in rosa dalla modale "➕ Atleta" a partita in corso |
 | 20/09/2026 | Frontend v3.13: `APP_VERSION`, versione in Home e Impostazioni, pulsante "Verifica versioni" (app online vs in esecuzione + versione del backend) |
@@ -610,6 +648,8 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [ ] Valutare: selezione automatica del ritaglio colonne anche per foto orizzontali; anteprima delle strisce prima dell'invio
 
 ## Da verificare
+- [ ] **A carico di Max — backend v5.3** (dopo il push di v3.14-v3.16): incollare `backend/Code.gs` nell'editor, salvare, poi Deploy → Gestisci deployment → per **tutti e 3** i deployment: matita → Nuova versione (descrizione es. `v5.3 - OCR numeri di maglia a mano`) sul primo, poi la stessa versione già creata sugli altri due. Assorbe anche la voce sotto sui deployment ancora alla 14. Poi sull'iPad: Impostazioni → Verifica versioni → "✅ Backend: v5.3"
+- [ ] Prova OCR reale con la foto della distinta di Real Trezzano–Fiamma Monza (20/09/2026): "Libreria foto" → controllare che i numeri di maglia arrivino (13, 14, 10, 7, 6, 3, 15, 16, 1, 9, 5, 4, 12, 11, 2, 17, 18, 8)
 - [x] Backend v5.2 pubblicato come **versione 16** (20/09/2026 13:16). Prima di incollare, la copia dell'editor è stata confrontata con `backend/Code.gs` v5.1: codice identico (416 righe senza commenti), differenze solo nei commenti
 - [x] iPad (20/09/2026): Impostazioni → Verifica versioni → "✅ App: v3.13 (ultima pubblicata)" e "✅ Backend: v5.2" per l'URL salvato sull'iPad
 - [ ] Portare alla **versione 16** anche i due deployment "v5 (13/09/2026)…" che il 20/09/2026 erano ancora alla 14 (Gestisci deployment → matita → Versione: 16, senza creare nuove versioni): finché non lo si fa, un URL diverso da quello dell'iPad risponde ancora senza `version`. Nota: in "Archiviato" c'è un deployment "v5.2 - ping GET c…" (non risponde più, da ignorare)

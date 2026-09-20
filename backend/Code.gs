@@ -1,5 +1,9 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v5.3 (20/09/2026): OCR - i numeri di maglia scritti A MANO nella cella "N del
+//   Ruolo" vengono letti (prima il prompt li scartava come "cella vuota" o
+//   contatore di riga). Il contatore di riga stampato nel margine resta ignorato.
+//   Solo prompt: nessun nuovo scope, pubblicare su TUTTI e 3 i deployment.
 // v5.2 (20/09/2026): il ping GET restituisce `version` (BACKEND_VERSION), cosi' il
 //   frontend (Impostazioni > Verifica versioni) sa quale codice gira su ogni
 //   deployment. Nessun nuovo scope: non serve ri-autorizzare, basta pubblicare
@@ -27,7 +31,7 @@
 
 // Aggiornare ad OGNI modifica di questo file; il frontend la confronta con
 // BACKEND_MIN_VERSION di index.html.
-const BACKEND_VERSION = '5.2';
+const BACKEND_VERSION = '5.3';
 
 const SHEET_PARTITE = 'Partite';
 const SHEET_STATISTICHE = 'Statistiche';
@@ -125,21 +129,22 @@ function handleOcrRequest(payload) {
   prompt += 'PIU SOTTO c\'e la riga "Distinta dei/delle giocatori/trici partecipanti alla gara" seguita da DUE squadre separate da un trattino (es. "A.S.D. FIAMMA MONZA 1970 - C.S.D. UESSE SARNICO 1908 (A)"): quella riga indica la PARTITA, NON e il nome squadra. NON usarla MAI.\n';
   prompt += 'CONTROLLO FINALE: se in teamName ti ritrovi due nomi separati da un trattino, oppure "(A)" o "(C)" in fondo, hai letto la riga sbagliata: torna in cima alla pagina e prendi la riga con la matricola.\n\n';
   prompt += 'STRUTTURA DISTINTA FIGC:\n';
-  prompt += 'Tabella con colonne (da sinistra a destra): N del Ruolo (numero di maglia, MOLTO SPESSO VUOTO), Data di nascita, Cognome e nome, Capitano/V.Cap (lettera C o V se presente), N. Matricola FIGC, Tipo documento, Numero documento, Rilasciato da.\n';
-  prompt += 'FUORI dalla tabella, nel margine sinistro, puo esserci una colonnina senza intestazione con la numerazione progressiva delle righe (1, 2, 3, ...): non fa parte della tabella e va ignorata.\n';
+  prompt += 'Tabella con colonne (da sinistra a destra): N del Ruolo (numero di maglia), Data di nascita, Cognome e nome, Capitano/V.Cap (lettera C o V se presente), N. Matricola FIGC, Tipo documento, Numero documento, Rilasciato da.\n';
+  prompt += 'FUORI dalla tabella, nel margine sinistro, c e una colonnina senza intestazione con la numerazione progressiva delle righe (1, 2, 3, ..., anche oltre l ultima riga compilata), stampata in piccolo in carattere tipografico: non fa parte della tabella e va ignorata.\n';
+  prompt += 'IL NUMERO DI MAGLIA: nella cella "N del Ruolo" (la prima colonna DENTRO il bordo della tabella) il numero di maglia e di norma SCRITTO A MANO con penna o pennarello poco prima della gara: cifre grandi, di 1 o 2 cifre, che possono uscire dai bordi della cella e sconfinare verso il margine. Leggilo comunque: e uno dei dati piu importanti. Solo nelle distinte interamente digitali e non ancora compilate la cella puo essere vuota.\n';
   prompt += 'Sotto la colonna "Cognome e nome" puo apparire "(P)" = Portiere.\n\n';
   prompt += 'OUTPUT - SOLO QUESTO JSON, niente altro:\n';
   prompt += '{\n';
   prompt += '  "teamName": "<una sola squadra, dall intestazione in alto, senza matricola e senza avversaria>",\n';
   prompt += '  "rowsCounted": <numero di righe con cognome contate nella pagina intera>,\n';
   prompt += '  "players": [\n';
-  prompt += '    {"num": <contenuto della cella "N del Ruolo" DENTRO la tabella, null se la cella e vuota, mai il contatore di riga del margine>, "birthDate": "<GG/MM/AAAA come scritto>", "name": "<COGNOME NOME esatto>", "role": "<GK se (P), altrimenti stringa vuota>"}\n';
+  prompt += '    {"num": <numero di maglia (intero) scritto nella cella "N del Ruolo" DENTRO la tabella; null se la cella e vuota o la cifra e illeggibile; mai il contatore di riga stampato nel margine>, "birthDate": "<GG/MM/AAAA come scritto>", "name": "<COGNOME NOME esatto>", "role": "<GK se (P), altrimenti stringa vuota>"}\n';
   prompt += '  ]\n';
   prompt += '}\n\n';
   prompt += 'NOTE:\n';
-  prompt += '- ATTENZIONE AI NUMERI A SINISTRA. Molte distinte hanno un CONTATORE DI RIGA progressivo (1, 2, 3, 4, ...) stampato nel MARGINE, FUORI dal bordo sinistro della tabella. Quello NON e il numero di maglia: ignoralo completamente.\n';
-  prompt += '- num = SOLO il contenuto della cella intestata "N del Ruolo", cioe la prima colonna DENTRO la tabella, tra il bordo sinistro e la colonna "Data di nascita". Su molte distinte queste celle sono VUOTE: in quel caso num = null per tutte le righe.\n';
-  prompt += '- VERIFICA OBBLIGATORIA sui num: se i numeri che stai per scrivere sono esattamente 1, 2, 3, ... nell ordine delle righe, hai copiato il contatore di riga del margine: metti num = null su TUTTE le righe.\n';
+  prompt += '- NUMERI A SINISTRA: a sinistra ci sono DUE tipi di numeri, da non confondere. (a) Il CONTATORE DI RIGA: stampato in piccolo in carattere tipografico, FUORI dal bordo della tabella, progressivo 1, 2, 3, ... una per riga: NON e il numero di maglia, ignoralo. (b) Il NUMERO DI MAGLIA: DENTRO la tabella, nella cella "N del Ruolo", di solito scritto a mano con tratto di penna, cifre grandi e irregolari. num = SOLO (b). Un numero scritto a mano nella cella e il numero di maglia anche se per caso coincide con il contatore della riga.\n';
+  prompt += '- Se le celle (b) sono vuote su TUTTE le righe (distinta digitale non compilata), num = null per tutte. Se le uniche cifre che vedi sono quelle stampate nel margine e sono esattamente 1, 2, 3, ... nell ordine delle righe, hai letto il contatore: num = null su TUTTE le righe.\n';
+  prompt += '- I numeri di maglia di una squadra sono TUTTI DIVERSI tra loro (da 1 a 99): se ne leggi due uguali, ricontrolla quelle righe. Se una cifra scritta a mano e davvero ambigua metti null: meglio vuoto che sbagliato.\n';
   prompt += '- Includi SOLO righe con un cognome scritto, nell\'ordine della distinta. Salta righe completamente vuote.\n';
   prompt += '- Salta righe Assistente, Dirigente, Allenatore, Massaggiatore, Medico in fondo.\n';
   prompt += '- Non aggiungere ruoli DEF/MID/FWD/LM da te: la distinta FIGC non li indica, quindi role="" per chi non ha (P).\n';
