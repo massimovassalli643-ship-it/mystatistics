@@ -175,12 +175,6 @@
   .player-toggle.selected { background: rgba(46,204,113,0.15); border-color: rgba(46,204,113,0.5); }
   .player-toggle:active { transform: scale(0.99); }
   .player-num { background: rgba(0,0,0,0.4); color: #ffb84d; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; flex-shrink: 0; }
-  .player-role-badge { background: rgba(127,184,255,0.2); color: #7fb8ff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800; letter-spacing: 0.5px; flex-shrink: 0; }
-  .player-role-badge.gk { background: rgba(241,196,15,0.2); color: #f1c40f; }
-  .player-role-badge.def { background: rgba(52,152,219,0.2); color: #3498db; }
-  .player-role-badge.mid { background: rgba(46,204,113,0.2); color: #2ecc71; }
-  .player-role-badge.fwd { background: rgba(231,76,60,0.2); color: #e74c3c; }
-  .player-role-badge.lm { background: rgba(155,89,182,0.2); color: #9b59b6; }
   .player-name { flex: 1; font-size: 13px; font-weight: 600; }
 
   #match-screen { flex-direction: row; }
@@ -658,10 +652,6 @@
         <label class="modal-label">Cognome e nome</label>
         <input type="text" class="modal-input" id="new-player-name" placeholder="Es. Rossi Maria">
       </div>
-      <div class="modal-field">
-        <label class="modal-label">Ruolo</label>
-        <div class="modal-radio-group cols-5" id="new-player-role-choice"></div>
-      </div>
     </div>
     <div class="modal-footer">
       <button class="modal-btn cancel" onclick="closeModal('add-player-modal')">Annulla</button>
@@ -752,12 +742,10 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.14';
+const APP_VERSION = '3.15';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '5.2';
 const STORAGE_KEY = 'mystatistics_matches_v2';
-const ROLES = ['GK', 'DEF', 'MID', 'FWD', 'LM'];
-const ROLE_LABELS = { GK: 'Portiere', DEF: 'Difensore', MID: 'Centrale', FWD: 'Attaccante', LM: 'Tutta fascia' };
 const PERIODS = ['1° tempo', '2° tempo', '1° supplementare', '2° supplementare', 'Partita conclusa'];
 const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
 // Durata regolamentare di ogni periodo, in minuti: serve al conto alla rovescia
@@ -1875,10 +1863,9 @@ function playerSelect(id, team, optional = false, selectedVal = null) {
   const roster = state.currentMatch[team].roster;
   const sorted = [...roster].sort((a, b) => (a.num || 99) - (b.num || 99));
   const opts = sorted.map(p => {
-    const roleStr = p.role ? `[${p.role}] ` : '';
     const val = `${p.num}|${p.name}`;
     const sel = selectedVal === val ? ' selected' : '';
-    return `<option value="${p.num}|${escapeHtml(p.name)}"${sel}>${p.num ?? '?'} - ${roleStr}${escapeHtml(p.name || 'Senza nome')}</option>`;
+    return `<option value="${p.num}|${escapeHtml(p.name)}"${sel}>${p.num ?? '?'} - ${escapeHtml(p.name || 'Senza nome')}</option>`;
   }).join('');
   return `<select class="modal-select" id="${id}">
     <option value="">${optional ? '— Nessuno —' : '— Seleziona —'}</option>
@@ -2037,12 +2024,6 @@ function openAddPlayerModal() {
   `;
   choice.dataset.selected = 'home';
 
-  const roleChoice = document.getElementById('new-player-role-choice');
-  roleChoice.innerHTML = ROLES.map(r =>
-    `<div class="radio-option" onclick="selectAddPlayerRole(this, '${r}')" title="${ROLE_LABELS[r]}">${r}</div>`
-  ).join('');
-  roleChoice.dataset.selected = '';
-
   refreshAddPlayerExisting();
   document.getElementById('add-player-modal').classList.add('active');
 }
@@ -2072,14 +2053,8 @@ function onAddPlayerExistingChange() {
   document.getElementById('new-player-name').value = p ? (p.name || '') : '';
   document.getElementById('add-player-confirm-btn').textContent = p ? 'Salva correzione' : 'Aggiungi';
 }
-function selectAddPlayerRole(el, role) {
-  document.querySelectorAll('#new-player-role-choice .radio-option').forEach(x => x.classList.remove('selected'));
-  el.classList.add('selected');
-  document.getElementById('new-player-role-choice').dataset.selected = role;
-}
 function confirmAddPlayer() {
   const team = document.getElementById('add-player-team-choice').dataset.selected;
-  const role = document.getElementById('new-player-role-choice').dataset.selected || '';
   const num = parseInt(document.getElementById('new-player-num').value);
   const name = document.getElementById('new-player-name').value.trim();
   if (!name) { alert('Inserisci cognome e nome'); return; }
@@ -2098,7 +2073,7 @@ function confirmAddPlayer() {
     closeModal('add-player-modal');
     return;
   }
-  state.currentMatch[team].roster.push({ num: newNum, name, role, birthDate: '' });
+  state.currentMatch[team].roster.push({ num: newNum, name, role: '', birthDate: '' });
   persistCurrent();
   closeModal('add-player-modal');
 }
@@ -2216,7 +2191,7 @@ function renderSummary() {
         ${allScorers.map(s => {
           const team = statsHome.includes(s) ? m.home.name : m.away.name;
           return `<tr>
-            <td>${s.num ?? '?'} ${escapeHtml(s.name)} ${s.role ? `<span style="opacity:0.6;font-size:11px">[${s.role}]</span>` : ''}</td>
+            <td>${s.num ?? '?'} ${escapeHtml(s.name)}</td>
             <td style="color:#7a96b3;font-size:12px">${escapeHtml(team)}</td>
             <td class="num-cell">${s.goals}</td>
             <td class="num-cell">${s.assists}</td>
@@ -2238,7 +2213,6 @@ function statsPanelHtml(teamName, stats) {
     <tr>
       <td class="player-cell">
         <span style="background:rgba(0,0,0,0.4);color:#ffb84d;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;">${s.num ?? '?'}</span>
-        ${s.role ? `<span class="player-role-badge ${s.role.toLowerCase()}">${s.role}</span>` : ''}
         <span>${escapeHtml(s.name)}</span>
       </td>
       <td class="num-cell">${s.goals || ''}</td>

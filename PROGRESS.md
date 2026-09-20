@@ -19,7 +19,29 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.14 — Correzione atlete che segue eventi e formazione (20/09/2026)
+## Stato attuale: v3.15 — Niente più tag ruolo (GK) a video (20/09/2026)
+
+### Novità v3.15 (20/09/2026)
+
+Alla prima partita reale il tag **GK** compariva ancora accanto ad alcune
+atlete (quelle che l'OCR aveva marcato come portiere con "(P)"). Il ruolo non è
+un dato utile per chi usa l'app, e in v3.9 era stato tolto solo dalla
+formazione. Ora non compare più **in nessuna schermata**:
+- menu di scelta dell'atleta (goal, assist, cartellini, cambi): tolto `[GK]`
+- riepilogo: tabella marcatrici e pannelli statistiche per squadra: tolto il badge
+- modale "➕ Atleta": tolto il selettore del ruolo (ora le atlete aggiunte a mano
+  hanno sempre `role: ''`); rimossi anche `ROLES`, `ROLE_LABELS` e il CSS
+  `.player-role-badge*`, non più usati
+- Il campo `role` **resta nel modello dati**: lo imposta l'OCR per i "(P)", ordina
+  la formazione (portiere in cima) e alimenta la colonna Ruolo degli export
+  (Excel, PDF, Sheets, schema a 12 colonne invariato). Per toglierla anche
+  dagli export basta dirlo.
+
+**Provato** (browser): menu goal, riepilogo e modale senza `[GK]`/badge/selettore;
+con il cronometro in marcia, aprire "➕ Atleta", correggere un'atleta e salvare
+non interrompe il tempo (stesso timer, il conto continua a modale aperta e dopo).
+
+## Versione precedente: v3.14 — Correzione atlete che segue eventi e formazione (20/09/2026)
 
 ### Novità v3.14 (20/09/2026)
 
@@ -524,7 +546,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `OCR_STRIP_OVERLAP` | 0.08 | sovrapposizione tra strisce (frazione dell'altezza) |
 | `OCR_LEFT_CROP` | 0.62 | frazione di larghezza tenuta per le strisce (foto verticali) |
 | `OCR_JPEG_QUALITY` | 0.9 | qualità JPEG delle immagini inviate |
-| `APP_VERSION` | 3.14 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
+| `APP_VERSION` | 3.15 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
 | `BACKEND_MIN_VERSION` | 5.2 | versione minima di backend richiesta dal frontend (Verifica versioni) |
 | `BACKEND_VERSION` (`Code.gs`) | 5.2 | versione del backend, restituita dal ping GET |
 | `WAKE_SCREENS` | setup, lineup, match | schermate su cui lo schermo resta acceso (Wake Lock) |
@@ -550,6 +572,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 20/09/2026 | Frontend v3.15: tag ruolo (GK) rimosso da menu atleta, riepilogo e modale "➕ Atleta" (campo `role` mantenuto nel modello e negli export) |
 | 20/09/2026 | Frontend v3.14: correggere nome/numero di un'atleta aggiorna formazione ed eventi (`relinkPlayerRefs`); nuova correzione di un'atleta in rosa dalla modale "➕ Atleta" a partita in corso |
 | 20/09/2026 | Frontend v3.13: `APP_VERSION`, versione in Home e Impostazioni, pulsante "Verifica versioni" (app online vs in esecuzione + versione del backend) |
 | 20/09/2026 | Backend v5.2: `BACKEND_VERSION`, il ping GET restituisce `version` (nessun nuovo scope). Pubblicato come versione 16 sul deployment "Senza titolo", verificato dall'iPad; gli altri 2 deployment ancora da allineare (vedi "Da verificare") |
