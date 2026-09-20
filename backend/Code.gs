@@ -1,5 +1,9 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v5.2 (20/09/2026): il ping GET restituisce `version` (BACKEND_VERSION), cosi' il
+//   frontend (Impostazioni > Verifica versioni) sa quale codice gira su ogni
+//   deployment. Nessun nuovo scope: non serve ri-autorizzare, basta pubblicare
+//   la nuova versione su TUTTI e 3 i deployment.
 // v5.1 (13/09/2026): fix testInvioEmail (Session.getEffectiveUser richiedeva uno
 //   scope non dichiarato: 'Specified permissions are not sufficient') - ora
 //   invia a un indirizzo fisso. DEPLOYATO su tutti e 3 i deployment (versione 14)
@@ -20,6 +24,10 @@
 // funzione testDriveDistinte() e accettare la richiesta di accesso a Drive.
 // Se si pubblica senza aver autorizzato, la web app puo' chiedere la
 // ri-autorizzazione e OCR/sincronizzazione si fermano.
+
+// Aggiornare ad OGNI modifica di questo file; il frontend la confronta con
+// BACKEND_MIN_VERSION di index.html.
+const BACKEND_VERSION = '5.2';
 
 const SHEET_PARTITE = 'Partite';
 const SHEET_STATISTICHE = 'Statistiche';
@@ -63,7 +71,8 @@ function doPost(e) {
 function doGet() {
   return jsonResponse({
     ok: true,
-    message: 'My Statistics endpoint attivo (v5: OCR, distinte da Drive, invio report via email)',
+    version: BACKEND_VERSION,
+    message: 'My Statistics endpoint attivo (v' + BACKEND_VERSION + ': OCR, distinte da Drive, invio report via email)',
     timestamp: new Date().toISOString()
   });
 }

@@ -19,7 +19,41 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.12 — Schermo sempre acceso + cronometro ripristinabile (20/09/2026)
+## Stato attuale: v3.13 — Verifica versioni app/backend (20/09/2026)
+
+### Novità v3.13 + backend v5.2 (20/09/2026)
+
+**Problema**: sull'iPad non c'era modo di sapere se l'app e il backend fossero
+l'ultima versione. Il frontend è servito da GitHub Pages con `max-age=600` e la
+web app da Home Screen può tenerne una copia vecchia; il backend ha 3 deployment
+e il ping GET rispondeva con lo stesso testo ("v5") per le versioni 13 e 14.
+
+- **`APP_VERSION`** (frontend) e **`BACKEND_VERSION`** (`backend/Code.gs`) sono
+  due costanti da **aggiornare ad ogni modifica** del rispettivo file.
+  `BACKEND_MIN_VERSION` in `index.html` è la versione minima di backend che quel
+  frontend richiede.
+- La versione dell'app compare in **Home** (accanto al sottotitolo) e in
+  **Impostazioni**.
+- **⚙️ Impostazioni → "🔍 Verifica versioni (app + backend)"**:
+  - *App*: rilegge `index.html` dal server senza cache e confronta `APP_VERSION`.
+    Se online c'è una versione più nuova compare **"Ricarica ora"**.
+  - *Backend*: chiama il ping GET dell'URL salvato (o scritto nel campo) e legge
+    `version`. Distingue: ok · versione non dichiarata (backend precedente alla
+    5.2) · troppo vecchio · errore di rete · URL non impostato. Ogni riga ha
+    icona + testo. Il controllo riguarda **il deployment raggiunto da quell'URL**:
+    è quello che l'iPad usa davvero.
+- Backend v5.2: il ping GET restituisce `version`. **Nessun nuovo scope**: non
+  serve ri-autorizzare, basta pubblicare la nuova versione sui **3** deployment.
+- **Limite**: l'app che gira sull'iPad prima di ricevere la v3.13 non ha il
+  pulsante. La prima volta serve chiudere/riaprire l'app (o rimuovere e
+  riaggiungere l'icona) finché in Home non compare "v3.13".
+- Nessuna modifica alla logica di partita.
+
+**Provato** (browser, risposte del backend simulate): tutto ok, backend senza
+versione, backend 5.1, backend 5.10 (confronto numerico, non testuale), errore
+di rete, URL vuoto, app indietro rispetto al server, file online senza versione.
+
+## Versione precedente: v3.12 — Schermo sempre acceso + cronometro ripristinabile (20/09/2026)
 
 ### Novità v3.12 (20/09/2026)
 
@@ -458,6 +492,9 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `OCR_STRIP_OVERLAP` | 0.08 | sovrapposizione tra strisce (frazione dell'altezza) |
 | `OCR_LEFT_CROP` | 0.62 | frazione di larghezza tenuta per le strisce (foto verticali) |
 | `OCR_JPEG_QUALITY` | 0.9 | qualità JPEG delle immagini inviate |
+| `APP_VERSION` | 3.13 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
+| `BACKEND_MIN_VERSION` | 5.2 | versione minima di backend richiesta dal frontend (Verifica versioni) |
+| `BACKEND_VERSION` (`Code.gs`) | 5.2 | versione del backend, restituita dal ping GET |
 | `WAKE_SCREENS` | setup, lineup, match | schermate su cui lo schermo resta acceso (Wake Lock) |
 | `TIMER_RECOVERY_MAX_MS` | 2 h | oltre questo intervallo un cronometro "in marcia" salvato non viene ripristinato |
 
@@ -481,6 +518,8 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 20/09/2026 | Frontend v3.13: `APP_VERSION`, versione in Home e Impostazioni, pulsante "Verifica versioni" (app online vs in esecuzione + versione del backend) |
+| 20/09/2026 | Backend v5.2: `BACKEND_VERSION`, il ping GET restituisce `version` (da pubblicare sui 3 deployment, nessun nuovo scope) |
 | 20/09/2026 | Frontend v3.12: Screen Wake Lock (schermo sempre acceso da setup a fine partita) + badge di stato; cronometro ripristinato alla riapertura (`timer.runningSince`) |
 | 12/09/2026 | Backend v4 deployato (versione 11) sui 3 deployment attivi; scope `drive.readonly` aggiunto a `appsscript.json`; test end-to-end su PDF Drive: 20/20 |
 | 12/09/2026 | Mockup restyling UX pubblicato (5 artboard, 2 direzioni per il match live); palette di stato validata per daltonismo → colore sempre con icona + etichetta |
@@ -515,6 +554,8 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [ ] Valutare: selezione automatica del ritaglio colonne anche per foto orizzontali; anteprima delle strisce prima dell'invio
 
 ## Da verificare
+- [ ] **A carico di Max — backend v5.2**: incollare `backend/Code.gs` nell'editor Apps Script, salvare, poi Deploy → Gestisci deployment → Nuova versione → Implementa su **tutti e 3** i deployment (nessuna nuova autorizzazione). Poi sull'iPad: ⚙️ Impostazioni → Verifica versioni → deve dire "✅ Backend: v5.2"
+- [ ] Dopo il push della v3.13: sull'iPad chiudere e riaprire l'app finché in Home compare "v3.13", poi Impostazioni → Verifica versioni → "✅ App: v3.13"
 - [ ] **A carico di Max, sull'iPad (prima della partita)**: Impostazioni → Schermo e luminosità → **Blocco automatico = Mai** (rete di sicurezza se il Wake Lock non è supportato) e disattivare **Blocco/Sblocco cover** (nome esatto da confermare sul dispositivo): senza, chiudere la Smart Folio spegne lo schermo comunque. Ricordarsi di ripristinare a fine uso.
 - [ ] Prova sul campo v3.12: aprire una partita, controllare che il badge in match-screen dica "🔆 Schermo sempre acceso" (se dice "⚠️ Schermo non protetto" la versione di iPadOS non supporta il Wake Lock nelle web app da Home Screen — credo serva iPadOS 18.4+, da confermare); avviare il cronometro, bloccare l'iPad 1-2 min, sbloccare e verificare che il tempo sia corretto
 - [x] Backend v4 nell'editor, salvato (12/09/2026 22:10)

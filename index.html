@@ -373,7 +373,7 @@
 
   <div class="screen active" id="home-screen">
     <h1 class="home-title">Le tue partite</h1>
-    <p class="home-subtitle">F.I.G.C. - Lega Nazionale Dilettanti • Calcio femminile a 11</p>
+    <p class="home-subtitle">F.I.G.C. - Lega Nazionale Dilettanti • Calcio femminile a 11 • <span id="app-version"></span></p>
     <div class="home-actions">
       <button class="primary-btn" onclick="startNewMatch()">⚽ Nuova partita</button>
       <button class="secondary-btn" onclick="exportAllData()">📤 Backup completo</button>
@@ -731,6 +731,12 @@
         <button class="secondary-btn" onclick="testSheetsConnection()" style="flex:1;padding:10px;font-size:13px;">🔗 Testa connessione</button>
         <button class="secondary-btn" onclick="clearSheetsUrl()" style="flex:1;padding:10px;font-size:13px;background:rgba(220,53,69,0.15);color:#ff6b7a;">🗑️ Rimuovi</button>
       </div>
+      <div class="modal-field" style="margin-top:16px;">
+        <label class="modal-label">Versioni</label>
+        <div id="settings-version-app" style="font-size:12px;color:#b8d4ed;margin-bottom:8px;"></div>
+        <div id="settings-version-result" style="font-size:12px;padding:8px;border-radius:6px;display:none;margin-bottom:10px;line-height:1.5;"></div>
+        <button class="secondary-btn" onclick="checkVersions()" style="width:100%;padding:10px;font-size:13px;">🔍 Verifica versioni (app + backend)</button>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="modal-btn cancel" onclick="closeModal('settings-modal')">Chiudi</button>
@@ -740,6 +746,11 @@
 </div>
 <script>
 /* ==================== CONFIG ==================== */
+// Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
+// checkVersions() la confronta con quella online leggendo questa stessa riga.
+const APP_VERSION = '3.13';
+// Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
+const BACKEND_MIN_VERSION = '5.2';
 const STORAGE_KEY = 'mystatistics_matches_v2';
 const ROLES = ['GK', 'DEF', 'MID', 'FWD', 'LM'];
 const ROLE_LABELS = { GK: 'Portiere', DEF: 'Difensore', MID: 'Centrale', FWD: 'Attaccante', LM: 'Tutta fascia' };
@@ -2724,7 +2735,87 @@ function getSheetsUrl() {
 function openSettingsModal() {
   document.getElementById('settings-sheets-url').value = getSheetsUrl();
   document.getElementById('settings-test-result').style.display = 'none';
+  document.getElementById('settings-version-result').style.display = 'none';
+  document.getElementById('settings-version-app').textContent = 'App in esecuzione: v' + APP_VERSION + ' • backend richiesto: almeno v' + BACKEND_MIN_VERSION;
   document.getElementById('settings-modal').classList.add('active');
+}
+
+/*
+ * Verifica versioni (v3.13): dice se l'app in esecuzione e' l'ultima pubblicata
+ * e se il deployment del backend raggiunto dall'URL salvato e' abbastanza nuovo.
+ * Frontend: si rilegge index.html dal server senza cache e si confronta
+ * APP_VERSION. Backend: il ping GET restituisce BACKEND_VERSION (Code.gs).
+ * Ogni riga ha icona + testo: il colore non e' mai l'unico segnale.
+ */
+function compareVersions(a, b) {
+  const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
+async function fetchServerAppVersion() {
+  const res = await fetch(location.origin + location.pathname + '?_=' + Date.now(), { cache: 'no-store' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const m = (await res.text()).match(/^const APP_VERSION = '([^']+)'/m);
+  if (!m) throw new Error('versione non trovata nel file online');
+  return m[1];
+}
+async function fetchBackendVersion(url) {
+  const res = await fetch(url + (url.includes('?') ? '&' : '?') + '_=' + Date.now(), { method: 'GET', redirect: 'follow' });
+  const data = await res.json();
+  if (!data || !data.ok) throw new Error('risposta inattesa dal backend');
+  return data.version || null;
+}
+async function checkVersions() {
+  const el = document.getElementById('settings-version-result');
+  el.style.display = 'block';
+  el.style.background = 'rgba(127,184,255,0.15)';
+  el.style.color = '#7fb8ff';
+  el.textContent = '⏳ Verifica in corso...';
+  const url = document.getElementById('settings-sheets-url').value.trim() || getSheetsUrl();
+  const lines = [];
+  let allOk = true;
+
+  try {
+    const server = await fetchServerAppVersion();
+    const cmp = compareVersions(APP_VERSION, server);
+    if (cmp >= 0) lines.push('✅ App: v' + escapeHtml(APP_VERSION) + ' (ultima pubblicata)');
+    else {
+      allOk = false;
+      lines.push('⚠️ App: in esecuzione v' + escapeHtml(APP_VERSION) + ', online c\'è la v' + escapeHtml(server) +
+        ' <button onclick="location.reload()" style="margin-left:6px;padding:4px 10px;border-radius:6px;background:#f39c12;color:#fff;font-weight:700;">Ricarica ora</button>');
+    }
+  } catch (e) {
+    allOk = false;
+    lines.push('❌ App: impossibile leggere la versione online (' + escapeHtml(e.message) + ')');
+  }
+
+  if (!url) {
+    allOk = false;
+    lines.push('⚠️ Backend: URL non impostato');
+  } else {
+    try {
+      const v = await fetchBackendVersion(url);
+      if (!v) {
+        allOk = false;
+        lines.push('⚠️ Backend: versione non dichiarata (precedente alla 5.2). Serve almeno la v' + escapeHtml(BACKEND_MIN_VERSION) + ': incolla Code.gs e pubblica una nuova versione su questo deployment');
+      } else if (compareVersions(v, BACKEND_MIN_VERSION) < 0) {
+        allOk = false;
+        lines.push('⚠️ Backend: v' + escapeHtml(v) + ', serve almeno la v' + escapeHtml(BACKEND_MIN_VERSION) + ': pubblica una nuova versione su questo deployment');
+      } else {
+        lines.push('✅ Backend: v' + escapeHtml(v));
+      }
+    } catch (e) {
+      allOk = false;
+      lines.push('❌ Backend: ' + escapeHtml(e.message));
+    }
+  }
+
+  el.style.background = allOk ? 'rgba(46,204,113,0.15)' : 'rgba(255,210,63,0.15)';
+  el.style.color = allOk ? '#2ecc71' : '#ffd23f';
+  el.innerHTML = lines.join('<br>');
 }
 
 function saveSheetsUrl() {
@@ -2841,6 +2932,7 @@ async function syncToSheets() {
   }
 }
 
+document.getElementById('app-version').textContent = 'v' + APP_VERSION;
 renderHistory();
 window.addEventListener('beforeunload', () => { if (state.timer.running) stopTimer(); });
 </script>

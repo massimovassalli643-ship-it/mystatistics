@@ -36,6 +36,15 @@ Full functional/technical documentation: PDF "MyStatistics_Documentazione"
 - Files in the repo are normalized to LF: edit with tools that read/modify/write
   the file (python, sed), never re-type it from tool output (truncation risk)
 
+## Versioning
+
+- `APP_VERSION` (top of the script in `index.html`) and `BACKEND_VERSION`
+  (`backend/Code.gs`) must be bumped on EVERY change to that file, in the same
+  commit as the `PROGRESS.md` update. Settings → "Verifica versioni" compares
+  them with what is deployed (frontend online vs running, backend via GET ping)
+- If a frontend change needs new backend behavior, raise `BACKEND_MIN_VERSION`
+  in `index.html` too, so the iPad warns when a deployment is stale
+
 ## OCR (critical path)
 
 - Never send the whole photo as one image: the Anthropic API downsizes to
