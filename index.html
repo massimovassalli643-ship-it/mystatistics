@@ -742,7 +742,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.16';
+const APP_VERSION = '3.17';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '5.3';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -1119,16 +1119,100 @@ function renderOcrTile(img, sx, sy, sw, sh, enhance) {
   return { data: dataUrl.split(',')[1], mediaType: 'image/jpeg', width: w, height: h };
 }
 
+/*
+ * Rettangolo della pagina (carta chiara) dentro la foto, in pixel dell'originale.
+ * Con la fotocamera dell'iPad tenuto in orizzontale la distinta occupa solo
+ * parte del fotogramma: dividendo l'intera foto in strisce il testo arriva al
+ * modello ~2 volte piu' piccolo e le cifre scritte a mano diventano illeggibili.
+ * Si cerca la zona chiara con la soglia di Otsu su una miniatura e se ne prende
+ * l'estensione; se il risultato non e' plausibile si usa tutta la foto.
+ */
+function findPageBox(img) {
+  const W = img.naturalWidth, H = img.naturalHeight;
+  const full = { x: 0, y: 0, w: W, h: H };
+  try {
+    const s = 240 / Math.max(W, H);
+    const sw = Math.max(8, Math.round(W * s)), sh = Math.max(8, Math.round(H * s));
+    const cv = document.createElement('canvas');
+    cv.width = sw; cv.height = sh;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, sw, sh);
+    const d = ctx.getImageData(0, 0, sw, sh).data;
+    const n = sw * sh;
+    const lum = new Uint8Array(n), hist = new Uint32Array(256);
+    for (let i = 0, p = 0; i < n; i++, p += 4) {
+      const g = ((d[p] * 299 + d[p + 1] * 587 + d[p + 2] * 114) / 1000) | 0;
+      lum[i] = g; hist[g]++;
+    }
+    // Soglia di Otsu: separa la carta chiara dal fondo
+    let sumAll = 0;
+    for (let t = 0; t < 256; t++) sumAll += t * hist[t];
+    let wB = 0, sumB = 0, best = -1, thr = 128;
+    for (let t = 0; t < 256; t++) {
+      wB += hist[t];
+      if (!wB) continue;
+      const wF = n - wB;
+      if (!wF) break;
+      sumB += t * hist[t];
+      const mB = sumB / wB, mF = (sumAll - sumB) / wF;
+      const v = wB * wF * (mB - mF) * (mB - mF);
+      if (v > best) { best = v; thr = t; }
+    }
+    const col = new Float32Array(sw), row = new Float32Array(sh);
+    for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) {
+      if (lum[y * sw + x] > thr) { col[x]++; row[y]++; }
+    }
+    for (let x = 0; x < sw; x++) col[x] /= sh;
+    for (let y = 0; y < sh; y++) row[y] /= sw;
+    // Tratto piu' lungo con almeno il 35% di pixel chiari, tollerando piccoli buchi
+    const longestRun = (arr) => {
+      let bs = -1, be = -1, s0 = -1, e0 = -1, gap = 0;
+      const close = () => { if (s0 >= 0 && e0 - s0 > be - bs) { bs = s0; be = e0; } s0 = -1; gap = 0; };
+      for (let i = 0; i < arr.length; i++) {
+        if (arr[i] >= 0.35) { if (s0 < 0) s0 = i; e0 = i; gap = 0; }
+        else if (s0 >= 0 && ++gap > 2) close();
+      }
+      close();
+      return bs < 0 ? null : [bs, be];
+    };
+    const rx = longestRun(col), ry = longestRun(row);
+    if (!rx || !ry) return full;
+    // Contrasto dentro/fuori: se la carta e il fondo hanno quasi la stessa luminosita'
+    // (tavolo bianco) la soglia spezzerebbe la pagina stessa e taglierebbe colonne
+    // utili: in quel caso si tiene tutta la foto.
+    let inSum = 0, inN = 0, outSum = 0, outN = 0;
+    for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) {
+      const inside = x >= rx[0] && x <= rx[1] && y >= ry[0] && y <= ry[1];
+      if (inside) { inSum += lum[y * sw + x]; inN++; } else { outSum += lum[y * sw + x]; outN++; }
+    }
+    if (outN > 0.05 * n && (inSum / inN) - (outSum / outN) < 25) return full;
+    // Margine del 3% per non tagliare i bordi (le cifre a mano sconfinano verso il margine)
+    const padX = 0.03 * W, padY = 0.03 * H;
+    const x0 = Math.max(0, Math.round(rx[0] / sw * W - padX));
+    const x1 = Math.min(W, Math.round((rx[1] + 1) / sw * W + padX));
+    const y0 = Math.max(0, Math.round(ry[0] / sh * H - padY));
+    const y1 = Math.min(H, Math.round((ry[1] + 1) / sh * H + padY));
+    const box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    // Rettangolo implausibile (troppo piccolo): meglio tutta la foto
+    if (box.w < 0.3 * W || box.h < 0.3 * H || box.w * box.h < 0.25 * W * H) return full;
+    return box;
+  } catch (e) {
+    return full;
+  }
+}
+
 async function prepareOcrImages(file) {
   const img = await loadImageFromFile(file);
-  const W = img.naturalWidth, H = img.naturalHeight;
+  // Si lavora solo sulla pagina, non sull'intero fotogramma
+  const box = findPageBox(img);
+  const W = box.w, H = box.h;
   const images = [];
 
   // 1) pagina intera: contesto, nome squadra, conteggio righe
-  images.push(Object.assign(renderOcrTile(img, 0, 0, W, H, false), { kind: 'overview' }));
+  images.push(Object.assign(renderOcrTile(img, box.x, box.y, W, H, false), { kind: 'overview' }));
 
   // 2) strisce ad alta risoluzione. Il ritaglio della parte sinistra si applica
-  //    solo a foto verticali: una distinta fotografata di lato non ha una
+  //    solo a pagine verticali: una distinta fotografata di lato non ha una
   //    "sinistra" prevedibile, meglio la striscia intera.
   const portrait = H >= W;
   const cropW = portrait ? Math.round(W * OCR_LEFT_CROP) : W;
@@ -1137,7 +1221,7 @@ async function prepareOcrImages(file) {
   for (let i = 0; i < OCR_STRIPS; i++) {
     const y0 = Math.max(0, Math.round(i * stripH - (i > 0 ? ov : 0)));
     const y1 = Math.min(H, Math.round((i + 1) * stripH + (i < OCR_STRIPS - 1 ? ov : 0)));
-    images.push(Object.assign(renderOcrTile(img, 0, y0, cropW, y1 - y0, true), {
+    images.push(Object.assign(renderOcrTile(img, box.x, box.y + y0, cropW, y1 - y0, true), {
       kind: 'strip', index: i + 1, total: OCR_STRIPS
     }));
   }
@@ -1181,7 +1265,7 @@ async function handleOcr(input, side) {
     setTimeout(() => progressEl.classList.remove('active'), 8000);
   } catch (e) {
     progressEl.innerHTML = '❌ ' + humanOcrError(e.message || e);
-    setTimeout(() => progressEl.classList.remove('active'), 6000);
+    setTimeout(() => progressEl.classList.remove('active'), 30000);
   }
   input.value = '';
 }
@@ -1209,6 +1293,16 @@ function humanOcrError(raw) {
   }
   if (/non trovata su Drive/i.test(msg)) {
     return 'Cartella "Distinte" non trovata su Google Drive.' + hint('Usa "Sfoglia dal dispositivo" oppure controlla il percorso della cartella.');
+  }
+  if (/Errore chiamata Claude|SyntaxError|Unexpected (token|end)|JSON/i.test(msg)) {
+    return 'La distinta non e\' stata letta (risposta dell\'AI non valida).'
+      + hint('Riprova con la pagina dritta e che riempie l\'inquadratura, senza ombre. Oppure usa "Libreria foto".' + manuale)
+      + '<br><span style="opacity:0.6;font-size:11px">Dettaglio: ' + escapeHtml(msg.substring(0, 160)) + '</span>';
+  }
+  if (/Claude API error/i.test(msg)) {
+    return 'L\'AI ha rifiutato la richiesta.'
+      + hint('Riprova; se si ripete, fai una foto piu\' nitida. Dettaglio sotto.' + manuale)
+      + '<br><span style="opacity:0.6;font-size:11px">Dettaglio: ' + escapeHtml(msg.substring(0, 200)) + '</span>';
   }
   if (/Failed to fetch|NetworkError|Load failed|network/i.test(msg)) {
     return 'Nessuna risposta dal backend.' + hint('Controlla la connessione dell\'iPad.' + manuale);
@@ -1407,7 +1501,7 @@ async function pickDriveFile(fileId, fileName) {
     setTimeout(() => progressEl.classList.remove('active'), 8000);
   } catch (e) {
     progressEl.innerHTML = '❌ ' + humanOcrError(e.message || e);
-    setTimeout(() => progressEl.classList.remove('active'), 6000);
+    setTimeout(() => progressEl.classList.remove('active'), 30000);
   }
 }
 
@@ -1447,7 +1541,7 @@ async function handleFilePick(input, side) {
     setTimeout(() => progressEl.classList.remove('active'), 8000);
   } catch (e) {
     progressEl.innerHTML = '❌ ' + humanOcrError(e.message || e);
-    setTimeout(() => progressEl.classList.remove('active'), 6000);
+    setTimeout(() => progressEl.classList.remove('active'), 30000);
   }
   input.value = '';
 }

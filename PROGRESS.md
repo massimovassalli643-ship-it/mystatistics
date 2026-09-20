@@ -19,7 +19,46 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.16 + backend v5.3 — Numeri di maglia scritti a mano (20/09/2026)
+## Stato attuale: v3.17 — "Scatta foto": ritaglio della pagina (20/09/2026)
+
+### Novità v3.17 (20/09/2026)
+
+**Problema emerso alla prima partita reale**: con "📷 Scatta foto" il caricamento
+falliva con un errore dal backend, mentre da "Libreria foto" funzionava.
+**Causa più probabile** (ricostruita simulando la foto, **non confermata dal
+messaggio esatto**): il codice che elabora la foto è lo stesso, ma l'app è
+bloccata in orizzontale e la fotocamera dell'iPad scatta una foto **orizzontale**
+(4032×3024) con la distinta verticale al centro. Il codice trattava le foto
+orizzontali come "pagina girata di lato" e tagliava strisce a piena larghezza:
+la pagina occupava solo ~40% di ogni striscia e il testo arrivava al modello
+circa **la metà più piccolo** (cifre a mano illeggibili). Il modello non
+leggeva e rispondeva con qualcosa che non era un JSON valido → "Errore chiamata
+Claude: SyntaxError…".
+
+- **`findPageBox(img)`**: prima di tagliare le strisce si individua la pagina
+  (zona chiara) su una miniatura con la soglia di Otsu e si ritaglia con un
+  margine del 3% (le cifre a mano sconfinano verso il margine). Da lì la
+  pagina verticale si tratta come una foto verticale (strisce sul 62% di
+  sinistra). **Protezioni**: se il rettangolo è troppo piccolo o se dentro/fuori
+  c'è poco contrasto (tavolo bianco come la carta) si usa tutta la foto come
+  prima. Effetto sulle strisce simulate: da 1568×388 (pagina piccola) a
+  ~1173–1307 px con la pagina che riempie la striscia.
+- **Messaggi d'errore** (`humanOcrError`): risposta AI non valida ("La distinta
+  non è stata letta… riprova con la pagina dritta e che riempie l'inquadratura
+  oppure usa Libreria foto") e "L'AI ha rifiutato la richiesta", entrambi con
+  il **dettaglio tecnico** in piccolo; gli errori dell'OCR restano visibili
+  **30 secondi** invece di 6.
+- **Limite noto**: con un tavolo chiaro quasi bianco il ritaglio non scatta e
+  resta il comportamento precedente (pagina piccola nella foto orizzontale). In
+  quel caso conviene avvicinarsi e far riempire l'inquadratura, o usare Libreria
+  foto.
+- **Consiglio d'uso**: la distinta deve essere dritta e riempire l'inquadratura,
+  senza ombre.
+- **Non provato con la fotocamera reale né con l'API**: provata solo la
+  preparazione delle immagini con foto simulate (verticale, orizzontale su fondo
+  grigio/scuro/chiaro, pagina piccola). Da provare sull'iPad con "Scatta foto".
+
+## Versione precedente: v3.16 + backend v5.3 — Numeri di maglia scritti a mano (20/09/2026)
 
 ### Novità v3.16 + backend v5.3 (20/09/2026)
 
@@ -586,7 +625,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `OCR_STRIP_OVERLAP` | 0.08 | sovrapposizione tra strisce (frazione dell'altezza) |
 | `OCR_LEFT_CROP` | 0.62 | frazione di larghezza tenuta per le strisce (foto verticali) |
 | `OCR_JPEG_QUALITY` | 0.9 | qualità JPEG delle immagini inviate |
-| `APP_VERSION` | 3.16 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
+| `APP_VERSION` | 3.17 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
 | `BACKEND_MIN_VERSION` | 5.3 | versione minima di backend richiesta dal frontend (Verifica versioni) |
 | `BACKEND_VERSION` (`Code.gs`) | 5.3 | versione del backend, restituita dal ping GET |
 | `WAKE_SCREENS` | setup, lineup, match | schermate su cui lo schermo resta acceso (Wake Lock) |
@@ -612,6 +651,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 20/09/2026 | Frontend v3.17: "Scatta foto" — ritaglio della pagina prima delle strisce (`findPageBox`), messaggi d'errore OCR più chiari con dettaglio tecnico e visibili 30 s |
 | 20/09/2026 | Backend v5.3: OCR legge i numeri di maglia scritti a mano nella cella "N° del Ruolo" (prima scartati come cella vuota/contatore di riga); resta ignorato il contatore stampato nel margine. Da pubblicare sui 3 deployment |
 | 20/09/2026 | Frontend v3.16: una nuova scansione OCR senza numero non cancella quello già presente; il numero letto è sempre intero o vuoto; `BACKEND_MIN_VERSION` = 5.3 |
 | 20/09/2026 | Frontend v3.15: tag ruolo (GK) rimosso da menu atleta, riepilogo e modale "➕ Atleta" (campo `role` mantenuto nel modello e negli export) |
@@ -653,6 +693,7 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 
 ## Da verificare
 - [ ] **A carico di Max — backend v5.3** (dopo il push di v3.14-v3.16): incollare `backend/Code.gs` nell'editor, salvare, poi Deploy → Gestisci deployment → per **tutti e 3** i deployment: matita → Nuova versione (descrizione es. `v5.3 - OCR numeri di maglia a mano`) sul primo, poi la stessa versione già creata sugli altri due. Assorbe anche la voce sotto sui deployment ancora alla 14. Poi sull'iPad: Impostazioni → Verifica versioni → "✅ Backend: v5.3"
+- [ ] Prova "📷 Scatta foto" sull'iPad con una distinta (v3.17): deve arrivare la rosa come da "Libreria foto". Se dà ancora errore, **copiare il messaggio esatto** (ora resta 30 s a video, con il dettaglio tecnico in piccolo)
 - [ ] Prova OCR reale con la foto della distinta di Real Trezzano–Fiamma Monza (20/09/2026): "Libreria foto" → controllare che i numeri di maglia arrivino (13, 14, 10, 7, 6, 3, 15, 16, 1, 9, 5, 4, 12, 11, 2, 17, 18, 8)
 - [x] Backend v5.2 pubblicato come **versione 16** (20/09/2026 13:16). Prima di incollare, la copia dell'editor è stata confrontata con `backend/Code.gs` v5.1: codice identico (416 righe senza commenti), differenze solo nei commenti
 - [x] iPad (20/09/2026): Impostazioni → Verifica versioni → "✅ App: v3.13 (ultima pubblicata)" e "✅ Backend: v5.2" per l'URL salvato sull'iPad
