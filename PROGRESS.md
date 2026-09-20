@@ -54,6 +54,10 @@ Claude: SyntaxError…".
   foto.
 - **Consiglio d'uso**: la distinta deve essere dritta e riempire l'inquadratura,
   senza ombre.
+- **Aggiornamento serale (20/09/2026)**: "Scatta foto" ha poi funzionato
+  sull'iPad **con la v3.13, senza questo ritaglio** (insieme al backend v5.3).
+  Quindi il ritaglio non è dimostrato necessario e l'ipotesi sopra resta non
+  confermata; il ritaglio non è mai stato provato con una foto reale.
 - **Non provato con la fotocamera reale né con l'API**: provata solo la
   preparazione delle immagini con foto simulate (verticale, orizzontale su fondo
   grigio/scuro/chiaro, pagina piccola). Da provare sull'iPad con "Scatta foto".
@@ -693,8 +697,8 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 
 ## Da verificare
 - [ ] **A carico di Max — backend v5.3** (dopo il push di v3.14-v3.16): incollare `backend/Code.gs` nell'editor, salvare, poi Deploy → Gestisci deployment → per **tutti e 3** i deployment: matita → Nuova versione (descrizione es. `v5.3 - OCR numeri di maglia a mano`) sul primo, poi la stessa versione già creata sugli altri due. Assorbe anche la voce sotto sui deployment ancora alla 14. Poi sull'iPad: Impostazioni → Verifica versioni → "✅ Backend: v5.3"
-- [ ] Prova "📷 Scatta foto" sull'iPad con una distinta (v3.17): deve arrivare la rosa come da "Libreria foto". Se dà ancora errore, **copiare il messaggio esatto** (ora resta 30 s a video, con il dettaglio tecnico in piccolo)
-- [ ] Prova OCR reale con la foto della distinta di Real Trezzano–Fiamma Monza (20/09/2026): "Libreria foto" → controllare che i numeri di maglia arrivino (13, 14, 10, 7, 6, 3, 15, 16, 1, 9, 5, 4, 12, 11, 2, 17, 18, 8)
+- [x] Prova OCR reale (20/09/2026, sera, iPad con app **v3.13** e backend v5.3 su "Senza titolo"): i numeri di maglia scritti a mano arrivano correttamente sia da **"Scatta foto"** sia da **"Libreria foto"**. Prima della v5.3 la stessa distinta arrivava con 18 nomi e date corrette ma tutti i numeri vuoti (10062 token, ~$0,04)
+- [ ] "📷 Scatta foto" ora funziona con app v3.13, cioè **senza** il ritaglio della pagina della v3.17: l'errore della mattina non è stato riprodotto e la sua causa resta non confermata (la v3.17 è un'ipotesi non necessaria, vedi sezione v3.17). Se ricapita, copiare il messaggio esatto (dalla v3.17 resta 30 s a video)
 - [x] Backend v5.2 pubblicato come **versione 16** (20/09/2026 13:16). Prima di incollare, la copia dell'editor è stata confrontata con `backend/Code.gs` v5.1: codice identico (416 righe senza commenti), differenze solo nei commenti
 - [x] iPad (20/09/2026): Impostazioni → Verifica versioni → "✅ App: v3.13 (ultima pubblicata)" e "✅ Backend: v5.2" per l'URL salvato sull'iPad
 - [ ] Portare alla **versione 16** anche i due deployment "v5 (13/09/2026)…" che il 20/09/2026 erano ancora alla 14 (Gestisci deployment → matita → Versione: 16, senza creare nuove versioni): finché non lo si fa, un URL diverso da quello dell'iPad risponde ancora senza `version`. Nota: in "Archiviato" c'è un deployment "v5.2 - ping GET c…" (non risponde più, da ignorare)
