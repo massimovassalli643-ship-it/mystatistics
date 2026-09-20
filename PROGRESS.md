@@ -13,54 +13,36 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Cartella locale | `C:\Users\maxvas\claude-test\mystatistics` |
 | Frontend | `index.html` unico (HTML + CSS + JS inline), zero build, PWA landscape per iPad |
 | Backend | Google Apps Script "MyStatisticsBackend" — copia di riferimento in `backend/Code.gs` |
-| Deployment attivi | 3 web app ("Senza titolo", "v3 fresh deploy", "v3 con permessi external request") — "Senza titolo" alla versione 16 (v5.2), gli altri due ancora alla 14 (v5.1) da allineare, vedi "Da verificare" |
+| Deployment attivi | 3 web app ("Senza titolo", "v3 fresh deploy", "v3 con permessi external request") — "Senza titolo" alla v5.3 (verificato dall'iPad: i numeri di maglia arrivano), gli altri due erano ancora alla 14 (v5.1): da allineare, vedi "Da verificare" |
 | Database | Google Sheets "My Statistics - Fiamma Monza 2026 2027" (tab Partite, Statistiche, Eventi, Marcatrici) |
 | OCR | API Anthropic, modello `claude-sonnet-4-5`, chiave in Script Properties `CLAUDE_API_KEY` |
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.17 — "Scatta foto": ritaglio della pagina (20/09/2026)
+## Stato attuale: v3.17 — Messaggi d'errore OCR leggibili (20/09/2026)
 
 ### Novità v3.17 (20/09/2026)
 
-**Problema emerso alla prima partita reale**: con "📷 Scatta foto" il caricamento
-falliva con un errore dal backend, mentre da "Libreria foto" funzionava.
-**Causa più probabile** (ricostruita simulando la foto, **non confermata dal
-messaggio esatto**): il codice che elabora la foto è lo stesso, ma l'app è
-bloccata in orizzontale e la fotocamera dell'iPad scatta una foto **orizzontale**
-(4032×3024) con la distinta verticale al centro. Il codice trattava le foto
-orizzontali come "pagina girata di lato" e tagliava strisce a piena larghezza:
-la pagina occupava solo ~40% di ogni striscia e il testo arrivava al modello
-circa **la metà più piccolo** (cifre a mano illeggibili). Il modello non
-leggeva e rispondeva con qualcosa che non era un JSON valido → "Errore chiamata
-Claude: SyntaxError…".
+**Contesto**: con "📷 Scatta foto" il caricamento della mattina falliva con un
+errore dal backend, mentre da "Libreria foto" funzionava. In serata "Scatta
+foto" ha funzionato (app v3.13 + backend v5.3), quindi l'errore non si è
+ripetuto e **la sua causa non è confermata**.
 
-- **`findPageBox(img)`**: prima di tagliare le strisce si individua la pagina
-  (zona chiara) su una miniatura con la soglia di Otsu e si ritaglia con un
-  margine del 3% (le cifre a mano sconfinano verso il margine). Da lì la
-  pagina verticale si tratta come una foto verticale (strisce sul 62% di
-  sinistra). **Protezioni**: se il rettangolo è troppo piccolo o se dentro/fuori
-  c'è poco contrasto (tavolo bianco come la carta) si usa tutta la foto come
-  prima. Effetto sulle strisce simulate: da 1568×388 (pagina piccola) a
-  ~1173–1307 px con la pagina che riempie la striscia.
 - **Messaggi d'errore** (`humanOcrError`): risposta AI non valida ("La distinta
   non è stata letta… riprova con la pagina dritta e che riempie l'inquadratura
-  oppure usa Libreria foto") e "L'AI ha rifiutato la richiesta", entrambi con
-  il **dettaglio tecnico** in piccolo; gli errori dell'OCR restano visibili
-  **30 secondi** invece di 6.
-- **Limite noto**: con un tavolo chiaro quasi bianco il ritaglio non scatta e
-  resta il comportamento precedente (pagina piccola nella foto orizzontale). In
-  quel caso conviene avvicinarsi e far riempire l'inquadratura, o usare Libreria
-  foto.
-- **Consiglio d'uso**: la distinta deve essere dritta e riempire l'inquadratura,
-  senza ombre.
-- **Aggiornamento serale (20/09/2026)**: "Scatta foto" ha poi funzionato
-  sull'iPad **con la v3.13, senza questo ritaglio** (insieme al backend v5.3).
-  Quindi il ritaglio non è dimostrato necessario e l'ipotesi sopra resta non
-  confermata; il ritaglio non è mai stato provato con una foto reale.
-- **Non provato con la fotocamera reale né con l'API**: provata solo la
-  preparazione delle immagini con foto simulate (verticale, orizzontale su fondo
-  grigio/scuro/chiaro, pagina piccola). Da provare sull'iPad con "Scatta foto".
+  oppure usa Libreria foto") e "L'AI ha rifiutato la richiesta", entrambi con il
+  **dettaglio tecnico** in piccolo; gli errori dell'OCR restano visibili **30
+  secondi** invece di 6. Se l'errore ricapita, copiare il messaggio esatto.
+- **Ipotesi scartata (non pubblicata)**: la fotocamera dell'iPad scatta foto
+  orizzontali (4032×3024) con la distinta verticale al centro; il codice
+  taglia le foto orizzontali in strisce a piena larghezza, quindi la pagina
+  occupa ~40% di ogni striscia e il testo arriva ~2× più piccolo (simulato: da
+  ~1200 px a 1568×388). Era stato scritto un ritaglio della pagina
+  (`findPageBox`: soglia di Otsu su miniatura + protezioni di dimensione e di
+  contrasto), ma non era dimostrato necessario e non è mai stato provato con una
+  foto reale: rischio di tagliare la colonna dei numeri per un vantaggio
+  ignoto. **Rimosso prima della pubblicazione**; resta nella cronologia git
+  (commit `6852a35`) e si può riprendere se "Scatta foto" ridà l'errore.
 
 ## Versione precedente: v3.16 + backend v5.3 — Numeri di maglia scritti a mano (20/09/2026)
 
@@ -95,12 +77,12 @@ mano *dentro* la tabella.
   (`relinkPlayerRefs`, v3.14); (3) il numero letto è sempre un intero valido
   o vuoto, mai `NaN`. **`BACKEND_MIN_VERSION` = 5.3**: finché un deployment non
   è alla v5.3, "Verifica versioni" mostra l'avviso.
-- **Non ancora provato con l'API reale**: il prompt non si può eseguire da
-  questo ambiente (la chiave è nelle Script Properties). Provato solo che il
-  prompt si costruisce e che la fusione frontend funziona con risposte
-  simulate. Prova da fare dopo la pubblicazione: caricare questa stessa foto
-  ("Libreria foto") e verificare i numeri attesi 13, 14, 10, 7, 6, 3, 15, 16,
-  1, 9, 5, 4, 12, 11, 2, 17, 18, 8 (riga per riga, ARNESE → VASSALLI).
+- **Verificato sull'iPad (20/09/2026, sera)**: con il backend v5.3 su "Senza
+  titolo" i numeri di maglia scritti a mano arrivano correttamente sia da
+  "Scatta foto" sia da "Libreria foto" (stessa distinta, prima tutti vuoti).
+  Il prompt non si poteva eseguire dall'ambiente di sviluppo (la chiave è nelle
+  Script Properties): provati lì solo la costruzione del prompt e la fusione
+  frontend con risposte simulate.
 
 ## Versione precedente: v3.15 — Niente più tag ruolo (GK) a video (20/09/2026)
 
@@ -655,7 +637,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
-| 20/09/2026 | Frontend v3.17: "Scatta foto" — ritaglio della pagina prima delle strisce (`findPageBox`), messaggi d'errore OCR più chiari con dettaglio tecnico e visibili 30 s |
+| 20/09/2026 | Frontend v3.17: messaggi d'errore OCR più chiari con dettaglio tecnico, visibili 30 s (il ritaglio della pagina per "Scatta foto" è stato scritto e poi rimosso: non dimostrato necessario) |
 | 20/09/2026 | Backend v5.3: OCR legge i numeri di maglia scritti a mano nella cella "N° del Ruolo" (prima scartati come cella vuota/contatore di riga); resta ignorato il contatore stampato nel margine. Da pubblicare sui 3 deployment |
 | 20/09/2026 | Frontend v3.16: una nuova scansione OCR senza numero non cancella quello già presente; il numero letto è sempre intero o vuoto; `BACKEND_MIN_VERSION` = 5.3 |
 | 20/09/2026 | Frontend v3.15: tag ruolo (GK) rimosso da menu atleta, riepilogo e modale "➕ Atleta" (campo `role` mantenuto nel modello e negli export) |
@@ -698,7 +680,7 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 ## Da verificare
 - [ ] **A carico di Max — backend v5.3** (dopo il push di v3.14-v3.16): incollare `backend/Code.gs` nell'editor, salvare, poi Deploy → Gestisci deployment → per **tutti e 3** i deployment: matita → Nuova versione (descrizione es. `v5.3 - OCR numeri di maglia a mano`) sul primo, poi la stessa versione già creata sugli altri due. Assorbe anche la voce sotto sui deployment ancora alla 14. Poi sull'iPad: Impostazioni → Verifica versioni → "✅ Backend: v5.3"
 - [x] Prova OCR reale (20/09/2026, sera, iPad con app **v3.13** e backend v5.3 su "Senza titolo"): i numeri di maglia scritti a mano arrivano correttamente sia da **"Scatta foto"** sia da **"Libreria foto"**. Prima della v5.3 la stessa distinta arrivava con 18 nomi e date corrette ma tutti i numeri vuoti (10062 token, ~$0,04)
-- [ ] "📷 Scatta foto" ora funziona con app v3.13, cioè **senza** il ritaglio della pagina della v3.17: l'errore della mattina non è stato riprodotto e la sua causa resta non confermata (la v3.17 è un'ipotesi non necessaria, vedi sezione v3.17). Se ricapita, copiare il messaggio esatto (dalla v3.17 resta 30 s a video)
+- [ ] "📷 Scatta foto" ora funziona con app v3.13, senza alcun ritaglio della pagina: l'errore della mattina non è stato riprodotto e la sua causa resta non confermata (il ritaglio scritto per la v3.17 è stato scartato, vedi sezione v3.17). Se ricapita, copiare il messaggio esatto (dalla v3.17 resta 30 s a video)
 - [x] Backend v5.2 pubblicato come **versione 16** (20/09/2026 13:16). Prima di incollare, la copia dell'editor è stata confrontata con `backend/Code.gs` v5.1: codice identico (416 righe senza commenti), differenze solo nei commenti
 - [x] iPad (20/09/2026): Impostazioni → Verifica versioni → "✅ App: v3.13 (ultima pubblicata)" e "✅ Backend: v5.2" per l'URL salvato sull'iPad
 - [ ] Portare alla **versione 16** anche i due deployment "v5 (13/09/2026)…" che il 20/09/2026 erano ancora alla 14 (Gestisci deployment → matita → Versione: 16, senza creare nuove versioni): finché non lo si fa, un URL diverso da quello dell'iPad risponde ancora senza `version`. Nota: in "Archiviato" c'è un deployment "v5.2 - ping GET c…" (non risponde più, da ignorare)
