@@ -13,7 +13,7 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Cartella locale | `C:\Users\maxvas\claude-test\mystatistics` |
 | Frontend | `index.html` unico (HTML + CSS + JS inline), zero build, PWA landscape per iPad |
 | Backend | Google Apps Script "MyStatisticsBackend" — copia di riferimento in `backend/Code.gs` |
-| Deployment attivi | 3 web app ("Senza titolo", "v3 fresh deploy", "v3 con permessi external request") — tutti allineati alla stessa versione |
+| Deployment attivi | 3 web app ("Senza titolo", "v3 fresh deploy", "v3 con permessi external request") — "Senza titolo" alla versione 16 (v5.2), gli altri due ancora alla 14 (v5.1) da allineare, vedi "Da verificare" |
 | Database | Google Sheets "My Statistics - Fiamma Monza 2026 2027" (tab Partite, Statistiche, Eventi, Marcatrici) |
 | OCR | API Anthropic, modello `claude-sonnet-4-5`, chiave in Script Properties `CLAUDE_API_KEY` |
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
@@ -519,7 +519,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
 | 20/09/2026 | Frontend v3.13: `APP_VERSION`, versione in Home e Impostazioni, pulsante "Verifica versioni" (app online vs in esecuzione + versione del backend) |
-| 20/09/2026 | Backend v5.2: `BACKEND_VERSION`, il ping GET restituisce `version` (da pubblicare sui 3 deployment, nessun nuovo scope) |
+| 20/09/2026 | Backend v5.2: `BACKEND_VERSION`, il ping GET restituisce `version` (nessun nuovo scope). Pubblicato come versione 16 sul deployment "Senza titolo", verificato dall'iPad; gli altri 2 deployment ancora da allineare (vedi "Da verificare") |
 | 20/09/2026 | Frontend v3.12: Screen Wake Lock (schermo sempre acceso da setup a fine partita) + badge di stato; cronometro ripristinato alla riapertura (`timer.runningSince`) |
 | 12/09/2026 | Backend v4 deployato (versione 11) sui 3 deployment attivi; scope `drive.readonly` aggiunto a `appsscript.json`; test end-to-end su PDF Drive: 20/20 |
 | 12/09/2026 | Mockup restyling UX pubblicato (5 artboard, 2 direzioni per il match live); palette di stato validata per daltonismo → colore sempre con icona + etichetta |
@@ -554,8 +554,9 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [ ] Valutare: selezione automatica del ritaglio colonne anche per foto orizzontali; anteprima delle strisce prima dell'invio
 
 ## Da verificare
-- [ ] **A carico di Max — backend v5.2**: incollare `backend/Code.gs` nell'editor Apps Script, salvare, poi Deploy → Gestisci deployment → Nuova versione → Implementa su **tutti e 3** i deployment (nessuna nuova autorizzazione). Poi sull'iPad: ⚙️ Impostazioni → Verifica versioni → deve dire "✅ Backend: v5.2"
-- [ ] Dopo il push della v3.13: sull'iPad chiudere e riaprire l'app finché in Home compare "v3.13", poi Impostazioni → Verifica versioni → "✅ App: v3.13"
+- [x] Backend v5.2 pubblicato come **versione 16** (20/09/2026 13:16). Prima di incollare, la copia dell'editor è stata confrontata con `backend/Code.gs` v5.1: codice identico (416 righe senza commenti), differenze solo nei commenti
+- [x] iPad (20/09/2026): Impostazioni → Verifica versioni → "✅ App: v3.13 (ultima pubblicata)" e "✅ Backend: v5.2" per l'URL salvato sull'iPad
+- [ ] Portare alla **versione 16** anche i due deployment "v5 (13/09/2026)…" che il 20/09/2026 erano ancora alla 14 (Gestisci deployment → matita → Versione: 16, senza creare nuove versioni): finché non lo si fa, un URL diverso da quello dell'iPad risponde ancora senza `version`. Nota: in "Archiviato" c'è un deployment "v5.2 - ping GET c…" (non risponde più, da ignorare)
 - [ ] **A carico di Max, sull'iPad (prima della partita)**: Impostazioni → Schermo e luminosità → **Blocco automatico = Mai** (rete di sicurezza se il Wake Lock non è supportato) e disattivare **Blocco/Sblocco cover** (nome esatto da confermare sul dispositivo): senza, chiudere la Smart Folio spegne lo schermo comunque. Ricordarsi di ripristinare a fine uso.
 - [ ] Prova sul campo v3.12: aprire una partita, controllare che il badge in match-screen dica "🔆 Schermo sempre acceso" (se dice "⚠️ Schermo non protetto" la versione di iPadOS non supporta il Wake Lock nelle web app da Home Screen — credo serva iPadOS 18.4+, da confermare); avviare il cronometro, bloccare l'iPad 1-2 min, sbloccare e verificare che il tempo sia corretto
 - [x] Backend v4 nell'editor, salvato (12/09/2026 22:10)
