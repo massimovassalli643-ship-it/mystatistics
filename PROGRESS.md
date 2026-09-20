@@ -19,7 +19,49 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.11 — Partite concluse modificabili (14/09/2026)
+## Stato attuale: v3.12 — Schermo sempre acceso + cronometro ripristinabile (20/09/2026)
+
+### Novità v3.12 (20/09/2026)
+
+**Problema**: l'app non faceva nulla per impedire all'iPad di andare in pausa
+durante la partita (nessun Wake Lock), e se iPadOS scartava la pagina mentre
+l'iPad era bloccato il cronometro tornava indietro all'ultimo evento/pausa.
+
+**1) Screen Wake Lock** (blocco `Navigazione`, `showScreen`)
+- Lo schermo resta acceso su **Setup, Formazione e Partita** (`WAKE_SCREENS`),
+  cioè da "Nuova partita"/riapertura fino a "Termina partita". Su Home,
+  Riepilogo e Dashboard il blocco viene rilasciato: l'iPad può riposare.
+  Anche la modalità "✏️ Modifica" di una partita conclusa lo riacquisisce.
+- Il browser rilascia il lock da solo quando la pagina non è visibile (app in
+  background, iPad bloccato): `visibilitychange` lo richiede di nuovo al rientro.
+- Nella schermata partita, accanto al periodo, un badge mostra lo stato:
+  **🔆 Schermo sempre acceso** (verde) oppure **⚠️ Schermo non protetto**
+  (giallo: API non disponibile, iPadOS troppo vecchio, o pagina non visibile).
+  Icona e testo sempre presenti, il colore non è mai l'unico segnale.
+- **Limite noto**: il Wake Lock NON impedisce lo spegnimento causato dalla
+  **chiusura della cover** (sensore magnetico hardware). Va disattivato nelle
+  Impostazioni di iPadOS (vedi "Da verificare").
+
+**2) Cronometro ripristinabile dopo la riapertura**
+- La partita salva ora `timer.runningSince` (istante dell'ultimo avvio, `null`
+  in pausa) e `timer.elapsedMs` come **base** fino a quell'avvio (prima era il
+  tempo "vivo" al momento del salvataggio). `startTimer()` ora salva subito.
+- Riaprendo dallo storico una partita non conclusa con `runningSince`
+  valorizzato (`restoreRunningTimer`), il tempo trascorso nel frattempo si somma
+  alla base e il cronometro **riparte in marcia**, con un avviso.
+- Oltre `TIMER_RECOVERY_MAX_MS` (2 ore) il salvataggio è considerato abbandonato
+  (partita dimenticata aperta): cronometro **in pausa** alla base salvata, con
+  avviso a controllare il tempo.
+- Nessun impatto sulle partite vecchie (senza `runningSince`) né sull'export:
+  per le partite concluse `elapsedMs` coincide con il tempo finale come prima.
+
+**Provato** (browser, `navigator.wakeLock` simulato): richiesta su Setup/Match,
+nessuna richiesta doppia, rilascio da hidden e nuova richiesta al ritorno,
+rilascio a fine partita e su Home, riacquisizione in modifica; cronometro:
+ripristino a 06:00 con base 1:00 + 5 min, caso oltre 2 ore in pausa, `runningSince`
+azzerato su pausa/prossimo periodo. Da provare sul campo con l'iPad reale.
+
+## Versione precedente: v3.11 — Partite concluse modificabili (14/09/2026)
 
 ### Novità v3.11 (14/09/2026)
 
@@ -416,6 +458,8 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `OCR_STRIP_OVERLAP` | 0.08 | sovrapposizione tra strisce (frazione dell'altezza) |
 | `OCR_LEFT_CROP` | 0.62 | frazione di larghezza tenuta per le strisce (foto verticali) |
 | `OCR_JPEG_QUALITY` | 0.9 | qualità JPEG delle immagini inviate |
+| `WAKE_SCREENS` | setup, lineup, match | schermate su cui lo schermo resta acceso (Wake Lock) |
+| `TIMER_RECOVERY_MAX_MS` | 2 h | oltre questo intervallo un cronometro "in marcia" salvato non viene ripristinato |
 
 ## Changelog
 | Data | Modifica |
@@ -437,6 +481,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 20/09/2026 | Frontend v3.12: Screen Wake Lock (schermo sempre acceso da setup a fine partita) + badge di stato; cronometro ripristinato alla riapertura (`timer.runningSince`) |
 | 12/09/2026 | Backend v4 deployato (versione 11) sui 3 deployment attivi; scope `drive.readonly` aggiunto a `appsscript.json`; test end-to-end su PDF Drive: 20/20 |
 | 12/09/2026 | Mockup restyling UX pubblicato (5 artboard, 2 direzioni per il match live); palette di stato validata per daltonismo → colore sempre con icona + etichetta |
 
@@ -470,6 +515,8 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [ ] Valutare: selezione automatica del ritaglio colonne anche per foto orizzontali; anteprima delle strisce prima dell'invio
 
 ## Da verificare
+- [ ] **A carico di Max, sull'iPad (prima della partita)**: Impostazioni → Schermo e luminosità → **Blocco automatico = Mai** (rete di sicurezza se il Wake Lock non è supportato) e disattivare **Blocco/Sblocco cover** (nome esatto da confermare sul dispositivo): senza, chiudere la Smart Folio spegne lo schermo comunque. Ricordarsi di ripristinare a fine uso.
+- [ ] Prova sul campo v3.12: aprire una partita, controllare che il badge in match-screen dica "🔆 Schermo sempre acceso" (se dice "⚠️ Schermo non protetto" la versione di iPadOS non supporta il Wake Lock nelle web app da Home Screen — credo serva iPadOS 18.4+, da confermare); avviare il cronometro, bloccare l'iPad 1-2 min, sbloccare e verificare che il tempo sia corretto
 - [x] Backend v4 nell'editor, salvato (12/09/2026 22:10)
 - [x] `testDriveDistinte()` eseguita e accesso a Drive autorizzato (22:13)
 - [x] Versione 11 pubblicata sui 3 deployment attivi (22:16)

@@ -200,6 +200,10 @@
   .timer-clock.countdown.over { color: #ff8a80; }
   .timer-caption { font-size: 9px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #5a7793; }
   .timer-period { font-size: 13px; color: #7fb8ff; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; background: rgba(127,184,255,0.15); padding: 4px 10px; border-radius: 6px; align-self: center; }
+  /* Stato del blocco schermo (Wake Lock): colore sempre accompagnato da icona + testo */
+  .wake-badge { font-size: 10px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; padding: 4px 8px; border-radius: 6px; align-self: center; white-space: nowrap; }
+  .wake-badge.on { color: #2ed573; background: rgba(46,213,115,0.13); }
+  .wake-badge.off { color: #ffd23f; background: rgba(255,210,63,0.15); }
   .timer-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   /* Minuti di recupero: si digitano e si confermano con la spunta verde */
   .stoppage-box { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 8px; }
@@ -539,6 +543,7 @@
             <div class="timer-caption" id="timer-countdown-caption">Alla fine</div>
           </div>
           <div class="timer-period" id="timer-period">1° tempo</div>
+          <div class="wake-badge off" id="wake-badge" title="Se lo schermo può spegnersi, regola Blocco automatico su Mai in Impostazioni di iPadOS">⚠️ Schermo non protetto</div>
         </div>
         <div class="timer-right">
           <div class="stoppage-box">
@@ -742,6 +747,8 @@ const PERIODS = ['1° tempo', '2° tempo', '1° supplementare', '2° supplementa
 const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
 // Durata regolamentare di ogni periodo, in minuti: serve al conto alla rovescia
 const PERIOD_DURATIONS = [45, 45, 15, 15, 0];
+// Oltre questo intervallo un cronometro "in marcia" salvato non viene ripristinato
+const TIMER_RECOVERY_MAX_MS = 2 * 60 * 60 * 1000;
 // Destinatario predefinito dei report (modificabile nella modale prima dell'invio)
 const REPORT_DEFAULT_TO = 'massimo.vassalli643@gmail.com';
 
@@ -766,8 +773,12 @@ function persistCurrent() {
   // Il cronometro va salvato al volo: prima il tempo trascorso finiva nello
   // storage solo alla pausa, quindi ogni salvataggio intermedio lo riportava
   // indietro. Si sincronizza solo se il cronometro e' di QUESTA partita.
+  // v3.12: si salva la base (`elapsedMs` fino all'ultimo avvio) e l'istante di
+  // avvio (`runningSince`, null se in pausa): se iPadOS scarta la pagina mentre
+  // l'iPad e' bloccato, alla riapertura il tempo si ricostruisce invece di perdersi.
   if (state.currentMatch.timer && state.timer.matchId === state.currentMatch.id) {
-    state.currentMatch.timer.elapsedMs = currentElapsedMs();
+    state.currentMatch.timer.elapsedMs = state.timer.elapsedMs;
+    state.currentMatch.timer.runningSince = state.timer.running ? state.timer.startTimestamp : null;
     state.currentMatch.timer.periodIndex = state.timer.periodIndex;
     state.currentMatch.timer.stoppage = state.timer.stoppage.slice();
   }
@@ -781,7 +792,61 @@ function persistCurrent() {
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  // Lo schermo resta acceso dal setup fino alla fine della partita; su Home,
+  // riepilogo e dashboard il blocco viene rilasciato e l'iPad puo' riposare.
+  if (WAKE_SCREENS.includes(id)) acquireWakeLock(); else releaseWakeLock();
 }
+
+/*
+ * Screen Wake Lock (v3.12): impedisce all'iPad di spegnere lo schermo per
+ * inattivita' mentre si gestisce una partita. Il browser lo rilascia da solo
+ * quando la pagina non e' visibile (app in background, iPad bloccato): per
+ * questo si richiede di nuovo al ritorno in primo piano (visibilitychange).
+ * NON impedisce lo spegnimento causato dalla chiusura della cover (sensore
+ * magnetico hardware): va disattivato nelle Impostazioni di iPadOS.
+ */
+const WAKE_SCREENS = ['setup-screen', 'lineup-screen', 'match-screen'];
+let wakeLockSentinel = null;
+let wakeLockWanted = false;
+
+function renderWakeBadge() {
+  const el = document.getElementById('wake-badge');
+  if (!el) return;
+  const on = !!wakeLockSentinel;
+  el.className = 'wake-badge ' + (on ? 'on' : 'off');
+  el.textContent = on ? '🔆 Schermo sempre acceso' : '⚠️ Schermo non protetto';
+}
+async function acquireWakeLock() {
+  wakeLockWanted = true;
+  if (wakeLockSentinel || !('wakeLock' in navigator) || document.visibilityState !== 'visible') {
+    renderWakeBadge();
+    return;
+  }
+  try {
+    const sentinel = await navigator.wakeLock.request('screen');
+    if (!wakeLockWanted) { sentinel.release().catch(() => {}); return; }
+    wakeLockSentinel = sentinel;
+    sentinel.addEventListener('release', () => {
+      if (wakeLockSentinel === sentinel) wakeLockSentinel = null;
+      renderWakeBadge();
+    });
+  } catch (e) {
+    wakeLockSentinel = null;
+  }
+  renderWakeBadge();
+}
+function releaseWakeLock() {
+  wakeLockWanted = false;
+  const s = wakeLockSentinel;
+  wakeLockSentinel = null;
+  if (s) s.release().catch(() => {});
+  renderWakeBadge();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (wakeLockWanted) acquireWakeLock();
+  if (state.timer.running) updateTimerDisplay();
+});
 function goHome() {
   stopTimer();
   state.currentMatch = null;
@@ -1464,6 +1529,29 @@ function renderMatchScreen() {
   renderMatchInfo();
   updateTimerDisplay();
   applyMatchScreenMode();
+  restoreRunningTimer(m);
+}
+
+/*
+ * Ripristino dopo riapertura (v3.12): se la partita era salvata con il
+ * cronometro in marcia (`runningSince`), l'app e' stata chiusa/scartata da
+ * iPadOS mentre girava. Il tempo trascorso nel frattempo si somma alla base e il
+ * cronometro riparte. Oltre TIMER_RECOVERY_MAX_MS il salvataggio e' considerato
+ * abbandonato (partita dimenticata aperta): resta in pausa alla base salvata.
+ */
+function restoreRunningTimer(m) {
+  const since = m.timer && m.timer.runningSince;
+  if (!since) return;
+  if (m.completed) { m.timer.runningSince = null; return; }
+  const gap = Date.now() - since;
+  if (gap >= 0 && gap <= TIMER_RECOVERY_MAX_MS) {
+    startTimer(since);
+    alert('Cronometro ripristinato: era in marcia quando l\'app si è chiusa. Il tempo è stato ricalcolato (' + fmtClock(currentElapsedMs()) + ' trascorsi in questo periodo).');
+  } else {
+    m.timer.runningSince = null;
+    persistCurrent();
+    alert('Il cronometro risultava in marcia da più di ' + Math.round(TIMER_RECOVERY_MAX_MS / 3600000) + ' ore: è stato rimesso in pausa all\'ultimo valore salvato (' + fmtClock(m.timer.elapsedMs) + '). Controlla il tempo prima di ripartire.');
+  }
 }
 
 /* Una partita già completata può essere riaperta qui (vedi enterMatchEditMode)
@@ -1513,14 +1601,17 @@ function toggleTimer() {
   if (state.timer.running) stopTimer();
   else startTimer();
 }
-function startTimer() {
+/* `fromTs`: istante di avvio da ripristinare (recupero dopo riapertura); di norma ora */
+function startTimer(fromTs) {
   if (state.timer.periodIndex >= PERIODS.length - 1) return;
+  if (state.timer.intervalId) clearInterval(state.timer.intervalId);
   state.timer.running = true;
-  state.timer.startTimestamp = Date.now();
+  state.timer.startTimestamp = fromTs || Date.now();
   state.timer.intervalId = setInterval(() => updateTimerDisplay(), 250);
   const btn = document.getElementById('timer-toggle');
   btn.textContent = '⏸ Pausa';
   btn.className = 'timer-btn pause';
+  persistCurrent();
 }
 function stopTimer() {
   if (!state.timer.running) return;
@@ -1530,6 +1621,7 @@ function stopTimer() {
   if (state.timer.intervalId) { clearInterval(state.timer.intervalId); state.timer.intervalId = null; }
   if (state.currentMatch) {
     state.currentMatch.timer.elapsedMs = state.timer.elapsedMs;
+    state.currentMatch.timer.runningSince = null;
     persistCurrent();
   }
   const btn = document.getElementById('timer-toggle');
@@ -1545,6 +1637,7 @@ function nextPeriod() {
   if (state.currentMatch) {
     state.currentMatch.timer.periodIndex = state.timer.periodIndex;
     state.currentMatch.timer.elapsedMs = 0;
+    state.currentMatch.timer.runningSince = null;
     persistCurrent();
   }
   syncStoppageInput();
