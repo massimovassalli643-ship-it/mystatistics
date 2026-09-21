@@ -1,5 +1,9 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v5.4 (21/09/2026): sync su Sheets - gli eventi "Rigore parato" (type penaltysave)
+//   compaiono nel foglio Eventi con tipo "Rigore parato" (prima avrebbero il tipo
+//   vuoto). Nessun nuovo scope, schema fogli invariato (Statistiche resta a 12
+//   colonne). Pubblicare su TUTTI e 3 i deployment.
 // v5.3 (20/09/2026): OCR - i numeri di maglia scritti A MANO nella cella "N del
 //   Ruolo" vengono letti (prima il prompt li scartava come "cella vuota" o
 //   contatore di riga). Il contatore di riga stampato nel margine resta ignorato.
@@ -31,7 +35,7 @@
 
 // Aggiornare ad OGNI modifica di questo file; il frontend la confronta con
 // BACKEND_MIN_VERSION di index.html.
-const BACKEND_VERSION = '5.3';
+const BACKEND_VERSION = '5.4';
 
 const SHEET_PARTITE = 'Partite';
 const SHEET_STATISTICHE = 'Statistiche';
@@ -408,6 +412,9 @@ function handleSyncRequest(payload) {
       calc = (ev.player.num || '?') + ' ' + ev.player.name;
     } else if (ev.type === 'red') {
       tipo = 'Espulsione';
+      calc = (ev.player.num || '?') + ' ' + ev.player.name;
+    } else if (ev.type === 'penaltysave') {
+      tipo = 'Rigore parato';
       calc = (ev.player.num || '?') + ' ' + ev.player.name;
     } else if (ev.type === 'sub') {
       tipo = 'Sostituzione';

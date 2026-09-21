@@ -19,7 +19,104 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.17 — Messaggi d'errore OCR leggibili (20/09/2026)
+## Stato attuale: v3.19 + backend v5.4 — Rigori parati (21/09/2026)
+
+### Novità v3.19 + backend v5.4 (21/09/2026)
+
+**Richiesta di Max**: un pulsante "Rigore parato" tra Sostituz. e Atleta, per
+registrare squadra, atleta e minuto, con il dato che compare nelle statistiche.
+
+- **Pulsante** "🧤 Rigore parato" (verde acqua) tra Sostituz. e Atleta; la griglia
+  dei pulsanti passa da 5 a 6 colonne elastiche (`minmax(0, 1fr)`), quindi i pulsanti
+  si restringono invece di sconfinare sotto la colonna degli eventi.
+- **Modale** come gli altri eventi: Squadra, Minuto + Tempo (1° T / 2° T) e
+  "Atleta che ha parato". Modificabile con ✏️ ed eliminabile come ogni evento.
+- **Modello dati**: nuovo evento `{ type: 'penaltysave', team, player: {num, name},
+  period, periodMinute, minute }`. `team` = squadra dell'atleta che ha parato (come per
+  gli altri eventi); usa `player`, quindi `relinkPlayerRefs` la segue se si corregge
+  nome o numero. Non tocca il punteggio.
+- **Statistiche**: `computePlayerStats` conta `saves` per atleta.
+  - *Riepilogo partita*: colonna 🧤 nelle tabelle delle due squadre, visibile solo se
+    in partita c'è stato almeno un rigore parato.
+  - *Dashboard*: tessera "Rigori parati" (della nostra squadra, in entrambe le viste),
+    grafico "🧤 Rigori parati" (solo se ce n'è almeno uno) e colonna "🧤 Parati" nella
+    tabella "Tutte le calciatrici".
+  - *Excel*: riga "Rigori parati" nel Riepilogo (entrambe le squadre), colonna
+    "Rigori parati" in fondo al foglio Statistiche (le altre colonne non si spostano),
+    tipo "Rigore parato" nel foglio Eventi.
+  - *PDF*: colonna "PAR" tra R e MIN e riga "RIGORE PARATO" nella cronologia.
+- **Backend v5.4** (solo `Code.gs`, nessun nuovo scope): il foglio Eventi di Sheets
+  scrive tipo "Rigore parato" per questi eventi (con un backend precedente la riga
+  avrebbe il tipo vuoto). Il foglio **Statistiche resta a 12 colonne**: i rigori
+  parati per atleta non ci sono, si leggono dal foglio Eventi.
+  `BACKEND_MIN_VERSION` = 5.4: finché i 3 deployment non sono alla v5.4,
+  "Verifica versioni" mostra l'avviso.
+- **Da fare per Max**: incollare `backend/Code.gs` nell'editor Apps Script, salvare e
+  pubblicare una nuova versione su TUTTI e 3 i deployment (nessuna ri-autorizzazione).
+- **Provato** (browser): modale per entrambe le squadre e per entrambi i tempi,
+  cronologia, riepilogo, dashboard, Excel (fogli Riepilogo, Statistiche, Eventi) e PDF;
+  i 6 pulsanti restano quadrati e uguali a 1024 px. **Da provare sull'iPad** in partita.
+
+## Versione precedente: v3.18 — Dashboard: analisi gol subiti (21/09/2026)
+
+### Novità v3.18 (21/09/2026)
+
+**Richiesta**: analizzare i pattern dei gol subiti (minuti che si ripetono, gol
+ravvicinati, split 1°/2° tempo) e capire quale formazione in campo ne prende di
+più. Mockup approvato da Max (soglia ravvicinati 5', sezione sotto i KPI e prima
+dei grafici a barre).
+
+- **Nuova sezione "🥅 Analisi gol subiti"** nella Dashboard, tra la riga di KPI e i
+  grafici a barre (`<div id="dash-conceded">`, `renderConceded()` chiamata da
+  `renderDashboard()`). Solo frontend: nessuna modifica a backend, Sheets, modello
+  dati o export.
+- **Vista "Tutta la stagione"**: box "Cosa emerge" (frasi generate), 4 KPI (porta
+  inviolata, % nel tempo peggiore, gol ravvicinati, fascia critica), grafico "una
+  riga per partita" con i minuti dei gol + istogramma per fasce da 15' allineato,
+  scheda 1° vs 2° tempo, elenco degli episodi ravvicinati, e una scheda a tre tab:
+  **Gol per gol** (per ogni gol subito, la formazione in campo in quel momento),
+  **Formazioni** (gruppi di 11 per tempo, gol ogni 90') e **Singole calciatrici**
+  (gol subiti mentre è in campo, ogni 90').
+- **Vista singola partita** (stesso menu a tendina): KPI, linea 0–90' con gol, cambi
+  numerati e tratti di formazione (S1, S2…), "Gol per gol" e una scheda per ogni
+  tratto con i nomi e chi è entrata/uscita.
+- **Formazione in campo** = titolari (`lineup`) + cambi e rossi della nostra
+  squadra in ordine (`gsAnalyzeMatch`). Mostrata come **Base − chi esce + chi entra**;
+  "Base" = i titolari più ricorrenti nelle partite analizzate (`gsBaseXI`). Un gol
+  nello stesso minuto di un cambio conta dopo il cambio. Le calciatrici si
+  riconoscono per nome (i numeri di maglia cambiano da una partita all'altra).
+- **Tempo e minuti**: il tempo si legge da `period` (un recupero del 1° tempo resta
+  nel 1° tempo); i minuti mostrati sono assoluti (51', non 6' del 2° tempo). Si
+  analizzano solo i tempi regolamentari; i gol dei supplementari sono contati a
+  parte e non entrano nei grafici. Autogol nostri = gol subiti.
+- **Gol ravvicinati**: due o più gol subiti nella stessa partita entro N minuti,
+  anche a cavallo dell'intervallo. Soglia 3'/5'/10' con i pulsanti in testata
+  (predefinita 5'); cambiare soglia o tab non ridisegna la sezione (attributo
+  `data-w`/`data-tab`), quindi i dettagli aperti restano aperti.
+- **Limiti dichiarati a video**: sotto 30' in campo una formazione non si confronta,
+  sotto 60' (formazioni) / 180' (calciatrici) compare "campione piccolo"; con meno
+  di 5 partite un avviso ricorda che i pattern sono indicativi. Il ruolo non è
+  registrato, quindi niente schema tattico. Se manca la formazione iniziale di una
+  partita, quella partita resta nei conteggi dei gol ma non nelle formazioni.
+- **Colori**: blu `#4a8fe0` = 1° tempo, ambra `#d17a26` = 2° tempo (validati per
+  protanopia/deuteranopia/tritanopia con ΔE > 24); il colore non è mai l'unico
+  segnale (numeri, etichette, legenda).
+- **Grafico "Minuti giocati" allungato**: mostra tutte le calciatrici con almeno
+  1 minuto invece delle prime 8 (`barChartHtml` ha ora un parametro `limit`;
+  marcatrici e assist restano alle prime 8). Chi ha 0 minuti resta solo nella
+  tabella "Tutte le calciatrici".
+- **Costanti** (`index.html`, blocco Dashboard): `GS_WINDOWS`, `GS_MIN_FORM`,
+  `GS_SMALL_FORM`, `GS_MIN_PLAYER`, `GS_SMALL_PLAYER`, `GS_RATE_MAX`,
+  `GS_GOALS_SHOWN`.
+
+**Provato** (browser, 8 partite di prova salvate in localStorage): totali, fasce e
+episodi coincidono col mockup (15 gol, 67% nel 2° tempo, picco 45–60', 2 episodi a
+5'); vista stagione e partita; cambio soglia e tab; casi limite (rosso, autogol
+nostro, gol nel recupero del 1° tempo, gol nei supplementari, cambio nello stesso
+minuto di un gol, evento senza `period`, partita senza formazione, nessun gol
+subito). **Da provare con partite vere**: finora c'è una sola partita reale.
+
+## Versione precedente: v3.17 — Messaggi d'errore OCR leggibili (20/09/2026)
 
 ### Novità v3.17 (20/09/2026)
 
@@ -611,9 +708,14 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `OCR_STRIP_OVERLAP` | 0.08 | sovrapposizione tra strisce (frazione dell'altezza) |
 | `OCR_LEFT_CROP` | 0.62 | frazione di larghezza tenuta per le strisce (foto verticali) |
 | `OCR_JPEG_QUALITY` | 0.9 | qualità JPEG delle immagini inviate |
-| `APP_VERSION` | 3.17 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
-| `BACKEND_MIN_VERSION` | 5.3 | versione minima di backend richiesta dal frontend (Verifica versioni) |
-| `BACKEND_VERSION` (`Code.gs`) | 5.3 | versione del backend, restituita dal ping GET |
+| `APP_VERSION` | 3.19 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
+| `GS_WINDOWS` | 3, 5, 10 | soglie (minuti) dei "gol ravvicinati" nella dashboard; predefinita 5 (`gsWindow`) |
+| `GS_MIN_FORM` / `GS_SMALL_FORM` | 30 / 60 | minuti minimi per confrontare una formazione / sotto i quali compare "campione piccolo" |
+| `GS_MIN_PLAYER` / `GS_SMALL_PLAYER` | 60 / 180 | come sopra, per le singole calciatrici |
+| `GS_RATE_MAX` | 5 | fondo scala delle barre "gol ogni 90'" |
+| `GS_GOALS_SHOWN` | 12 | righe di "Gol per gol" visibili prima di "Mostra gli altri" |
+| `BACKEND_MIN_VERSION` | 5.4 | versione minima di backend richiesta dal frontend (Verifica versioni) |
+| `BACKEND_VERSION` (`Code.gs`) | 5.4 | versione del backend, restituita dal ping GET |
 | `WAKE_SCREENS` | setup, lineup, match | schermate su cui lo schermo resta acceso (Wake Lock) |
 | `TIMER_RECOVERY_MAX_MS` | 2 h | oltre questo intervallo un cronometro "in marcia" salvato non viene ripristinato |
 
@@ -637,6 +739,8 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 21/09/2026 | Frontend v3.19 + backend v5.4: pulsante "Rigore parato" (squadra, atleta, minuto/tempo) con statistiche in riepilogo, dashboard, Excel e PDF; Sheets scrive il tipo "Rigore parato" nel foglio Eventi. **Backend da pubblicare sui 3 deployment** |
+| 21/09/2026 | Frontend v3.18: dashboard, nuova sezione "Analisi gol subiti" (split 1°/2° tempo, fasce da 15', gol ravvicinati, formazione in campo a ogni gol dedotta dai cambi; vista stagione e singola partita). Solo frontend |
 | 20/09/2026 | Frontend v3.17: messaggi d'errore OCR più chiari con dettaglio tecnico, visibili 30 s (il ritaglio della pagina per "Scatta foto" è stato scritto e poi rimosso: non dimostrato necessario) |
 | 20/09/2026 | Backend v5.3: OCR legge i numeri di maglia scritti a mano nella cella "N° del Ruolo" (prima scartati come cella vuota/contatore di riga); resta ignorato il contatore stampato nel margine. Da pubblicare sui 3 deployment |
 | 20/09/2026 | Frontend v3.16: una nuova scansione OCR senza numero non cancella quello già presente; il numero letto è sempre intero o vuoto; `BACKEND_MIN_VERSION` = 5.3 |
@@ -673,11 +777,13 @@ da solo. Nei mockup è già così.
 Nessuna modifica al codice finché Max non scegle la direzione.
 
 ## Roadmap / backlog
+- [ ] **Analisi gol subiti (v3.18)**: verificare sull'iPad con le partite vere man mano che si accumulano; valutare il confronto con i gol segnati (es. gol subiti subito dopo aver segnato)
 - [ ] **Restyling UX**: scelta direzione A o B da parte di Max, poi implementazione in `index.html` (solo CSS + markup, nessuna modifica alla logica)
 - [ ] Dalla documentazione (2.10): statistiche stagionali aggregate, check-list pre-partita, confronto formazioni, sharing veloce PDF via WhatsApp/email dal Summary, multi-stagione, modalità coach
 - [ ] Valutare: selezione automatica del ritaglio colonne anche per foto orizzontali; anteprima delle strisce prima dell'invio
 
 ## Da verificare
+- [ ] **A carico di Max**: pubblicare il backend v5.4 (incollare `backend/Code.gs` nell'editor, salvare, nuova versione su TUTTI e 3 i deployment); poi Impostazioni → Verifica versioni → "Backend: v5.4" e, dopo una partita con un rigore parato, Sincronizza su Sheets e controllare la riga "Rigore parato" nel foglio Eventi
 - [x] Backend v5.3 pubblicato (20/09/2026) come nuovo deployment "v5.3 - OCR numeri di maglia a mano"; sull'iPad Impostazioni → Verifica versioni → "App v3.17 · Backend v5.3" e i numeri di maglia arrivano da Scatta foto e da Libreria foto
 - [x] Prova OCR reale (20/09/2026, sera, iPad con app **v3.13** e backend v5.3 su "Senza titolo"): i numeri di maglia scritti a mano arrivano correttamente sia da **"Scatta foto"** sia da **"Libreria foto"**. Prima della v5.3 la stessa distinta arrivava con 18 nomi e date corrette ma tutti i numeri vuoti (10062 token, ~$0,04)
 - [ ] "📷 Scatta foto" ora funziona con app v3.13, senza alcun ritaglio della pagina: l'errore della mattina non è stato riprodotto e la sua causa resta non confermata (il ritaglio scritto per la v3.17 è stato scartato, vedi sezione v3.17). Se ricapita, copiare il messaggio esatto (dalla v3.17 resta 30 s a video)

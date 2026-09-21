@@ -214,14 +214,15 @@
   .timer-btn.pause { background: #f39c12; color: white; }
   .timer-btn.next { background: rgba(127,184,255,0.2); color: #7fb8ff; }
   .timer-btn:active { transform: scale(0.95); }
-  .actions-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; flex: 1; align-content: start; }
-  .action-btn { aspect-ratio: 1; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: white; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); padding: 12px; }
+  .actions-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; flex: 1; align-content: start; }
+  .action-btn { aspect-ratio: 1; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: white; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); padding: 12px 6px; min-width: 0; text-align: center; line-height: 1.1; }
   .action-btn:active { transform: scale(0.95); }
-  .action-btn .ico { font-size: 32px; }
+  .action-btn .ico { font-size: 30px; line-height: 1.1; }
   .action-btn.goal { background: linear-gradient(135deg, #27ae60, #2ecc71); }
   .action-btn.yellow { background: linear-gradient(135deg, #f1c40f, #f39c12); color: #2c1810; }
   .action-btn.red { background: linear-gradient(135deg, #c0392b, #e74c3c); }
   .action-btn.sub { background: linear-gradient(135deg, #2980b9, #3498db); }
+  .action-btn.save { background: linear-gradient(135deg, #16a085, #1abc9c); }
   .action-btn.add-player { background: linear-gradient(135deg, #8e44ad, #9b59b6); }
   .events-sidebar { width: 340px; background: rgba(0,0,0,0.35); border-left: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
   .events-header { padding: 18px 20px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; }
@@ -233,6 +234,7 @@
   .event-item.yellow { border-left-color: #f1c40f; }
   .event-item.red { border-left-color: #e74c3c; }
   .event-item.sub { border-left-color: #3498db; }
+  .event-item.penaltysave { border-left-color: #1abc9c; }
   .event-min { font-size: 13px; font-weight: 800; color: #ffb84d; min-width: 36px; font-variant-numeric: tabular-nums; }
   .event-content { flex: 1; font-size: 13px; line-height: 1.4; }
   .event-type { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; color: #b8d4ed; }
@@ -302,6 +304,131 @@
   .dash-table td.n { text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; }
   .dash-table td.dim { color: #5a7793; }
   .dash-scroll { overflow-x: auto; }
+
+  /* ============ ANALISI GOL SUBITI (dashboard) ============
+     Due soli colori con un significato fisso: blu = 1° tempo, ambra = 2° tempo
+     (validati per protanopia/deuteranopia/tritanopia). Il colore non e' mai
+     l'unico segnale: ci sono sempre etichette, numeri e legenda. Le altre
+     grandezze restano in bianco/grigio. */
+  .gs-sec { margin-bottom: 18px; }
+  .gs-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 4px 0 14px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); }
+  .gs-head h2 { font-size: 22px; font-weight: 800; }
+  .gs-sub { color: #7a96b3; font-size: 14px; }
+  .gs-chips { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .gs-chips-l { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #7a96b3; }
+  .gs-chip, .gs-tab { min-height: 44px; padding: 0 18px; border-radius: 10px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: #e8f0f7; font-size: 14px; font-weight: 600; }
+  .gs-chip.on, .gs-tab.on { background: #e8f0f7; color: #0a1929; border-color: #e8f0f7; font-weight: 800; }
+  .gs-insights { background: rgba(127,184,255,0.08); border: 1px solid rgba(127,184,255,0.25); border-left: 4px solid #7fb8ff; border-radius: 12px; padding: 12px 18px; margin-bottom: 16px; }
+  .gs-ins-t { font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #7fb8ff; margin-bottom: 6px; }
+  .gs-insights ul { list-style: none; display: grid; gap: 4px; font-size: 15px; }
+  .gs-insights li::before { content: '›'; color: #7fb8ff; margin-right: 8px; font-weight: 800; }
+  .gs-insights li.gs-caution { color: #ffd9a1; font-size: 13px; }
+  /* varianti per soglia e per scheda: si cambia un attributo, senza ridisegnare (i dettagli aperti restano aperti) */
+  .gs-wc, .gs-panel { display: none; }
+  .gs-sec[data-w="3"] .gs-wc-3, .gs-sec[data-w="5"] .gs-wc-5, .gs-sec[data-w="10"] .gs-wc-10,
+  .gs-sec[data-tab="goals"] .gs-p-goals, .gs-sec[data-tab="forms"] .gs-p-forms, .gs-sec[data-tab="players"] .gs-p-players { display: block; }
+  .gs-grow { display: grid; grid-template-columns: 190px 110px 1fr; gap: 6px 14px; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .gs-grow.single { grid-template-columns: 110px 1fr; }
+  .gs-gm { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+  .gs-gm span { color: #7a96b3; font-variant-numeric: tabular-nums; }
+  .gs-gmin { display: flex; align-items: center; gap: 8px; }
+  .gs-gh { font-size: 11px; color: #7a96b3; }
+  .gs-sec[data-w="3"] li.gs-wc-3, .gs-sec[data-w="5"] li.gs-wc-5, .gs-sec[data-w="10"] li.gs-wc-10 { display: list-item; }
+  .gs-grid2 { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 14px; align-items: start; margin-bottom: 14px; }
+  .gs-col { display: grid; gap: 14px; }
+  .gs-card-gap { margin-bottom: 14px; }
+  .gs-sec svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .gs-sec svg text { font-family: inherit; fill: #e8f0f7; }
+  .gs-ax { font-size: 10px; fill: #7a96b3 !important; font-weight: 700; letter-spacing: 0.6px; }
+  .gs-rl { font-size: 12.5px; font-weight: 700; }
+  .gs-rr { font-size: 11.5px; fill: #7a96b3 !important; font-weight: 600; }
+  .gs-cnt { font-size: 12px; font-weight: 800; fill: #b8d4ed !important; }
+  .gs-clean { font-size: 11px; fill: #7a96b3 !important; font-style: italic; }
+  .gs-pill { font-size: 10px; font-weight: 800; fill: #0a1929 !important; }
+  .gs-bv { font-size: 15px; font-weight: 900; }
+  .gs-bl { font-size: 11px; fill: #7a96b3 !important; font-weight: 600; }
+  .gs-bp { font-size: 10px; fill: #6d89a6 !important; }
+  .gs-peak { font-size: 10px; font-weight: 800; letter-spacing: 0.8px; fill: #ffd9a1 !important; }
+  .gs-dn { font-size: 11px; font-weight: 900; fill: #0a1929 !important; }
+  .gs-stl { font-size: 11px; font-weight: 700; fill: #cfe0f0 !important; }
+  .gs-legend { display: flex; gap: 6px 16px; flex-wrap: wrap; font-size: 11.5px; color: #7a96b3; margin: -2px 0 10px; }
+  .gs-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .gs-sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .gs-sw.ln { width: 16px; height: 3px; border-radius: 2px; background: #e8f0f7; }
+  .gs-split-labels { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+  .gs-split-labels > div { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .gs-split-labels .r { justify-content: flex-end; }
+  .gs-split-labels .sv { color: #7a96b3; }
+  .gs-split-bar { display: flex; gap: 2px; height: 34px; border-radius: 8px; overflow: hidden; }
+  .gs-split-bar > div { display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 16px; color: #0a1929; min-width: 4px; }
+  .gs-split-foot { display: flex; justify-content: space-between; margin-top: 10px; font-size: 12.5px; color: #7a96b3; }
+  .gs-split-foot b { color: #e8f0f7; font-size: 15px; }
+  .gs-note { font-size: 12px; color: #7a96b3; margin-top: 10px; line-height: 1.45; }
+  .gs-note.top { margin: -4px 0 14px; }
+  .gs-note b { color: #e8f0f7; }
+  .gs-ep { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .gs-ep:last-child { border-bottom: none; padding-bottom: 0; }
+  .gs-ep:first-child { padding-top: 0; }
+  .gs-ep-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+  .gs-ep-gap { color: #0a1929; background: #e8f0f7; border-radius: 20px; padding: 1px 9px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+  .gs-ep-mins { margin: 8px 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .gs-mchip { color: #0a1929; font-weight: 900; font-size: 13px; padding: 3px 10px; border-radius: 20px; font-variant-numeric: tabular-nums; }
+  .gs-arrow { color: #7a96b3; }
+  .gs-ep-form { font-size: 11.5px; color: #7a96b3; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+  .gs-d { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.06); color: #e8f0f7; white-space: nowrap; }
+  .gs-d.base { background: transparent; color: #7a96b3; }
+  .gs-d.in { border-color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.14); }
+  .gs-d.out { color: #7a96b3; text-decoration: line-through; text-decoration-color: rgba(255,255,255,0.4); }
+  .gs-deltas { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .gs-pcs { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .gs-pc { font-size: 11.5px; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #cfe0f0; }
+  .gs-pc b { color: #e8f0f7; font-variant-numeric: tabular-nums; margin-right: 2px; }
+  .gs-pc.new { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.55); color: #e8f0f7; }
+  .gs-pc.gone { opacity: 0.55; text-decoration: line-through; }
+  .gs-pc i { font-style: normal; font-size: 9px; }
+  .gs-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .gs-cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  .gs-colhead { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; letter-spacing: 1px; padding-bottom: 8px; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.12); }
+  .gs-frow { display: grid; grid-template-columns: 1fr auto; column-gap: 14px; row-gap: 8px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .gs-frow-main { min-width: 0; }
+  .gs-frow-meta { font-size: 12px; color: #7a96b3; margin-top: 6px; }
+  .gs-frow-meta b { color: #e8f0f7; }
+  .gs-frow-rate { text-align: right; line-height: 1.1; }
+  .gs-frow-rate .num { font-size: 24px; font-weight: 900; font-variant-numeric: tabular-nums; display: block; }
+  .gs-frow-rate .unit { font-size: 10px; color: #7a96b3; }
+  .gs-track { grid-column: 1 / -1; position: relative; height: 8px; background: rgba(255,255,255,0.07); border-radius: 4px; }
+  .gs-track i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0 4px 4px 0; min-width: 3px; }
+  .gs-track u { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #e8f0f7; opacity: 0.8; text-decoration: none; }
+  .gs-warn { display: inline-block; font-size: 10px; font-weight: 800; letter-spacing: 0.4px; color: #ffd9a1; border: 1px solid rgba(255,184,77,0.5); background: rgba(255,184,77,0.1); padding: 0 7px; border-radius: 20px; margin-left: 4px; }
+  .gs-sec details { grid-column: 1 / -1; }
+  .gs-sec details summary { cursor: pointer; font-size: 12px; color: #7fb8ff; font-weight: 700; list-style: none; min-height: 32px; display: flex; align-items: center; }
+  .gs-sec details summary::before { content: '▸'; margin-right: 6px; }
+  .gs-sec details[open] summary::before { content: '▾'; }
+  .gs-sec details summary::-webkit-details-marker { display: none; }
+  .gs-fmore { font-size: 12px; color: #7a96b3; padding: 10px 0 0; }
+  .gs-fmore.dim { color: #6d89a6; }
+  .gs-prows { display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; }
+  .gs-prow { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 6px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .gs-pname { font-size: 14px; font-weight: 700; }
+  .gs-pmeta { grid-column: 1; font-size: 11.5px; color: #7a96b3; order: 3; }
+  .gs-prow .gs-track { order: 4; }
+  .gs-prow .gs-frow-rate { grid-row: 1 / span 2; grid-column: 2; order: 2; }
+  .gs-prow .gs-frow-rate .num { font-size: 20px; }
+  .gs-stints { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .gs-stint { border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); border-radius: 10px; padding: 12px 14px; }
+  .gs-stint-h { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; margin-bottom: 8px; font-size: 12.5px; color: #7a96b3; }
+  .gs-stint-h b { background: #e8f0f7; color: #0a1929; border-radius: 6px; padding: 1px 8px; font-weight: 900; }
+  .gs-gbadge { flex-basis: 100%; font-size: 12px; font-weight: 700; color: #7a96b3; }
+  .gs-gbadge.has { color: #e8f0f7; }
+  .gs-sublist { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: #b8d4ed; margin-top: 4px; }
+  .gs-sublist b { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #e8f0f7; color: #0a1929; font-size: 10px; margin-right: 6px; }
+  .gs-how { margin-top: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 18px; }
+  .gs-how ul { margin: 8px 0 4px 18px; font-size: 12.5px; color: #7a96b3; display: grid; gap: 6px; }
+  .gs-how b { color: #e8f0f7; }
+  @media (max-width: 940px) {
+    .gs-grid2, .gs-cols2, .gs-prows, .gs-stints, .gs-grow { grid-template-columns: 1fr; }
+    .gs-chips { margin-left: 0; }
+  }
 
   /* ============ REPORT ============ */
   .report-step-title { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #7a96b3; margin: 4px 0 10px; }
@@ -393,6 +520,7 @@
       <select class="dash-select" id="dash-match-select" onchange="renderDashboard()"></select>
     </div>
     <div class="kpi-row" id="dash-kpis"></div>
+    <div id="dash-conceded"></div>
     <div class="dash-grid" id="dash-grid"></div>
   </div>
 
@@ -564,6 +692,9 @@
         </button>
         <button class="action-btn sub" onclick="openEventModal('sub')">
           <span class="ico">🔄</span><span>Sostituz.</span>
+        </button>
+        <button class="action-btn save" onclick="openEventModal('penaltysave')">
+          <span class="ico">🧤</span><span>Rigore parato</span>
         </button>
         <button class="action-btn add-player" onclick="openAddPlayerModal()">
           <span class="ico">➕</span><span>Atleta</span>
@@ -742,9 +873,9 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.17';
+const APP_VERSION = '3.19';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
-const BACKEND_MIN_VERSION = '5.3';
+const BACKEND_MIN_VERSION = '5.4';
 const STORAGE_KEY = 'mystatistics_matches_v2';
 const PERIODS = ['1° tempo', '2° tempo', '1° supplementare', '2° supplementare', 'Partita conclusa'];
 const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
@@ -1785,7 +1916,7 @@ function editEvent(id) {
 }
 
 function showEventModal(type) {
-  const titles = { goal: '⚽ Goal', yellow: '🟨 Ammonizione', red: '🟥 Espulsione', sub: '🔄 Sostituzione' };
+  const titles = { goal: '⚽ Goal', yellow: '🟨 Ammonizione', red: '🟥 Espulsione', sub: '🔄 Sostituzione', penaltysave: '🧤 Rigore parato' };
   const isEdit = !!currentEventDraft.editingId;
   document.getElementById('event-modal-title').textContent = (isEdit ? 'Modifica · ' : '') + titles[type];
   renderEventModalBody();
@@ -1845,11 +1976,11 @@ function renderEventModalBody() {
           `).join('')}
         </div>
       </div>`;
-  } else if (type === 'yellow' || type === 'red') {
+  } else if (type === 'yellow' || type === 'red' || type === 'penaltysave') {
     const playerSel = currentEventDraft.player ? `${currentEventDraft.player.num}|${currentEventDraft.player.name}` : null;
     body += `
       <div class="modal-field">
-        <label class="modal-label">Calciatrice</label>
+        <label class="modal-label">${type === 'penaltysave' ? 'Atleta che ha parato' : 'Calciatrice'}</label>
         ${playerSelect('event-player', currentEventDraft.team, false, playerSel)}
       </div>`;
   } else if (type === 'sub') {
@@ -1939,9 +2070,9 @@ function confirmEvent() {
     } else {
       state.currentMatch[team].score++;
     }
-  } else if (type === 'yellow' || type === 'red') {
+  } else if (type === 'yellow' || type === 'red' || type === 'penaltysave') {
     const pv = document.getElementById('event-player').value;
-    if (!pv) { alert('Seleziona la calciatrice'); return; }
+    if (!pv) { alert(type === 'penaltysave' ? 'Seleziona l\'atleta che ha parato' : 'Seleziona la calciatrice'); return; }
     currentEventDraft.player = parsePlayer(pv);
   } else if (type === 'sub') {
     const outV = document.getElementById('event-out').value;
@@ -2015,6 +2146,9 @@ function eventCardHtml(e) {
     typeLabel = `🔄 Sostituzione · ${escapeHtml(teamName)}`;
     detail = `Esce ${e.playerOut.num ?? '?'} ${escapeHtml(e.playerOut.name)}`;
     subDetail = `Entra ${e.playerIn.num ?? '?'} ${escapeHtml(e.playerIn.name)} • ${e.subReason}`;
+  } else if (e.type === 'penaltysave') {
+    typeLabel = `🧤 Rigore parato · ${escapeHtml(teamName)}`;
+    detail = `${e.player.num ?? '?'} ${escapeHtml(e.player.name)}`;
   }
   return `
     <div class="event-item ${e.type}">
@@ -2113,7 +2247,7 @@ function computePlayerStats(side, match) {
     const key = `${p.num}_${p.name}`;
     stats[key] = {
       num: p.num, name: p.name, role: p.role || '',
-      goals: 0, assists: 0, yellows: 0, reds: 0,
+      goals: 0, assists: 0, yellows: 0, reds: 0, saves: 0,
       minutesIn: null, minutesOut: null, minutesPlayed: 0,
       starter: lineup.some(l => l.num === p.num && l.name === p.name)
     };
@@ -2135,6 +2269,10 @@ function computePlayerStats(side, match) {
         if (e.type === 'yellow') stats[k].yellows++;
         else stats[k].reds++;
       }
+    }
+    if (e.type === 'penaltysave' && e.team === side) {
+      const k = `${e.player.num}_${e.player.name}`;
+      if (stats[k]) stats[k].saves++;
     }
     if (e.type === 'sub' && e.team === side) {
       const outK = `${e.playerOut.num}_${e.playerOut.name}`;
@@ -2192,9 +2330,11 @@ function renderSummary() {
 
   const statsHome = computePlayerStats('home');
   const statsAway = computePlayerStats('away');
+  // La colonna dei rigori parati compare solo se in partita ce n'e' stato almeno uno
+  const showSaves = [...statsHome, ...statsAway].some(s => s.saves > 0);
   document.getElementById('summary-stats').innerHTML = `
-    ${statsPanelHtml(m.home.name, statsHome)}
-    ${statsPanelHtml(m.away.name, statsAway)}
+    ${statsPanelHtml(m.home.name, statsHome, showSaves)}
+    ${statsPanelHtml(m.away.name, statsAway, showSaves)}
   `;
 
   const allScorers = [...statsHome, ...statsAway].filter(s => s.goals > 0).sort((a, b) => b.goals - a.goals);
@@ -2225,7 +2365,7 @@ function renderSummary() {
   showScreen('summary-screen');
 }
 
-function statsPanelHtml(teamName, stats) {
+function statsPanelHtml(teamName, stats, showSaves) {
   const rows = stats.map(s => `
     <tr>
       <td class="player-cell">
@@ -2236,6 +2376,7 @@ function statsPanelHtml(teamName, stats) {
       <td class="num-cell">${s.assists || ''}</td>
       <td class="num-cell" style="color:#f1c40f">${s.yellows || ''}</td>
       <td class="num-cell" style="color:#e74c3c">${s.reds || ''}</td>
+      ${showSaves ? `<td class="num-cell" style="color:#1abc9c">${s.saves || ''}</td>` : ''}
       <td class="num-cell">${s.minutesPlayed || (s.minutesIn != null ? 0 : '—')}'</td>
     </tr>
   `).join('');
@@ -2250,6 +2391,7 @@ function statsPanelHtml(teamName, stats) {
             <th style="text-align:center" title="Assist">A</th>
             <th style="text-align:center" title="Ammonizioni">🟨</th>
             <th style="text-align:center" title="Espulsioni">🟥</th>
+            ${showSaves ? '<th style="text-align:center" title="Rigori parati">🧤</th>' : ''}
             <th style="text-align:center" title="Minuti giocati">MIN</th>
           </tr>
         </thead>
@@ -2327,6 +2469,7 @@ function exportMatchXlsx(match, asBase64) {
     ['Ammonizioni', m.events.filter(e => e.type === 'yellow').length],
     ['Espulsioni', m.events.filter(e => e.type === 'red').length],
     ['Sostituzioni', m.events.filter(e => e.type === 'sub').length],
+    ['Rigori parati', m.events.filter(e => e.type === 'penaltysave').length],
   ];
   const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
   ws1['!cols'] = [{ wch: 25 }, { wch: 35 }];
@@ -2334,13 +2477,13 @@ function exportMatchXlsx(match, asBase64) {
 
   const statsHome = computePlayerStats('home', m);
   const statsAway = computePlayerStats('away', m);
-  const statsHeaders = ['Squadra', 'N° Maglia', 'Ruolo', 'Cognome e Nome', 'Goal', 'Assist', 'Ammonizioni', 'Espulsioni', 'Minuti giocati', 'Titolare'];
+  const statsHeaders = ['Squadra', 'N° Maglia', 'Ruolo', 'Cognome e Nome', 'Goal', 'Assist', 'Ammonizioni', 'Espulsioni', 'Minuti giocati', 'Titolare', 'Rigori parati'];
   const statsRows = [statsHeaders];
-  statsHome.forEach(s => statsRows.push([m.home.name, s.num ?? '', s.role || '', s.name, s.goals, s.assists, s.yellows, s.reds, s.minutesPlayed || (s.minutesIn != null ? 0 : ''), s.starter ? 'Sì' : 'No']));
+  statsHome.forEach(s => statsRows.push([m.home.name, s.num ?? '', s.role || '', s.name, s.goals, s.assists, s.yellows, s.reds, s.minutesPlayed || (s.minutesIn != null ? 0 : ''), s.starter ? 'Sì' : 'No', s.saves]));
   statsRows.push([]);
-  statsAway.forEach(s => statsRows.push([m.away.name, s.num ?? '', s.role || '', s.name, s.goals, s.assists, s.yellows, s.reds, s.minutesPlayed || (s.minutesIn != null ? 0 : ''), s.starter ? 'Sì' : 'No']));
+  statsAway.forEach(s => statsRows.push([m.away.name, s.num ?? '', s.role || '', s.name, s.goals, s.assists, s.yellows, s.reds, s.minutesPlayed || (s.minutesIn != null ? 0 : ''), s.starter ? 'Sì' : 'No', s.saves]));
   const ws2 = XLSX.utils.aoa_to_sheet(statsRows);
-  ws2['!cols'] = [{ wch: 25 }, { wch: 10 }, { wch: 8 }, { wch: 30 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 10 }];
+  ws2['!cols'] = [{ wch: 25 }, { wch: 10 }, { wch: 8 }, { wch: 30 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 10 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, ws2, 'Statistiche');
 
   const eventsHeaders = ['Minuto', 'Periodo', 'Tipo evento', 'Squadra', 'Calciatrice', 'Dettaglio aggiuntivo', 'Note'];
@@ -2356,6 +2499,7 @@ function exportMatchXlsx(match, asBase64) {
       note = e.goalType || 'azione';
     } else if (e.type === 'yellow') { tipoEvento = 'Ammonizione'; calciatrice = `${e.player.num ?? '?'} ${e.player.name}`; }
     else if (e.type === 'red') { tipoEvento = 'Espulsione'; calciatrice = `${e.player.num ?? '?'} ${e.player.name}`; }
+    else if (e.type === 'penaltysave') { tipoEvento = 'Rigore parato'; calciatrice = `${e.player.num ?? '?'} ${e.player.name}`; }
     else if (e.type === 'sub') {
       tipoEvento = 'Sostituzione';
       calciatrice = `Esce: ${e.playerOut.num ?? '?'} ${e.playerOut.name}`;
@@ -2413,8 +2557,8 @@ function exportMatchPdf(match, asBase64) {
     doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 107, 53);
     doc.text(teamName.toUpperCase(), 14, yStart);
     doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 80, 80);
-    const headers = ['N°', 'RUOLO', 'CALCIATRICE', 'G', 'A', 'Y', 'R', 'MIN'];
-    const xs = [14, 22, 36, 130, 142, 154, 166, 178];
+    const headers = ['N°', 'RUOLO', 'CALCIATRICE', 'G', 'A', 'Y', 'R', 'PAR', 'MIN'];
+    const xs = [14, 22, 36, 120, 131, 142, 153, 164, 178];
     headers.forEach((h, i) => doc.text(h, xs[i], yStart + 5));
     doc.setLineWidth(0.2); doc.line(14, yStart + 6.5, 196, yStart + 6.5);
     doc.setFont('helvetica', 'normal'); doc.setTextColor(20, 20, 20);
@@ -2428,7 +2572,8 @@ function exportMatchPdf(match, asBase64) {
       doc.text(String(s.assists || ''), xs[4], yy);
       doc.text(String(s.yellows || ''), xs[5], yy);
       doc.text(String(s.reds || ''), xs[6], yy);
-      doc.text(s.minutesPlayed ? String(s.minutesPlayed) + "'" : (s.minutesIn != null ? "0'" : '—'), xs[7], yy);
+      doc.text(String(s.saves || ''), xs[7], yy);
+      doc.text(s.minutesPlayed ? String(s.minutesPlayed) + "'" : (s.minutesIn != null ? "0'" : '—'), xs[8], yy);
       yy += 5;
     });
     return yy + 4;
@@ -2452,6 +2597,7 @@ function exportMatchPdf(match, asBase64) {
       if (e.goalType && e.goalType !== 'azione' && e.goalType !== 'autogol') line += ` (${e.goalType})`;
     } else if (e.type === 'yellow') line += `AMMONIZIONE (${team}): ${e.player.num ?? '?'} ${e.player.name}`;
     else if (e.type === 'red') line += `ESPULSIONE (${team}): ${e.player.num ?? '?'} ${e.player.name}`;
+    else if (e.type === 'penaltysave') line += `RIGORE PARATO (${team}): ${e.player.num ?? '?'} ${e.player.name}`;
     else if (e.type === 'sub') line += `SOSTITUZIONE (${team}): out ${e.playerOut.num ?? '?'} ${e.playerOut.name} → in ${e.playerIn.num ?? '?'} ${e.playerIn.name} (${e.subReason})`;
     doc.text(line, 14, y, { maxWidth: 182 });
     y += 5;
@@ -2515,7 +2661,7 @@ function matchLabel(m) {
 
 /* Aggrega squadra e calciatrici su un insieme di partite */
 function buildDashboardStats(matches, ourKey) {
-  const team = { played: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, yellows: 0, reds: 0 };
+  const team = { played: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, yellows: 0, reds: 0, saves: 0 };
   const players = {};
   matches.forEach(m => {
     const side = ourSideOf(m, ourKey);
@@ -2529,25 +2675,27 @@ function buildDashboardStats(matches, ourKey) {
     computePlayerStats(side, m).forEach(st => {
       const key = normTeam(st.name);
       if (!key) return;
-      if (!players[key]) players[key] = { name: st.name, num: st.num, goals: 0, assists: 0, yellows: 0, reds: 0, minutes: 0, apps: 0 };
+      if (!players[key]) players[key] = { name: st.name, num: st.num, goals: 0, assists: 0, yellows: 0, reds: 0, saves: 0, minutes: 0, apps: 0 };
       const p = players[key];
       if (st.num != null) p.num = st.num;
       p.goals += st.goals;
       p.assists += st.assists;
       p.yellows += st.yellows;
       p.reds += st.reds;
+      p.saves += st.saves;
       p.minutes += st.minutesPlayed || 0;
       if (st.minutesIn != null) p.apps++;
       team.yellows += st.yellows;
       team.reds += st.reds;
+      team.saves += st.saves;
     });
   });
   return { team, players: Object.values(players) };
 }
 
 /* Barre orizzontali: una sola grandezza, un solo colore, valore in chiaro a destra */
-function barChartHtml(rows, unit) {
-  const top = rows.filter(r => r.value > 0).sort((a, b) => b.value - a.value).slice(0, 8);
+function barChartHtml(rows, unit, limit) {
+  const top = rows.filter(r => r.value > 0).sort((a, b) => b.value - a.value).slice(0, limit || 8);
   if (top.length === 0) return '<div class="dash-empty">Nessun dato da mostrare</div>';
   const max = top[0].value;
   return top.map(r => {
@@ -2579,10 +2727,11 @@ function playersTableHtml(players) {
     + '<td class="n' + (p.assists ? '' : ' dim') + '">' + p.assists + '</td>'
     + '<td class="n' + (p.yellows ? '' : ' dim') + '">' + p.yellows + '</td>'
     + '<td class="n' + (p.reds ? '' : ' dim') + '">' + p.reds + '</td>'
+    + '<td class="n' + (p.saves ? '' : ' dim') + '">' + p.saves + '</td>'
     + '</tr>').join('');
   return '<div class="dash-scroll"><table class="dash-table">'
     + '<thead><tr><th>N°</th><th>Cognome e nome</th><th>Presenze</th><th>Minuti</th>'
-    + '<th>⚽ Gol</th><th>🅰️ Assist</th><th>🟨 Gialli</th><th>🟥 Rossi</th></tr></thead>'
+    + '<th>⚽ Gol</th><th>🅰️ Assist</th><th>🟨 Gialli</th><th>🟥 Rossi</th><th>🧤 Parati</th></tr></thead>'
     + '<tbody>' + body + '</tbody></table></div>';
 }
 
@@ -2591,6 +2740,488 @@ function kpiHtml(label, value, sub) {
     + '<div class="kpi-value">' + value + '</div>'
     + (sub ? '<div class="kpi-sub">' + sub + '</div>' : '') + '</div>';
 }
+
+/* ---------- Analisi gol subiti ----------
+ * Pattern dei gol subiti: tempo (1°/2°), fasce da 15', gol ravvicinati, e chi
+ * era in campo. Lavora solo sui tempi regolamentari (i supplementari sono
+ * contati a parte). Il "tempo" di un evento si legge da `period`, non dal
+ * minuto assoluto, cosi' un recupero (es. 47' del 1° tempo) resta nel 1° tempo.
+ *
+ * Chi era in campo: si parte dai titolari (`lineup`) e si applicano in ordine i
+ * cambi e i rossi della nostra squadra. Un gol segnato nello stesso minuto di un
+ * cambio conta come dopo il cambio. Ogni tratto con gli stessi in campo e'
+ * uno "stint". Le calciatrici si riconoscono per nome (il numero di maglia
+ * puo' cambiare da una partita all'altra, come nella dashboard).
+ */
+const GS_COLORS = ['#4a8fe0', '#d17a26'];   // 1° tempo, 2° tempo
+const GS_BIN_LABELS = ["0–15'", "15–30'", "30–45'", "45–60'", "60–75'", "75–90'"];
+const GS_WINDOWS = [3, 5, 10];               // soglie "gol ravvicinati" (minuti)
+const GS_MIN_FORM = 30;                       // sotto questi minuti una formazione non si confronta
+const GS_SMALL_FORM = 60;                     // sotto questi minuti: etichetta "campione piccolo"
+const GS_MIN_PLAYER = 60;
+const GS_SMALL_PLAYER = 180;
+const GS_RATE_MAX = 5;                        // fondo scala delle barre "gol ogni 90'"
+let gsWindow = 5;
+let gsTab = 'goals';
+const GS_GOALS_SHOWN = 12;                    // righe "gol per gol" visibili prima di "mostra altri"
+
+function gsPeriodOf(e) { return typeof e.period === 'number' ? e.period : ((e.minute || 0) >= 45 ? 1 : 0); }
+function gsPeriodMin(e) {
+  if (typeof e.periodMinute === 'number') return e.periodMinute;
+  return Math.max(0, (e.minute || 0) - (PERIOD_OFFSETS[gsPeriodOf(e)] || 0));
+}
+/* minuto di partita nei tempi regolamentari, con i recuperi riportati a 45 / 90 */
+function gsClock(e) { return (gsPeriodOf(e) === 0 ? 0 : 45) + Math.min(45, gsPeriodMin(e)); }
+function gsOrder(a, b) {
+  return (gsPeriodOf(a) - gsPeriodOf(b)) || (gsPeriodMin(a) - gsPeriodMin(b)) || ((a.timestamp || 0) - (b.timestamp || 0));
+}
+function gsKey(p) { return normTeam(p && p.name) || ('#' + (p && p.num)); }
+function gsName(name) {
+  return String(name || '').toLowerCase().replace(/(^|[\s'’-])(\S)/g, (m, a, b) => a + b.toUpperCase());
+}
+function gsFmt(n) { return (Math.round(n * 10) / 10).toFixed(1); }
+function gsMatchLabel(m, side) {
+  const opp = (m[side === 'home' ? 'away' : 'home'].name) || 'Avversari';
+  const d = new Date(m.endedAt || m.createdAt);
+  const dd = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2);
+  return dd + ' ' + gsName(opp.length > 16 ? opp.slice(0, 15) + '…' : opp) + ' (' + (side === 'home' ? 'C' : 'T') + ')';
+}
+
+function gsApply(on, e) {
+  if (e.type === 'sub') {
+    const inn = e.playerIn || {};
+    const next = on.filter(p => p.key !== gsKey(e.playerOut));
+    if (!next.some(p => p.key === gsKey(inn))) next.push({ key: gsKey(inn), name: inn.name, num: inn.num });
+    return next;
+  }
+  // rosso: esce senza essere sostituita
+  return on.filter(p => p.key !== gsKey(e.player));
+}
+
+/* Gol subiti + tratti di formazione di una partita, dal punto di vista della nostra squadra */
+function gsAnalyzeMatch(m, side) {
+  const opp = side === 'home' ? 'away' : 'home';
+  const conceded = (m.events || []).filter(e => e.type === 'goal'
+    && ((e.team === opp && e.goalType !== 'autogol') || (e.team === side && e.goalType === 'autogol'))).sort(gsOrder);
+  const regular = conceded.filter(e => gsPeriodOf(e) <= 1);
+  const res = {
+    m, side, label: gsMatchLabel(m, side), gf: m[side].score || 0, ga: m[opp].score || 0,
+    goals: regular.map(e => ({ period: gsPeriodOf(e), pm: gsPeriodMin(e), min: (gsPeriodOf(e) === 0 ? 0 : 45) + gsPeriodMin(e), clock: gsClock(e) })),
+    extra: conceded.length - regular.length, stints: [], subs: [], hasLineup: false
+  };
+  const starters = (m.lineup && m.lineup[side]) || [];
+  const changes = (m.events || []).filter(e => e.team === side && (e.type === 'sub' || e.type === 'red') && gsPeriodOf(e) <= 1).sort(gsOrder);
+  res.subs = changes.filter(e => e.type === 'sub').map(e => ({
+    period: gsPeriodOf(e), clock: gsClock(e), pm: gsPeriodMin(e), out: gsName(e.playerOut && e.playerOut.name), inn: gsName(e.playerIn && e.playerIn.name)
+  }));
+  if (!starters.length) return res;
+  res.hasLineup = true;
+  let on = starters.map(p => ({ key: gsKey(p), name: p.name, num: p.num }));
+  for (let p = 0; p <= 1; p++) {
+    const ch = changes.filter(e => gsPeriodOf(e) === p);
+    const cuts = [...new Set([0, 45].concat(ch.map(e => Math.min(45, gsPeriodMin(e)))))].sort((a, b) => a - b);
+    let idx = 0;
+    for (let i = 0; i < cuts.length - 1; i++) {
+      while (idx < ch.length && Math.min(45, gsPeriodMin(ch[idx])) <= cuts[i]) { on = gsApply(on, ch[idx]); idx++; }
+      res.stints.push({ period: p, a: cuts[i], b: cuts[i + 1], xi: on.slice(), goals: [] });
+    }
+    // cambi a 45' esatti (o nel recupero) valgono dall'inizio del tempo dopo
+    while (idx < ch.length) { on = gsApply(on, ch[idx]); idx++; }
+  }
+  res.goals.forEach(g => {
+    const cand = res.stints.filter(s => s.period === g.period && s.a <= Math.min(45, g.pm));
+    if (cand.length) cand[cand.length - 1].goals.push(g);
+  });
+  return res;
+}
+
+/* Gruppi di gol subiti a distanza <= w minuti nella stessa partita (anche a cavallo dell'intervallo) */
+function gsClusters(a, w) {
+  const out = []; let cur = [];
+  a.goals.forEach(g => {
+    if (cur.length && g.clock - cur[cur.length - 1].clock <= w) cur.push(g);
+    else { if (cur.length > 1) out.push(cur); cur = [g]; }
+  });
+  if (cur.length > 1) out.push(cur);
+  return out;
+}
+
+function gsStintAt(a, g) {
+  const cand = a.stints.filter(s => s.period === g.period && s.a <= Math.min(45, g.pm));
+  return cand.length ? cand[cand.length - 1] : null;
+}
+
+/* Formazione "base" = gli 11 titolari piu' ricorrenti nelle partite analizzate */
+function gsBaseXI(per) {
+  const tally = {};
+  per.filter(a => a.hasLineup).forEach(a => {
+    const keys = a.stints[0].xi.map(p => p.key).sort();
+    const sig = keys.join(',');
+    const t = tally[sig] || (tally[sig] = { keys, n: 0 });
+    t.n++;
+    t.last = true;
+  });
+  let best = null;
+  Object.keys(tally).forEach(k => { if (!best || tally[k].n >= best.n) best = tally[k]; });
+  return best ? best.keys : [];
+}
+
+function gsBuild(matches, ourKey) {
+  const per = matches.map(m => gsAnalyzeMatch(m, ourSideOf(m, ourKey)))
+    .sort((x, y) => new Date(x.m.endedAt || x.m.createdAt) - new Date(y.m.endedAt || y.m.createdAt));
+  const goals = [];
+  per.forEach(a => a.goals.forEach(g => goals.push(g)));
+  const bins = [0, 0, 0, 0, 0, 0];
+  goals.forEach(g => { bins[(g.period === 0 ? 0 : 3) + Math.min(2, Math.floor(Math.min(45, g.pm) / 15))]++; });
+  const ga1 = goals.filter(g => g.period === 0).length;
+  const names = {};
+  const forms = {}, players = {};
+  per.forEach(a => a.stints.forEach(s => {
+    const dur = s.b - s.a;
+    const keys = s.xi.map(p => p.key).sort();
+    const fk = s.period + '|' + keys.join(',');
+    const f = forms[fk] || (forms[fk] = { period: s.period, keys, min: 0, goals: 0, matches: {} });
+    f.min += dur; f.goals += s.goals.length; f.matches[a.m.id] = true;
+    s.xi.forEach(p => {
+      names[p.key] = p.name;
+      const q = players[p.key] || (players[p.key] = { key: p.key, min: 0, goals: 0 });
+      q.min += dur; q.goals += s.goals.length;
+    });
+  }));
+  const rate = (g, min) => (min ? g / min * 90 : 0);
+  const formList = Object.keys(forms).map(k => ({ ...forms[k], nMatches: Object.keys(forms[k].matches).length, rate: rate(forms[k].goals, forms[k].min) }));
+  const withLineup = per.filter(a => a.hasLineup);
+  const teamMin = withLineup.length * 90;
+  const teamGoals = withLineup.reduce((n, a) => n + a.goals.length, 0);
+  return {
+    per, total: goals.length, ga1, ga2: goals.length - ga1, bins,
+    extra: per.reduce((n, a) => n + a.extra, 0), cleanSheets: per.filter(a => !a.goals.length && !a.extra).length,
+    base: gsBaseXI(per), names, formList,
+    playerList: Object.keys(players).map(k => ({ ...players[k], rate: rate(players[k].goals, players[k].min) })),
+    teamAvg: rate(teamGoals, teamMin), noLineup: per.length - withLineup.length
+  };
+}
+
+/* ---------- pezzi di HTML ---------- */
+function gsVariants(fn) { return GS_WINDOWS.map(w => '<div class="gs-wc gs-wc-' + w + '">' + fn(w) + '</div>').join(''); }
+function gsEpCount(per, w) { return per.reduce((n, a) => n + gsClusters(a, w).length, 0); }
+function gsEpMatches(per, w) { return per.filter(a => gsClusters(a, w).length).length; }
+function gsPlural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+
+function gsDeltaHtml(keys, base, names) {
+  const out = base.filter(k => keys.indexOf(k) < 0);
+  const inn = keys.filter(k => base.indexOf(k) < 0);
+  if (!out.length && !inn.length) return '<span class="gs-d base">Formazione base</span>';
+  if (out.length + inn.length > 6) return '<span class="gs-d base">Molto diversa dalla base</span>';
+  return '<span class="gs-d base">Base</span>'
+    + out.map(k => '<span class="gs-d out">− ' + escapeHtml(gsName(names[k])) + '</span>').join('')
+    + inn.map(k => '<span class="gs-d in">+ ' + escapeHtml(gsName(names[k])) + '</span>').join('');
+}
+function gsElevenHtml(keys, base, names) {
+  const on = keys.map(k => {
+    const isNew = base.length && base.indexOf(k) < 0;
+    return '<span class="gs-pc' + (isNew ? ' new' : '') + '">' + escapeHtml(gsName(names[k])) + (isNew ? ' <i>▲</i>' : '') + '</span>';
+  }).join('');
+  const off = base.filter(k => keys.indexOf(k) < 0).map(k => '<span class="gs-pc gone">' + escapeHtml(gsName(names[k])) + ' <i>▼</i></span>').join('');
+  return '<div class="gs-pcs">' + on + off + '</div>';
+}
+function gsTrack(rate, color, avg) {
+  return '<div class="gs-track" aria-hidden="true"><i style="width:' + Math.min(100, rate / GS_RATE_MAX * 100) + '%;background:' + color + '"></i>'
+    + '<u style="left:' + Math.min(100, avg / GS_RATE_MAX * 100) + '%"></u></div>';
+}
+
+/* ---------- grafico stagione: una riga per partita + istogramma per fascia ---------- */
+function gsSeasonSvg(st, w) {
+  const per = st.per, n = per.length;
+  const W = 780, X0 = 176, PX = 6, rowH = n <= 10 ? 38 : (n <= 20 ? 30 : 24), top = 44;
+  const dotR = rowH >= 30 ? 7 : 5.5;
+  const xOf = t => X0 + t * PX;
+  const yEnd = top + n * rowH;
+  const yB = yEnd + 16 + 20 + 90;
+  const maxB = Math.max.apply(null, st.bins);
+  const peak = maxB > 0 && st.bins.filter(v => v === maxB).length === 1 ? st.bins.indexOf(maxB) : -1;
+  let s = '<svg viewBox="0 0 ' + W + ' ' + (yB + 40) + '" role="img" aria-label="Minuti dei gol subiti partita per partita e distribuzione per fascia da 15 minuti">';
+  if (peak >= 0) s += '<rect x="' + xOf(peak * 15) + '" y="34" width="' + (15 * PX) + '" height="' + (yB - 34) + '" rx="6" fill="rgba(255,255,255,0.06)"/>';
+  for (let t = 0; t <= 90; t += 15) {
+    s += '<line x1="' + xOf(t) + '" y1="34" x2="' + xOf(t) + '" y2="' + yB + '" stroke="rgba(255,255,255,0.07)"/>';
+    s += '<text x="' + xOf(t) + '" y="26" text-anchor="middle" class="gs-ax">' + t + "'</text>";
+  }
+  s += '<line x1="' + xOf(45) + '" y1="34" x2="' + xOf(45) + '" y2="' + yB + '" stroke="rgba(255,255,255,0.4)" stroke-dasharray="4 4"/>';
+  s += '<text x="' + (xOf(45) - 6) + '" y="12" text-anchor="end" class="gs-ax">1° TEMPO</text><text x="' + (xOf(45) + 6) + '" y="12" class="gs-ax">2° TEMPO</text>';
+  per.forEach((a, i) => {
+    const y0 = top + i * rowH, cy = y0 + rowH * 0.6;
+    if (i % 2 === 0) s += '<rect x="0" y="' + y0 + '" width="' + W + '" height="' + rowH + '" rx="6" fill="rgba(255,255,255,0.03)"/>';
+    s += '<text x="8" y="' + (cy + 4) + '" class="gs-rl">' + escapeHtml(a.label) + ' <tspan class="gs-rr">' + a.gf + '–' + a.ga + '</tspan></text>';
+    const cnt = a.goals.length + a.extra;
+    s += '<text x="' + (W - 8) + '" y="' + (cy + 4) + '" text-anchor="end" class="gs-cnt">' + (cnt ? cnt + ' gol' : '0') + '</text>';
+    if (!cnt) s += '<text x="' + xOf(45) + '" y="' + (cy + 4) + '" text-anchor="middle" class="gs-clean">porta inviolata 🧤</text>';
+    gsClusters(a, w).forEach(c => {
+      const x1 = xOf(c[0].clock), x2 = xOf(c[c.length - 1].clock), mid = (x1 + x2) / 2, gap = c[c.length - 1].clock - c[0].clock;
+      s += '<line x1="' + x1 + '" y1="' + cy + '" x2="' + x2 + '" y2="' + cy + '" stroke="#e8f0f7" stroke-width="2.5"/>';
+      s += '<rect x="' + (mid - 15) + '" y="' + (y0 + 1) + '" width="30" height="14" rx="7" fill="#e8f0f7"/><text x="' + mid + '" y="' + (y0 + 11.5) + '" text-anchor="middle" class="gs-pill">' + gap + "'</text>";
+    });
+    a.goals.forEach(g => {
+      s += '<circle cx="' + xOf(g.clock) + '" cy="' + cy + '" r="' + dotR + '" fill="' + GS_COLORS[g.period] + '" stroke="#122a44" stroke-width="2"><title>'
+        + escapeHtml(a.label) + ': gol subito al ' + g.min + "' del " + (g.period + 1) + '° tempo</title></circle>';
+    });
+  });
+  s += '<text x="8" y="' + (yEnd + 46) + '" class="gs-rl">Gol subiti per fascia</text><text x="8" y="' + (yEnd + 62) + '" class="gs-rr">' + n + (n === 1 ? ' partita' : ' partite') + '</text>';
+  st.bins.forEach((v, i) => {
+    const bw = 78, bx = X0 + i * 90 + 6, bh = maxB ? Math.max(v ? 4 : 0, v / maxB * 90) : 0, by = yB - bh;
+    const pct = st.total ? Math.round(v / st.total * 100) : 0;
+    if (v) s += '<path d="M' + bx + ',' + yB + ' V' + (by + 4) + ' Q' + bx + ',' + by + ' ' + (bx + 4) + ',' + by + ' H' + (bx + bw - 4) + ' Q' + (bx + bw) + ',' + by + ' ' + (bx + bw) + ',' + (by + 4) + ' V' + yB + ' Z" fill="' + GS_COLORS[i < 3 ? 0 : 1] + '"><title>' + GS_BIN_LABELS[i] + ': ' + v + ' gol (' + pct + '%)</title></path>';
+    s += '<text x="' + (bx + bw / 2) + '" y="' + (by - 6) + '" text-anchor="middle" class="gs-bv">' + v + '</text>';
+    if (i === peak) s += '<text x="' + (bx + bw / 2) + '" y="' + (by - 22) + '" text-anchor="middle" class="gs-peak">⚠ PICCO</text>';
+    s += '<text x="' + (bx + bw / 2) + '" y="' + (yB + 16) + '" text-anchor="middle" class="gs-bl">' + GS_BIN_LABELS[i] + '</text>';
+    s += '<text x="' + (bx + bw / 2) + '" y="' + (yB + 30) + '" text-anchor="middle" class="gs-bp">' + pct + '%</text>';
+  });
+  s += '<line x1="' + X0 + '" y1="' + yB + '" x2="' + (X0 + 540) + '" y2="' + yB + '" stroke="rgba(255,255,255,0.25)"/>';
+  return s + '</svg>';
+}
+
+/* ---------- grafico singola partita: gol, cambi e tratti di formazione ---------- */
+function gsMatchSvg(a, w) {
+  const W = 780, X0 = 30, PX = 8, barY = 130, barH = 34;
+  const xOf = t => X0 + t * PX;
+  let s = '<svg viewBox="0 0 ' + W + ' 226" role="img" aria-label="Gol subiti e cambi minuto per minuto">';
+  for (let t = 0; t <= 90; t += 15) {
+    s += '<line x1="' + xOf(t) + '" y1="34" x2="' + xOf(t) + '" y2="' + barY + '" stroke="rgba(255,255,255,0.07)"/>';
+    s += '<text x="' + xOf(t) + '" y="26" text-anchor="middle" class="gs-ax">' + t + "'</text>";
+  }
+  s += '<text x="' + (xOf(45) - 6) + '" y="12" text-anchor="end" class="gs-ax">1° TEMPO</text><text x="' + (xOf(45) + 6) + '" y="12" class="gs-ax">2° TEMPO</text>';
+  const segs = a.stints.length ? a.stints : [{ period: 0, a: 0, b: 45 }, { period: 1, a: 0, b: 45 }];
+  segs.forEach((x, i) => {
+    const x1 = xOf(x.period * 45 + x.a), wpx = (x.b - x.a) * PX;
+    s += '<rect x="' + (x1 + 1) + '" y="' + barY + '" width="' + (wpx - 2) + '" height="' + barH + '" rx="6" fill="rgba(255,255,255,' + (i % 2 ? 0.13 : 0.07) + ')"/>';
+    if (a.stints.length) s += '<text x="' + (x1 + wpx / 2) + '" y="' + (barY + 21) + '" text-anchor="middle" class="gs-stl">S' + (i + 1) + (wpx > 90 ? ' · ' + (x.period * 45 + x.a) + "'–" + (x.period * 45 + x.b) + "'" : '') + '</text>';
+  });
+  s += '<line x1="' + xOf(45) + '" y1="34" x2="' + xOf(45) + '" y2="' + (barY + barH + 8) + '" stroke="rgba(255,255,255,0.4)" stroke-dasharray="4 4"/>';
+  // gol: se due sono troppo vicini il secondo sale di una corsia
+  let lastX = -99, lane = 0;
+  const lanes = a.goals.map(g => {
+    const x = xOf(g.clock);
+    lane = (x - lastX < 22) ? 1 - lane : 0; lastX = x;
+    return { g, x, y: 100 - lane * 26 };
+  });
+  gsClusters(a, w).forEach(c => {
+    const p1 = lanes.find(l => l.g === c[0]), p2 = lanes.find(l => l.g === c[c.length - 1]), mid = (p1.x + p2.x) / 2;
+    s += '<line x1="' + p1.x + '" y1="' + p1.y + '" x2="' + p2.x + '" y2="' + p2.y + '" stroke="#e8f0f7" stroke-width="3"/>';
+    const py = Math.min(p1.y, p2.y) - 34;
+    s += '<rect x="' + (mid - 17) + '" y="' + py + '" width="34" height="16" rx="8" fill="#e8f0f7"/><text x="' + mid + '" y="' + (py + 12) + '" text-anchor="middle" class="gs-pill">' + (c[c.length - 1].clock - c[0].clock) + "'</text>";
+  });
+  lanes.forEach(l => {
+    const col = GS_COLORS[l.g.period];
+    s += '<line x1="' + l.x + '" y1="' + (l.y + 8) + '" x2="' + l.x + '" y2="' + barY + '" stroke="' + col + '" stroke-width="2"/>';
+    s += '<circle cx="' + l.x + '" cy="' + l.y + '" r="11" fill="' + col + '" stroke="#122a44" stroke-width="2"><title>Gol subito al ' + l.g.min + "' del " + (l.g.period + 1) + '° tempo</title></circle>';
+    s += '<text x="' + l.x + '" y="' + (l.y + 4) + '" text-anchor="middle" class="gs-dn">' + l.g.min + '</text>';
+  });
+  // cambi: cerchietti numerati (l'elenco e' sotto il grafico)
+  let lastS = [-99, -99];
+  a.subs.forEach((sb, i) => {
+    const x = xOf(sb.clock);
+    const ln = x - lastS[0] >= 22 ? 0 : 1;
+    lastS[ln] = x;
+    const y = barY + barH + 18 + ln * 22;
+    s += '<line x1="' + x + '" y1="' + (barY + barH) + '" x2="' + x + '" y2="' + (y - 9) + '" stroke="rgba(255,255,255,0.35)"/>';
+    s += '<circle cx="' + x + '" cy="' + y + '" r="9" fill="#e8f0f7"><title>' + escapeHtml(sb.out + ' › ' + sb.inn) + '</title></circle>';
+    s += '<text x="' + x + '" y="' + (y + 3.5) + '" text-anchor="middle" class="gs-pill">' + (i + 1) + '</text>';
+  });
+  return s + '</svg>';
+}
+
+function gsSplitCardHtml(st) {
+  const p1 = st.total ? Math.round(st.ga1 / st.total * 100) : 0, p2 = st.total ? 100 - p1 : 0;
+  const gm = st.per.filter(a => a.goals.length);
+  const cnt = (a, p) => a.goals.filter(g => g.period === p).length;
+  const more2 = gm.filter(a => cnt(a, 1) > cnt(a, 0)).length, more1 = gm.filter(a => cnt(a, 0) > cnt(a, 1)).length;
+  const nM = st.per.length;
+  return '<div class="dash-card"><div class="dash-card-title">⏱️ 1° tempo vs 2° tempo</div>'
+    + '<div class="gs-split-labels"><div><span class="gs-sw" style="background:' + GS_COLORS[0] + '"></span><b>1° tempo</b><span class="sv">' + st.ga1 + ' gol · ' + p1 + '%</span></div>'
+    + '<div class="r"><span class="gs-sw" style="background:' + GS_COLORS[1] + '"></span><b>2° tempo</b><span class="sv">' + st.ga2 + ' gol · ' + p2 + '%</span></div></div>'
+    + '<div class="gs-split-bar" role="img" aria-label="' + st.ga1 + ' gol nel primo tempo, ' + st.ga2 + ' nel secondo">'
+    + (st.ga1 ? '<div style="flex:' + st.ga1 + ';background:' + GS_COLORS[0] + '">' + st.ga1 + '</div>' : '')
+    + (st.ga2 ? '<div style="flex:' + st.ga2 + ';background:' + GS_COLORS[1] + '">' + st.ga2 + '</div>' : '') + '</div>'
+    + '<div class="gs-split-foot"><div><b>' + gsFmt(st.ga1 / nM) + '</b> a partita nel 1° T</div><div><b>' + gsFmt(st.ga2 / nM) + '</b> a partita nel 2° T</div></div>'
+    + (gm.length > 1 ? '<div class="gs-note">In ' + more2 + ' delle ' + gm.length + ' partite con gol subiti ne abbiamo presi di più nel 2° tempo (' + more1 + ' nel 1°).</div>' : '')
+    + '</div>';
+}
+
+function gsEpisodesHtml(st, w) {
+  const items = [];
+  st.per.forEach(a => gsClusters(a, w).forEach(c => {
+    const last = c[c.length - 1], stint = a.hasLineup ? gsStintAt(a, last) : null;
+    items.push('<div class="gs-ep"><div class="gs-ep-top"><b>' + escapeHtml(a.label) + '</b><span class="gs-ep-gap">' + (last.clock - c[0].clock) + "' di distanza</span></div>"
+      + '<div class="gs-ep-mins">' + c.map(g => '<span class="gs-mchip" style="background:' + GS_COLORS[g.period] + '">' + g.min + "'</span>").join('<span class="gs-arrow">→</span>') + '</div>'
+      + (stint ? '<div class="gs-ep-form">In campo all’ultimo gol: ' + gsDeltaHtml(stint.xi.map(p => p.key).sort(), st.base, st.names) + '</div>' : '') + '</div>');
+  }));
+  return items.join('') || '<div class="dash-empty">Nessun episodio con questa soglia</div>';
+}
+
+/* Un gol per riga: partita, minuto e gli 11 in campo in quel momento (Base − chi esce + chi entra) */
+function gsGoalsHtml(st, single) {
+  const rows = [];
+  st.per.slice().reverse().forEach(a => a.goals.forEach(g => {
+    const stint = a.hasLineup ? gsStintAt(a, g) : null;
+    rows.push('<div class="gs-grow' + (single ? ' single' : '') + '">'
+      + (single ? '' : '<div class="gs-gm"><b>' + escapeHtml(a.label) + '</b><span>' + a.gf + '–' + a.ga + '</span></div>')
+      + '<div class="gs-gmin"><span class="gs-mchip" style="background:' + GS_COLORS[g.period] + '">' + g.min + "'</span><span class=\"gs-gh\">" + (g.period + 1) + '° tempo</span></div>'
+      + '<div class="gs-deltas">' + (stint ? gsDeltaHtml(stint.xi.map(p => p.key).sort(), st.base, st.names) : '<span class="gs-d base">formazione non registrata</span>') + '</div></div>');
+  }));
+  if (!rows.length) return '<div class="dash-empty">Nessun gol subito</div>';
+  const shown = rows.slice(0, GS_GOALS_SHOWN), rest = rows.slice(GS_GOALS_SHOWN);
+  return shown.join('') + (rest.length ? '<details><summary>Mostra gli altri ' + rest.length + ' gol</summary>' + rest.join('') + '</details>' : '');
+}
+
+function gsFormationRows(st, period) {
+  const all = st.formList.filter(f => f.period === period).sort((a, b) => b.rate - a.rate || b.min - a.min);
+  const ok = all.filter(f => f.min >= GS_MIN_FORM), rows = ok.slice(0, 3), hidden = all.length - ok.length;
+  const col = GS_COLORS[period];
+  const html = rows.map(f => '<div class="gs-frow"><div class="gs-frow-main"><div class="gs-deltas">' + gsDeltaHtml(f.keys, st.base, st.names) + '</div>'
+    + '<div class="gs-frow-meta"><b>' + gsPlural(f.goals, 'gol', 'gol') + '</b> in ' + f.min + "' · " + gsPlural(f.nMatches, 'partita', 'partite')
+    + (f.min < GS_SMALL_FORM ? ' <span class="gs-warn">campione piccolo</span>' : '') + '</div></div>'
+    + '<div class="gs-frow-rate"><span class="num">' + gsFmt(f.rate) + '</span><span class="unit">gol ogni 90\'</span></div>'
+    + gsTrack(f.rate, col, st.teamAvg)
+    + '<details><summary>Chi era in campo (' + f.keys.length + ')</summary>' + gsElevenHtml(f.keys, st.base, st.names) + '</details></div>').join('');
+  return (html || '<div class="dash-empty">Nessuna formazione con almeno ' + GS_MIN_FORM + " minuti</div>")
+    + (ok.length > rows.length ? '<div class="gs-fmore">＋ ' + (ok.length - rows.length) + ' altre formazioni con almeno ' + GS_MIN_FORM + " minuti e meno gol</div>" : '')
+    + (hidden > 0 ? '<div class="gs-fmore dim">＋ ' + hidden + ' formazioni con meno di ' + GS_MIN_FORM + " minuti in campo: campione troppo piccolo per un confronto</div>" : '');
+}
+
+function gsPlayerRows(st) {
+  const list = st.playerList.filter(p => p.min >= GS_MIN_PLAYER).sort((a, b) => b.rate - a.rate || b.min - a.min).slice(0, 10);
+  if (!list.length) return '<div class="dash-empty">Servono almeno ' + GS_MIN_PLAYER + ' minuti in campo per confrontare le calciatrici</div>';
+  return '<div class="gs-prows">' + list.map(p => '<div class="gs-prow"><div class="gs-pname">' + escapeHtml(gsName(st.names[p.key])) + '</div>'
+    + '<div class="gs-pmeta">' + p.min + "' in campo · " + p.goals + ' gol subiti' + (p.min < GS_SMALL_PLAYER ? ' <span class="gs-warn">campione piccolo</span>' : '') + '</div>'
+    + gsTrack(p.rate, '#9fb8d0', st.teamAvg)
+    + '<div class="gs-frow-rate"><span class="num">' + gsFmt(p.rate) + '</span><span class="unit">ogni 90\'</span></div></div>').join('') + '</div>';
+}
+
+function gsHeaderHtml(sub) {
+  return '<div class="gs-head"><h2>🥅 Analisi gol subiti</h2><span class="gs-sub">' + sub + '</span>'
+    + '<div class="gs-chips" role="group" aria-label="Soglia gol ravvicinati"><span class="gs-chips-l">Gol ravvicinati entro</span>'
+    + GS_WINDOWS.map(w => '<button class="gs-chip' + (w === gsWindow ? ' on' : '') + '" data-w="' + w + '" onclick="setGsWindow(' + w + ')">' + w + "'</button>").join('') + '</div></div>';
+}
+function gsHowHtml() {
+  return '<details class="gs-how"><summary>Come vengono calcolati i numeri</summary><ul>'
+    + '<li><b>Gol subiti</b> = gol degli avversari + autogol nostri, nei tempi regolamentari. Il tempo si legge dal periodo dell’evento: un recupero del 1° tempo resta nel 1° tempo. I gol dei supplementari non sono inclusi.</li>'
+    + '<li><b>Chi era in campo</b> = i titolari, aggiornati con i cambi e i rossi registrati. È esatto quanto lo sono i minuti dei cambi inseriti; un cambio nello stesso minuto di un gol conta come già avvenuto.</li>'
+    + '<li><b>Formazioni e calciatrici si confrontano ogni 90′</b>, non in valore assoluto. Sotto ' + GS_MIN_FORM + ' minuti la formazione non si confronta; con pochi minuti compare “campione piccolo”. Il trattino chiaro è la media della squadra.</li>'
+    + '<li><b>Gol ravvicinati</b>: due o più gol subiti nella stessa partita entro N minuti (anche a cavallo dell’intervallo).</li>'
+    + '<li>Le calciatrici si riconoscono dal nome. Il ruolo non è registrato, quindi si mostrano i nomi e non uno schema tattico.</li></ul></details>';
+}
+function gsKpi(label, value, sub) { return kpiHtml(label, value, sub); }
+
+function gsSeasonHtml(st) {
+  const n = st.per.length, peakMax = Math.max.apply(null, st.bins);
+  const peaks = st.bins.map((v, i) => v === peakMax ? i : -1).filter(i => i >= 0);
+  const pc = v => (st.total ? Math.round(v / st.total * 100) : 0);
+  const ins = [];
+  if (st.total) {
+    if (st.ga1 === st.ga2) ins.push('Gol subiti equamente divisi tra i due tempi (' + st.ga1 + ' e ' + st.ga2 + ').');
+    else ins.push('Il <b>' + pc(Math.max(st.ga1, st.ga2)) + '%</b> dei gol arriva nel ' + (st.ga2 > st.ga1 ? '2° tempo (' + st.ga2 : '1° tempo (' + st.ga1) + ' su ' + st.total + ').');
+    ins.push(peaks.length === 1 ? 'Fascia più a rischio: <b>' + GS_BIN_LABELS[peaks[0]] + '</b> con ' + peakMax + ' gol (' + pc(peakMax) + '% del totale).' : 'Nessuna fascia prevale: ' + peaks.length + ' fasce a pari merito con ' + peakMax + ' gol.');
+    GS_WINDOWS.forEach(w => ins.push({ w, html: '<b>' + gsEpCount(st.per, w) + '</b> ' + (gsEpCount(st.per, w) === 1 ? 'episodio' : 'episodi') + ' di gol ravvicinati (entro ' + w + "') in " + gsPlural(gsEpMatches(st.per, w), 'partita', 'partite') + '.' }));
+  } else {
+    ins.push('Nessun gol subito nei tempi regolamentari: porta inviolata in tutte le partite 🧤');
+  }
+  if (n < 5) ins.push({ cls: 'gs-caution', html: 'Solo ' + gsPlural(n, 'partita conclusa', 'partite concluse') + ': i pattern diventano affidabili con più giornate.' });
+  const peakTxt = peaks.length === 1 ? GS_BIN_LABELS[peaks[0]] : '—';
+  const peakSub = peaks.length === 1 ? peakMax + ' gol · ' + pc(peakMax) + '% del totale' : 'nessuna fascia prevale';
+  let h = '<div class="gs-sec" data-w="' + gsWindow + '" data-tab="' + gsTab + '">' + gsHeaderHtml(gsPlural(st.total, 'gol', 'gol') + ' in ' + gsPlural(n, 'partita', 'partite'));
+  h += '<div class="gs-insights"><div class="gs-ins-t">💡 Cosa emerge</div><ul>' + ins.map(x => {
+      const o = typeof x === 'string' ? { html: x } : x;
+      const cls = (o.cls || '') + (o.w ? ' gs-wc gs-wc-' + o.w : '');
+      return '<li' + (cls ? ' class="' + cls.trim() + '"' : '') + '>' + o.html + '</li>';
+    }).join('') + '</ul></div>';
+  h += '<div class="kpi-row">'
+    + gsKpi('Porta inviolata', st.cleanSheets, 'su ' + n + (n === 1 ? ' partita' : ' partite'))
+    + gsKpi(st.ga2 >= st.ga1 ? 'Nel 2° tempo' : 'Nel 1° tempo', pc(Math.max(st.ga1, st.ga2)) + '%', Math.max(st.ga1, st.ga2) + ' su ' + st.total + ' · ' + (st.ga2 >= st.ga1 ? '1° T: ' + st.ga1 : '2° T: ' + st.ga2))
+    + GS_WINDOWS.map(w => '<div class="gs-wc gs-wc-' + w + '">' + gsKpi('Gol ravvicinati', gsEpCount(st.per, w), 'episodi entro ' + w + "' · in " + gsEpMatches(st.per, w) + ' partite') + '</div>').join('')
+    + gsKpi('Fascia critica', peakTxt, peakSub) + '</div>';
+  if (st.total) {
+    h += '<div class="gs-grid2"><div class="dash-card"><div class="dash-card-title">📍 Quando subiamo, partita per partita</div>'
+      + '<div class="gs-legend"><span><i class="gs-sw" style="background:' + GS_COLORS[0] + '"></i>gol nel 1° tempo</span><span><i class="gs-sw" style="background:' + GS_COLORS[1] + '"></i>gol nel 2° tempo</span><span><i class="gs-sw ln"></i>gol ravvicinati (minuti di distanza)</span></div>'
+      + gsVariants(w => gsSeasonSvg(st, w)) + '</div>'
+      + '<div class="gs-col">' + gsSplitCardHtml(st)
+      + '<div class="dash-card"><div class="dash-card-title">⚡ Episodi ravvicinati</div>' + gsVariants(w => gsEpisodesHtml(st, w)) + '</div></div></div>';
+    h += '<div class="dash-card"><div class="dash-card-title">👥 Chi era in campo quando subiamo</div>'
+      + '<div class="gs-tabs" role="group"><button class="gs-tab' + (gsTab === 'goals' ? ' on' : '') + '" data-tab="goals" onclick="setGsTab(\'goals\')">Gol per gol</button>'
+      + '<button class="gs-tab' + (gsTab === 'forms' ? ' on' : '') + '" data-tab="forms" onclick="setGsTab(\'forms\')">Formazioni</button>'
+      + '<button class="gs-tab' + (gsTab === 'players' ? ' on' : '') + '" data-tab="players" onclick="setGsTab(\'players\')">Singole calciatrici</button></div>';
+    if (st.noLineup === n) {
+      h += '<div class="dash-empty">Nessuna partita ha la formazione iniziale registrata: non si può ricostruire chi era in campo.</div>';
+    } else {
+      h += '<div class="gs-panel gs-p-goals"><div class="gs-note top">Per ogni gol subito, chi era in campo in quel momento, ricostruito dai cambi registrati: <b>Base</b> = titolari più ricorrenti, <b>−</b> chi è uscita, <b>+</b> chi è entrata.'
+        + (st.noLineup ? ' ' + gsPlural(st.noLineup, 'partita senza formazione iniziale', 'partite senza formazione iniziale') + ': formazione non ricostruibile.' : '') + '</div>' + gsGoalsHtml(st) + '</div>'
+        + '<div class="gs-panel gs-p-forms"><div class="gs-note top">Ogni riga è un gruppo di 11 in campo nello <b>stesso tempo</b>, ordinato per gol subiti ogni 90′ (le barre hanno la stessa scala; il trattino chiaro è la media della squadra: <b>' + gsFmt(st.teamAvg) + '</b>). Sotto i ' + GS_MIN_FORM + ' minuti non si confronta.'
+        + (st.noLineup ? ' ' + gsPlural(st.noLineup, 'partita senza formazione iniziale è esclusa', 'partite senza formazione iniziale sono escluse') + '.' : '') + '</div>'
+        + '<div class="gs-cols2"><div><div class="gs-colhead"><i class="gs-sw" style="background:' + GS_COLORS[0] + '"></i>1° TEMPO</div>' + gsFormationRows(st, 0) + '</div>'
+        + '<div><div class="gs-colhead"><i class="gs-sw" style="background:' + GS_COLORS[1] + '"></i>2° TEMPO</div>' + gsFormationRows(st, 1) + '</div></div></div>'
+        + '<div class="gs-panel gs-p-players"><div class="gs-note top">Gol subiti <b>mentre lei è in campo</b>, ogni 90′: confrontabile perché normalizzato sui minuti. Il trattino chiaro è la media squadra (' + gsFmt(st.teamAvg) + '). Non dice di chi è la responsabilità: mostra solo chi c’era.</div>' + gsPlayerRows(st) + '</div>';
+    }
+    h += '</div>';
+  }
+  return h + gsHowHtml() + '</div>';
+}
+
+function gsMatchHtml(st) {
+  const a = st.per[0], nSt = a.stints.length;
+  const c1 = a.goals.filter(g => g.period === 0).length, c2 = a.goals.length - c1;
+  const kpis = '<div class="kpi-row">'
+    + gsKpi('Gol subiti', a.goals.length + a.extra, a.extra ? gsPlural(a.extra, 'nei supplementari', 'nei supplementari') : 'nei tempi regolamentari')
+    + gsKpi('Per tempo', c1 + ' · ' + c2, '1° tempo · 2° tempo')
+    + GS_WINDOWS.map(w => { const cl = gsClusters(a, w); return '<div class="gs-wc gs-wc-' + w + '">' + gsKpi('Ravvicinati', cl.length ? cl.map(c => c.map(g => g.min + "'").join(' → ')).join(' · ') : 'Nessuno', 'soglia ' + w + "'") + '</div>'; }).join('')
+    + gsKpi('Tratti di formazione', a.hasLineup ? nSt : '—', a.hasLineup ? 'cambiano con ogni sostituzione' : 'formazione non registrata') + '</div>';
+  let h = '<div class="gs-sec" data-w="' + gsWindow + '" data-tab="' + gsTab + '">' + gsHeaderHtml(escapeHtml(a.label) + ' · ' + a.gf + '–' + a.ga) + kpis;
+  h += '<div class="dash-card gs-card-gap"><div class="dash-card-title">Minuto per minuto: gol e cambi</div>'
+    + '<div class="gs-legend"><span><i class="gs-sw" style="background:' + GS_COLORS[0] + '"></i>1° tempo</span><span><i class="gs-sw" style="background:' + GS_COLORS[1] + '"></i>2° tempo</span><span><i class="gs-sw ln"></i>gol ravvicinati</span><span>S1, S2… = tratti con gli stessi 11 in campo · cerchietti bianchi numerati = cambi</span></div>'
+    + gsVariants(w => gsMatchSvg(a, w))
+    + (a.subs.length ? '<div class="gs-sublist">' + a.subs.map((sb, i) => '<span><b>' + (i + 1) + '</b>' + (sb.period === 1 && sb.pm === 0 ? 'Intervallo' : sb.clock + "'") + ' · ' + escapeHtml(sb.out) + ' › ' + escapeHtml(sb.inn) + '</span>').join('') + '</div>' : '')
+    + '</div>';
+  if (a.goals.length) {
+    h += '<div class="dash-card gs-card-gap"><div class="dash-card-title">🥅 Gol per gol: chi era in campo</div>'
+      + '<div class="gs-note top">Per ogni gol subito, la formazione in campo in quel momento, ricostruita dai cambi registrati: <b>Base</b> = titolari, <b>−</b> chi è uscita, <b>+</b> chi è entrata.</div>'
+      + gsGoalsHtml(st, true) + '</div>';
+  }
+  if (a.hasLineup) {
+    h += '<div class="dash-card"><div class="dash-card-title">👥 Chi era in campo, tratto per tratto</div>'
+      + '<div class="gs-note top">▲ entrata rispetto ai titolari · ▼ uscita. I minuti sono quelli dei cambi registrati durante la partita.</div><div class="gs-stints">'
+      + a.stints.map((s, i) => {
+        const keys = s.xi.map(p => p.key).sort();
+        const nm = {}; a.stints.forEach(x => x.xi.forEach(p => { nm[p.key] = p.name; }));
+        (a.stints[0].xi).forEach(p => { nm[p.key] = p.name; });
+        const gtxt = s.goals.length ? '⚽ ' + gsPlural(s.goals.length, 'gol subito', 'gol subiti') + ' (' + s.goals.map(g => g.min + "'").join(', ') + ')' : '🛡️ nessun gol subito';
+        return '<div class="gs-stint"><div class="gs-stint-h"><b>S' + (i + 1) + '</b><span>' + (s.period * 45 + s.a) + "'–" + (s.period * 45 + s.b) + "' · " + (s.b - s.a) + "' in campo · " + (s.period + 1) + '° tempo</span>'
+          + '<span class="gs-gbadge' + (s.goals.length ? ' has' : '') + '">' + gtxt + '</span></div>'
+          + '<div class="gs-deltas">' + gsDeltaHtml(keys, st.base, nm) + '</div>' + gsElevenHtml(keys, st.base, nm) + '</div>';
+      }).join('') + '</div></div>';
+  } else {
+    h += '<div class="dash-card"><div class="dash-empty">Formazione iniziale non registrata per questa partita: non si può ricostruire chi era in campo.</div></div>';
+  }
+  return h + gsHowHtml() + '</div>';
+}
+
+function renderConceded() {
+  const el = document.getElementById('dash-conceded');
+  if (!el) return;
+  if (!gsCtx || !gsCtx.matches.length) { el.innerHTML = ''; return; }
+  const st = gsBuild(gsCtx.matches, gsCtx.ourKey);
+  el.innerHTML = gsCtx.single ? gsMatchHtml(st) : gsSeasonHtml(st);
+}
+function setGsWindow(w) {
+  gsWindow = w;
+  const sec = document.querySelector('#dash-conceded .gs-sec');
+  if (sec) sec.setAttribute('data-w', w);
+  document.querySelectorAll('#dash-conceded .gs-chip').forEach(b => b.classList.toggle('on', Number(b.getAttribute('data-w')) === w));
+}
+function setGsTab(t) {
+  gsTab = t;
+  const sec = document.querySelector('#dash-conceded .gs-sec');
+  if (sec) sec.setAttribute('data-tab', t);
+  document.querySelectorAll('#dash-conceded .gs-tab').forEach(b => b.classList.toggle('on', b.getAttribute('data-tab') === t));
+}
+
+let gsCtx = null;
 
 function openDashboard() {
   const matches = loadMatches().filter(m => m.completed);
@@ -2618,11 +3249,15 @@ function renderDashboard() {
   if (matches.length === 0) {
     scopeEl.textContent = 'Nessuna partita conclusa: la dashboard si popola dopo il primo "Termina partita".';
     kpiEl.innerHTML = '';
+    gsCtx = null;
+    renderConceded();
     gridEl.innerHTML = '<div class="dash-card wide"><div class="dash-empty">Ancora nessun dato.</div></div>';
     return;
   }
 
   const st = buildDashboardStats(matches, ourKey);
+  gsCtx = { matches, ourKey, single: !!single };
+  renderConceded();
   const t = st.team;
   const diff = t.gf - t.ga;
 
@@ -2635,7 +3270,8 @@ function renderDashboard() {
       + kpiHtml('Esito', t.win ? 'Vittoria' : (t.draw ? 'Pareggio' : 'Sconfitta'), '')
       + kpiHtml('Gol fatti', t.gf, '')
       + kpiHtml('Gol subiti', t.ga, '')
-      + kpiHtml('Cartellini', t.yellows + t.reds, '🟨 ' + t.yellows + ' gialli · 🟥 ' + t.reds + ' rossi');
+      + kpiHtml('Cartellini', t.yellows + t.reds, '🟨 ' + t.yellows + ' gialli · 🟥 ' + t.reds + ' rossi')
+      + kpiHtml('Rigori parati', t.saves, '');
   } else {
     scopeEl.textContent = (ourKey ? ourKey + ' · ' : '') + t.played + ' partite concluse';
     const ptsPerMatch = t.played ? ((t.win * 3 + t.draw) / t.played).toFixed(2) : '0';
@@ -2645,17 +3281,20 @@ function renderDashboard() {
       + kpiHtml('Punti', t.win * 3 + t.draw, ptsPerMatch + ' a partita')
       + kpiHtml('Gol fatti', t.gf, (t.played ? (t.gf / t.played).toFixed(1) : '0') + ' a partita')
       + kpiHtml('Gol subiti', t.ga, (t.played ? (t.ga / t.played).toFixed(1) : '0') + ' a partita')
-      + kpiHtml('Differenza reti', (diff > 0 ? '+' : '') + diff, '');
+      + kpiHtml('Differenza reti', (diff > 0 ? '+' : '') + diff, '')
+      + kpiHtml('Rigori parati', t.saves, '');
   }
 
   const goals = st.players.map(p => ({ label: p.name, value: p.goals }));
   const assists = st.players.map(p => ({ label: p.name, value: p.assists }));
   const minutes = st.players.map(p => ({ label: p.name, value: p.minutes }));
+  const saves = st.players.map(p => ({ label: p.name, value: p.saves }));
 
   gridEl.innerHTML =
     '<div class="dash-card"><div class="dash-card-title">⚽ Marcatrici</div>' + barChartHtml(goals, '') + '</div>'
     + '<div class="dash-card"><div class="dash-card-title">🅰️ Assist</div>' + barChartHtml(assists, '') + '</div>'
-    + '<div class="dash-card"><div class="dash-card-title">⏱️ Minuti giocati</div>' + barChartHtml(minutes, "'") + '</div>'
+    + (t.saves > 0 ? '<div class="dash-card"><div class="dash-card-title">🧤 Rigori parati</div>' + barChartHtml(saves, '') + '</div>' : '')
+    + '<div class="dash-card"><div class="dash-card-title">⏱️ Minuti giocati</div>' + barChartHtml(minutes, "'", minutes.length) + '</div>'
     + '<div class="dash-card wide"><div class="dash-card-title">Tutte le calciatrici</div>' + playersTableHtml(st.players) + '</div>';
 }
 
