@@ -19,7 +19,29 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.19 + backend v5.4 — Rigori parati (21/09/2026)
+## Stato attuale: v3.20 — "Chi era in campo" con i nomi (21/09/2026)
+
+### Novità v3.20 (21/09/2026)
+
+**Richiesta di Max**: nella sezione "Chi era in campo quando subiamo" della Dashboard,
+niente più "Formazione base", nomi barrati di chi è uscita, nomi di chi è entrata e
+"Molto diversa dalla base": al loro posto un ovale con il nome di ogni calciatrice
+presente.
+
+- **`gsPlayersHtml(keys, names)`** disegna un ovale per ogni calciatrice in campo,
+  in ordine alfabetico (stesso ordine in ogni riga, per confrontare a colpo d'occhio).
+  Sostituisce `gsDeltaHtml` e `gsElevenHtml`.
+- **Vale ovunque nella sezione**: "Gol per gol" (stagione e singola partita),
+  "Formazioni", "Episodi ravvicinati" (formazione all'ultimo gol) e i tratti S1, S2…
+  della vista singola partita. Nelle righe "Formazioni" ho tolto il dettaglio
+  apribile "Chi era in campo (11)", ora ridondante.
+- **Rimossi**: il concetto di formazione "base" (`gsBaseXI`, `st.base`) e il relativo
+  CSS (`.gs-d*`, `.gs-pc.new/.gone`). Le note esplicative sono state riscritte.
+- Solo frontend, nessun cambio a calcoli, dati, export o backend.
+- **Provato** (browser, 8 partite di prova): 11 ovali per ogni gol, formazione e
+  tratto, nessun nome barrato né ▲/▼/"Base"; nessun errore in console.
+
+## Versione precedente: v3.19 + backend v5.4 — Rigori parati (21/09/2026)
 
 ### Novità v3.19 + backend v5.4 (21/09/2026)
 
@@ -708,7 +730,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `OCR_STRIP_OVERLAP` | 0.08 | sovrapposizione tra strisce (frazione dell'altezza) |
 | `OCR_LEFT_CROP` | 0.62 | frazione di larghezza tenuta per le strisce (foto verticali) |
 | `OCR_JPEG_QUALITY` | 0.9 | qualità JPEG delle immagini inviate |
-| `APP_VERSION` | 3.19 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
+| `APP_VERSION` | 3.20 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
 | `GS_WINDOWS` | 3, 5, 10 | soglie (minuti) dei "gol ravvicinati" nella dashboard; predefinita 5 (`gsWindow`) |
 | `GS_MIN_FORM` / `GS_SMALL_FORM` | 30 / 60 | minuti minimi per confrontare una formazione / sotto i quali compare "campione piccolo" |
 | `GS_MIN_PLAYER` / `GS_SMALL_PLAYER` | 60 / 180 | come sopra, per le singole calciatrici |
@@ -739,6 +761,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 21/09/2026 | Frontend v3.20: dashboard "Chi era in campo quando subiamo" mostra un ovale con il nome di ogni calciatrice presente (tolti "Base", nomi barrati, entrate/uscite). Solo frontend |
 | 21/09/2026 | Frontend v3.19 + backend v5.4: pulsante "Rigore parato" (squadra, atleta, minuto/tempo) con statistiche in riepilogo, dashboard, Excel e PDF; Sheets scrive il tipo "Rigore parato" nel foglio Eventi. **Backend da pubblicare sui 3 deployment** |
 | 21/09/2026 | Frontend v3.18: dashboard, nuova sezione "Analisi gol subiti" (split 1°/2° tempo, fasce da 15', gol ravvicinati, formazione in campo a ogni gol dedotta dai cambi; vista stagione e singola partita). Solo frontend |
 | 20/09/2026 | Frontend v3.17: messaggi d'errore OCR più chiari con dettaglio tecnico, visibili 30 s (il ritaglio della pagina per "Scatta foto" è stato scritto e poi rimosso: non dimostrato necessario) |

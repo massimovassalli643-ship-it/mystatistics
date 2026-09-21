@@ -374,18 +374,12 @@
   .gs-ep-mins { margin: 8px 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .gs-mchip { color: #0a1929; font-weight: 900; font-size: 13px; padding: 3px 10px; border-radius: 20px; font-variant-numeric: tabular-nums; }
   .gs-arrow { color: #7a96b3; }
-  .gs-ep-form { font-size: 11.5px; color: #7a96b3; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
-  .gs-d { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.06); color: #e8f0f7; white-space: nowrap; }
-  .gs-d.base { background: transparent; color: #7a96b3; }
-  .gs-d.in { border-color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.14); }
-  .gs-d.out { color: #7a96b3; text-decoration: line-through; text-decoration-color: rgba(255,255,255,0.4); }
-  .gs-deltas { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-  .gs-pcs { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
-  .gs-pc { font-size: 11.5px; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #cfe0f0; }
-  .gs-pc b { color: #e8f0f7; font-variant-numeric: tabular-nums; margin-right: 2px; }
-  .gs-pc.new { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.55); color: #e8f0f7; }
-  .gs-pc.gone { opacity: 0.55; text-decoration: line-through; }
-  .gs-pc i { font-style: normal; font-size: 9px; }
+  .gs-ep-form { font-size: 11.5px; color: #7a96b3; }
+  .gs-ep-form .gs-pcs { margin-top: 6px; }
+  /* chi era in campo: un ovale con il nome di ogni calciatrice presente */
+  .gs-pcs { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .gs-pc { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; padding: 2px 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.06); color: #e8f0f7; white-space: nowrap; }
+  .gs-pc.none { background: transparent; color: #7a96b3; font-weight: 600; }
   .gs-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
   .gs-cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
   .gs-colhead { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; letter-spacing: 1px; padding-bottom: 8px; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.12); }
@@ -873,7 +867,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.19';
+const APP_VERSION = '3.20';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '5.4';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -2851,21 +2845,6 @@ function gsStintAt(a, g) {
   return cand.length ? cand[cand.length - 1] : null;
 }
 
-/* Formazione "base" = gli 11 titolari piu' ricorrenti nelle partite analizzate */
-function gsBaseXI(per) {
-  const tally = {};
-  per.filter(a => a.hasLineup).forEach(a => {
-    const keys = a.stints[0].xi.map(p => p.key).sort();
-    const sig = keys.join(',');
-    const t = tally[sig] || (tally[sig] = { keys, n: 0 });
-    t.n++;
-    t.last = true;
-  });
-  let best = null;
-  Object.keys(tally).forEach(k => { if (!best || tally[k].n >= best.n) best = tally[k]; });
-  return best ? best.keys : [];
-}
-
 function gsBuild(matches, ourKey) {
   const per = matches.map(m => gsAnalyzeMatch(m, ourSideOf(m, ourKey)))
     .sort((x, y) => new Date(x.m.endedAt || x.m.createdAt) - new Date(y.m.endedAt || y.m.createdAt));
@@ -2896,7 +2875,7 @@ function gsBuild(matches, ourKey) {
   return {
     per, total: goals.length, ga1, ga2: goals.length - ga1, bins,
     extra: per.reduce((n, a) => n + a.extra, 0), cleanSheets: per.filter(a => !a.goals.length && !a.extra).length,
-    base: gsBaseXI(per), names, formList,
+    names, formList,
     playerList: Object.keys(players).map(k => ({ ...players[k], rate: rate(players[k].goals, players[k].min) })),
     teamAvg: rate(teamGoals, teamMin), noLineup: per.length - withLineup.length
   };
@@ -2908,22 +2887,11 @@ function gsEpCount(per, w) { return per.reduce((n, a) => n + gsClusters(a, w).le
 function gsEpMatches(per, w) { return per.filter(a => gsClusters(a, w).length).length; }
 function gsPlural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
 
-function gsDeltaHtml(keys, base, names) {
-  const out = base.filter(k => keys.indexOf(k) < 0);
-  const inn = keys.filter(k => base.indexOf(k) < 0);
-  if (!out.length && !inn.length) return '<span class="gs-d base">Formazione base</span>';
-  if (out.length + inn.length > 6) return '<span class="gs-d base">Molto diversa dalla base</span>';
-  return '<span class="gs-d base">Base</span>'
-    + out.map(k => '<span class="gs-d out">− ' + escapeHtml(gsName(names[k])) + '</span>').join('')
-    + inn.map(k => '<span class="gs-d in">+ ' + escapeHtml(gsName(names[k])) + '</span>').join('');
-}
-function gsElevenHtml(keys, base, names) {
-  const on = keys.map(k => {
-    const isNew = base.length && base.indexOf(k) < 0;
-    return '<span class="gs-pc' + (isNew ? ' new' : '') + '">' + escapeHtml(gsName(names[k])) + (isNew ? ' <i>▲</i>' : '') + '</span>';
-  }).join('');
-  const off = base.filter(k => keys.indexOf(k) < 0).map(k => '<span class="gs-pc gone">' + escapeHtml(gsName(names[k])) + ' <i>▼</i></span>').join('');
-  return '<div class="gs-pcs">' + on + off + '</div>';
+/* Chi era in campo: un ovale con il nome di ogni calciatrice presente, in ordine alfabetico
+   (stesso ordine in ogni riga, cosi' si confrontano a colpo d'occhio) */
+function gsPlayersHtml(keys, names) {
+  const list = keys.map(k => gsName(names[k])).sort((a, b) => a.localeCompare(b, 'it'));
+  return '<div class="gs-pcs">' + list.map(n => '<span class="gs-pc">' + escapeHtml(n) + '</span>').join('') + '</div>';
 }
 function gsTrack(rate, color, avg) {
   return '<div class="gs-track" aria-hidden="true"><i style="width:' + Math.min(100, rate / GS_RATE_MAX * 100) + '%;background:' + color + '"></i>'
@@ -3052,12 +3020,12 @@ function gsEpisodesHtml(st, w) {
     const last = c[c.length - 1], stint = a.hasLineup ? gsStintAt(a, last) : null;
     items.push('<div class="gs-ep"><div class="gs-ep-top"><b>' + escapeHtml(a.label) + '</b><span class="gs-ep-gap">' + (last.clock - c[0].clock) + "' di distanza</span></div>"
       + '<div class="gs-ep-mins">' + c.map(g => '<span class="gs-mchip" style="background:' + GS_COLORS[g.period] + '">' + g.min + "'</span>").join('<span class="gs-arrow">→</span>') + '</div>'
-      + (stint ? '<div class="gs-ep-form">In campo all’ultimo gol: ' + gsDeltaHtml(stint.xi.map(p => p.key).sort(), st.base, st.names) + '</div>' : '') + '</div>');
+      + (stint ? '<div class="gs-ep-form">In campo all’ultimo gol:' + gsPlayersHtml(stint.xi.map(p => p.key), st.names) + '</div>' : '') + '</div>');
   }));
   return items.join('') || '<div class="dash-empty">Nessun episodio con questa soglia</div>';
 }
 
-/* Un gol per riga: partita, minuto e gli 11 in campo in quel momento (Base − chi esce + chi entra) */
+/* Un gol per riga: partita, minuto e le calciatrici in campo in quel momento */
 function gsGoalsHtml(st, single) {
   const rows = [];
   st.per.slice().reverse().forEach(a => a.goals.forEach(g => {
@@ -3065,7 +3033,7 @@ function gsGoalsHtml(st, single) {
     rows.push('<div class="gs-grow' + (single ? ' single' : '') + '">'
       + (single ? '' : '<div class="gs-gm"><b>' + escapeHtml(a.label) + '</b><span>' + a.gf + '–' + a.ga + '</span></div>')
       + '<div class="gs-gmin"><span class="gs-mchip" style="background:' + GS_COLORS[g.period] + '">' + g.min + "'</span><span class=\"gs-gh\">" + (g.period + 1) + '° tempo</span></div>'
-      + '<div class="gs-deltas">' + (stint ? gsDeltaHtml(stint.xi.map(p => p.key).sort(), st.base, st.names) : '<span class="gs-d base">formazione non registrata</span>') + '</div></div>');
+      + (stint ? gsPlayersHtml(stint.xi.map(p => p.key), st.names) : '<div class="gs-pcs"><span class="gs-pc none">formazione non registrata</span></div>') + '</div>');
   }));
   if (!rows.length) return '<div class="dash-empty">Nessun gol subito</div>';
   const shown = rows.slice(0, GS_GOALS_SHOWN), rest = rows.slice(GS_GOALS_SHOWN);
@@ -3076,12 +3044,11 @@ function gsFormationRows(st, period) {
   const all = st.formList.filter(f => f.period === period).sort((a, b) => b.rate - a.rate || b.min - a.min);
   const ok = all.filter(f => f.min >= GS_MIN_FORM), rows = ok.slice(0, 3), hidden = all.length - ok.length;
   const col = GS_COLORS[period];
-  const html = rows.map(f => '<div class="gs-frow"><div class="gs-frow-main"><div class="gs-deltas">' + gsDeltaHtml(f.keys, st.base, st.names) + '</div>'
+  const html = rows.map(f => '<div class="gs-frow"><div class="gs-frow-main">' + gsPlayersHtml(f.keys, st.names)
     + '<div class="gs-frow-meta"><b>' + gsPlural(f.goals, 'gol', 'gol') + '</b> in ' + f.min + "' · " + gsPlural(f.nMatches, 'partita', 'partite')
     + (f.min < GS_SMALL_FORM ? ' <span class="gs-warn">campione piccolo</span>' : '') + '</div></div>'
     + '<div class="gs-frow-rate"><span class="num">' + gsFmt(f.rate) + '</span><span class="unit">gol ogni 90\'</span></div>'
-    + gsTrack(f.rate, col, st.teamAvg)
-    + '<details><summary>Chi era in campo (' + f.keys.length + ')</summary>' + gsElevenHtml(f.keys, st.base, st.names) + '</details></div>').join('');
+    + gsTrack(f.rate, col, st.teamAvg) + '</div>').join('');
   return (html || '<div class="dash-empty">Nessuna formazione con almeno ' + GS_MIN_FORM + " minuti</div>")
     + (ok.length > rows.length ? '<div class="gs-fmore">＋ ' + (ok.length - rows.length) + ' altre formazioni con almeno ' + GS_MIN_FORM + " minuti e meno gol</div>" : '')
     + (hidden > 0 ? '<div class="gs-fmore dim">＋ ' + hidden + ' formazioni con meno di ' + GS_MIN_FORM + " minuti in campo: campione troppo piccolo per un confronto</div>" : '');
@@ -3151,7 +3118,7 @@ function gsSeasonHtml(st) {
     if (st.noLineup === n) {
       h += '<div class="dash-empty">Nessuna partita ha la formazione iniziale registrata: non si può ricostruire chi era in campo.</div>';
     } else {
-      h += '<div class="gs-panel gs-p-goals"><div class="gs-note top">Per ogni gol subito, chi era in campo in quel momento, ricostruito dai cambi registrati: <b>Base</b> = titolari più ricorrenti, <b>−</b> chi è uscita, <b>+</b> chi è entrata.'
+      h += '<div class="gs-panel gs-p-goals"><div class="gs-note top">Per ogni gol subito, le calciatrici che erano in campo in quel momento, ricostruite dai titolari e dai cambi registrati.'
         + (st.noLineup ? ' ' + gsPlural(st.noLineup, 'partita senza formazione iniziale', 'partite senza formazione iniziale') + ': formazione non ricostruibile.' : '') + '</div>' + gsGoalsHtml(st) + '</div>'
         + '<div class="gs-panel gs-p-forms"><div class="gs-note top">Ogni riga è un gruppo di 11 in campo nello <b>stesso tempo</b>, ordinato per gol subiti ogni 90′ (le barre hanno la stessa scala; il trattino chiaro è la media della squadra: <b>' + gsFmt(st.teamAvg) + '</b>). Sotto i ' + GS_MIN_FORM + ' minuti non si confronta.'
         + (st.noLineup ? ' ' + gsPlural(st.noLineup, 'partita senza formazione iniziale è esclusa', 'partite senza formazione iniziale sono escluse') + '.' : '') + '</div>'
@@ -3180,20 +3147,18 @@ function gsMatchHtml(st) {
     + '</div>';
   if (a.goals.length) {
     h += '<div class="dash-card gs-card-gap"><div class="dash-card-title">🥅 Gol per gol: chi era in campo</div>'
-      + '<div class="gs-note top">Per ogni gol subito, la formazione in campo in quel momento, ricostruita dai cambi registrati: <b>Base</b> = titolari, <b>−</b> chi è uscita, <b>+</b> chi è entrata.</div>'
+      + '<div class="gs-note top">Per ogni gol subito, le calciatrici che erano in campo in quel momento, ricostruite dai titolari e dai cambi registrati.</div>'
       + gsGoalsHtml(st, true) + '</div>';
   }
   if (a.hasLineup) {
     h += '<div class="dash-card"><div class="dash-card-title">👥 Chi era in campo, tratto per tratto</div>'
-      + '<div class="gs-note top">▲ entrata rispetto ai titolari · ▼ uscita. I minuti sono quelli dei cambi registrati durante la partita.</div><div class="gs-stints">'
+      + '<div class="gs-note top">Ogni tratto ha le stesse calciatrici in campo: cambia a ogni sostituzione (o espulsione). I minuti sono quelli dei cambi registrati durante la partita.</div><div class="gs-stints">'
       + a.stints.map((s, i) => {
-        const keys = s.xi.map(p => p.key).sort();
-        const nm = {}; a.stints.forEach(x => x.xi.forEach(p => { nm[p.key] = p.name; }));
-        (a.stints[0].xi).forEach(p => { nm[p.key] = p.name; });
+        const nm = {}; s.xi.forEach(p => { nm[p.key] = p.name; });
         const gtxt = s.goals.length ? '⚽ ' + gsPlural(s.goals.length, 'gol subito', 'gol subiti') + ' (' + s.goals.map(g => g.min + "'").join(', ') + ')' : '🛡️ nessun gol subito';
         return '<div class="gs-stint"><div class="gs-stint-h"><b>S' + (i + 1) + '</b><span>' + (s.period * 45 + s.a) + "'–" + (s.period * 45 + s.b) + "' · " + (s.b - s.a) + "' in campo · " + (s.period + 1) + '° tempo</span>'
           + '<span class="gs-gbadge' + (s.goals.length ? ' has' : '') + '">' + gtxt + '</span></div>'
-          + '<div class="gs-deltas">' + gsDeltaHtml(keys, st.base, nm) + '</div>' + gsElevenHtml(keys, st.base, nm) + '</div>';
+          + gsPlayersHtml(s.xi.map(p => p.key), nm) + '</div>';
       }).join('') + '</div></div>';
   } else {
     h += '<div class="dash-card"><div class="dash-empty">Formazione iniziale non registrata per questa partita: non si può ricostruire chi era in campo.</div></div>';
