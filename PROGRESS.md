@@ -19,7 +19,69 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.20 — "Chi era in campo" con i nomi (21/09/2026)
+## Stato attuale: v3.22 — Riquadri Dashboard espandibili a tutto schermo (23/09/2026)
+
+### Novità v3.22 (23/09/2026)
+
+**Richiesta di Max**: poter toccare i riquadri della Dashboard (grafici, KPI di
+"Analisi gol subiti", tabella calciatrici) per ingrandirli a tutto schermo e
+leggerli meglio, in particolare sull'iPad.
+
+- **Ogni `.dash-card`** (tutti i riquadri con titolo, sia nella griglia
+  principale — Marcatrici, Assist, Rigori parati, Minuti giocati, Tutte le
+  calciatrici — sia dentro "Analisi gol subiti" — Quando subiamo partita per
+  partita, 1° tempo vs 2° tempo, Episodi ravvicinati, Chi era in campo quando
+  subiamo, Minuto per minuto, Gol per gol, Chi era in campo tratto per tratto —
+  è ora **cliccabile** (icona ⤢ in alto a destra) e apre una copia ingrandita
+  a tutto schermo (`openCardZoom`/`closeCardZoom`), chiudibile con il pulsante
+  "✕ Chiudi", toccando fuori dal riquadro o con Esc.
+- **Si clona il riquadro** invece di spostarlo, così la dashboard sotto resta
+  intatta e riutilizzabile subito dopo la chiusura. I riquadri interni a
+  "Analisi gol subiti" dipendono dagli attributi `data-w`/`data-tab`
+  dell'antenato `.gs-sec` (mostrano/nascondono figli via CSS): la copia viene
+  quindi racchiusa in un `.gs-sec` clone con gli stessi attributi, altrimenti
+  risulterebbe vuota.
+- **`setGsWindow`/`setGsTab`** ora aggiornano *tutti* i `.gs-sec`/`.gs-chip`/
+  `.gs-tab` del documento (non più solo quelli dentro `#dash-conceded`): se il
+  riquadro "Chi era in campo quando subiamo" è aperto a tutto schermo, i suoi
+  pulsanti tab funzionano e restano sincronizzati con la pagina sotto.
+- Clic su pulsanti, tendine, link o `<details>` dentro un riquadro non apre lo
+  zoom (altrimenti i controlli esistenti — tab, soglia gol ravvicinati,
+  "Come vengono calcolati i numeri" — smetterebbero di funzionare).
+- Solo frontend, nessuna modifica a dati, backend o export.
+- **Provato** (browser, con partite di prova): zoom su tutti i tipi di
+  riquadro elencati sopra, chiusura con pulsante/click fuori/Esc, cambio tab e
+  soglia gol ravvicinati funzionante sia a schermo intero sia tornando alla
+  dashboard normale; nessun riquadro vuoto, nessun errore in console.
+
+## Versione precedente: v3.21 — Gol su rigore in Dashboard (23/09/2026)
+
+### Novità v3.21 (23/09/2026)
+
+**Richiesta di Max**: nella Dashboard, un riquadro sotto "Gol fatti" con quanti
+di questi sono arrivati su rigore, e uno sotto "Gol subiti" con lo stesso per i
+gol incassati — la causale "rigore" esisteva già per l'evento gol, mancava solo
+di essere riepilogata.
+
+- **`buildDashboardStats`**: due nuovi contatori `team.gfPen` / `team.gaPen`,
+  calcolati scorrendo `m.events` di ogni partita e contando i gol con
+  `goalType === 'rigore'` fatti dalla nostra squadra o dall'avversaria
+  (l'autogol resta un tipo a parte, non si sovrappone al rigore).
+- **`kpiStackHtml(topHtml, bottomHtml)`**: impila due tessere KPI nella stessa
+  cella della griglia (`.kpi-stack`, flex a colonna) invece di aggiungerle come
+  voci separate — cosi "Gol fatti su rigore"/"Gol subiti su rigore" restano
+  **sempre visivamente sotto** la tessera principale, qualunque sia il numero
+  di colonne che il layout responsive sceglie per riquadro.
+- Vale sia per la vista "Tutta la stagione" sia per la singola partita. Nessuna
+  modifica al modello dati, al backend o agli export: i rigori si leggono già
+  dagli eventi esistenti (`goalType`, presente dalla v3.x che introduce i tipi
+  di gol).
+- **Provato** (browser): con partite di prova che includono gol "rigore" per
+  entrambe le squadre, le due nuove tessere mostrano i conteggi corretti sotto
+  "Gol fatti" e "Gol subiti" in entrambe le viste; con zero rigori mostrano 0
+  invece di sparire (coerente con le altre tessere KPI, sempre visibili).
+
+## Versione precedente: v3.20 — "Chi era in campo" con i nomi (21/09/2026)
 
 ### Novità v3.20 (21/09/2026)
 

@@ -284,14 +284,25 @@
   .dash-select { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 8px; padding: 10px 12px; font-size: 14px; font-weight: 600; min-width: 320px; max-width: 100%; }
   .dash-select:focus { border-color: #7fb8ff; }
   .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .kpi-stack { display: flex; flex-direction: column; gap: 12px; }
   .kpi { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 16px; }
   .kpi-label { font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #7a96b3; margin-bottom: 6px; }
   .kpi-value { font-size: 30px; font-weight: 900; line-height: 1; color: #fff; font-variant-numeric: tabular-nums; }
   .kpi-sub { font-size: 11px; color: #7a96b3; margin-top: 6px; }
   .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
-  .dash-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 18px; min-width: 0; }
+  .dash-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 18px; min-width: 0; position: relative; cursor: zoom-in; }
   .dash-card.wide { grid-column: 1 / -1; }
-  .dash-card-title { font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #7fb8ff; margin-bottom: 14px; }
+  .dash-card::after { content: '⤢'; position: absolute; top: 12px; right: 14px; font-size: 14px; color: #5a7793; pointer-events: none; }
+  .dash-card-title { font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #7fb8ff; margin-bottom: 14px; padding-right: 22px; }
+
+  /* ---- Zoom a tutto schermo di un riquadro dashboard, al tocco ---- */
+  .card-zoom-overlay { display: none; position: fixed; inset: 0; z-index: 500; background: rgba(6,14,24,0.94); padding: 20px; overflow-y: auto; cursor: zoom-out; }
+  .card-zoom-overlay.active { display: block; }
+  .card-zoom-panel { max-width: 1100px; margin: 0 auto; cursor: default; }
+  .card-zoom-close { position: sticky; top: 0; display: block; margin: 0 0 14px auto; background: #e8f0f7; color: #0a1929; border: none; border-radius: 10px; padding: 10px 18px; font-size: 14px; font-weight: 800; cursor: pointer; }
+  .card-zoom-body .dash-card { cursor: default; font-size: 17px; padding: 22px 26px; }
+  .card-zoom-body .dash-card::after { display: none; }
+  .card-zoom-body .dash-card-title { font-size: 15px; }
   .bar-row { display: grid; grid-template-columns: 1fr 100px 44px; gap: 10px; align-items: center; margin-bottom: 8px; }
   .bar-name { font-size: 12px; font-weight: 600; color: #e8f0f7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bar-track { height: 10px; background: rgba(255,255,255,0.07); border-radius: 5px; overflow: hidden; }
@@ -516,6 +527,13 @@
     <div class="kpi-row" id="dash-kpis"></div>
     <div id="dash-conceded"></div>
     <div class="dash-grid" id="dash-grid"></div>
+  </div>
+
+  <div class="card-zoom-overlay" id="card-zoom-overlay" onclick="if(event.target===this) closeCardZoom()">
+    <div class="card-zoom-panel">
+      <button class="card-zoom-close" onclick="closeCardZoom()">✕ Chiudi</button>
+      <div class="card-zoom-body" id="card-zoom-body"></div>
+    </div>
   </div>
 
   <div class="screen" id="setup-screen">
@@ -867,7 +885,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.20';
+const APP_VERSION = '3.22';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '5.4';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -2655,7 +2673,7 @@ function matchLabel(m) {
 
 /* Aggrega squadra e calciatrici su un insieme di partite */
 function buildDashboardStats(matches, ourKey) {
-  const team = { played: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, yellows: 0, reds: 0, saves: 0 };
+  const team = { played: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, gfPen: 0, gaPen: 0, yellows: 0, reds: 0, saves: 0 };
   const players = {};
   matches.forEach(m => {
     const side = ourSideOf(m, ourKey);
@@ -2665,6 +2683,11 @@ function buildDashboardStats(matches, ourKey) {
     team.played++;
     team.gf += gf;
     team.ga += ga;
+    (m.events || []).forEach(e => {
+      if (e.type !== 'goal' || e.goalType !== 'rigore') return;
+      if (e.team === side) team.gfPen++;
+      else if (e.team === opp) team.gaPen++;
+    });
     if (gf > ga) team.win++; else if (gf === ga) team.draw++; else team.loss++;
     computePlayerStats(side, m).forEach(st => {
       const key = normTeam(st.name);
@@ -2733,6 +2756,12 @@ function kpiHtml(label, value, sub) {
   return '<div class="kpi"><div class="kpi-label">' + label + '</div>'
     + '<div class="kpi-value">' + value + '</div>'
     + (sub ? '<div class="kpi-sub">' + sub + '</div>' : '') + '</div>';
+}
+
+/* Due kpi impilati nella stessa cella di griglia, cosi' il secondo compare sempre
+ * direttamente sotto il primo qualunque sia il numero di colonne del layout responsive */
+function kpiStackHtml(topHtml, bottomHtml) {
+  return '<div class="kpi-stack">' + topHtml + bottomHtml + '</div>';
 }
 
 /* ---------- Analisi gol subiti ----------
@@ -3175,16 +3204,59 @@ function renderConceded() {
 }
 function setGsWindow(w) {
   gsWindow = w;
-  const sec = document.querySelector('#dash-conceded .gs-sec');
-  if (sec) sec.setAttribute('data-w', w);
-  document.querySelectorAll('#dash-conceded .gs-chip').forEach(b => b.classList.toggle('on', Number(b.getAttribute('data-w')) === w));
+  // querySelectorAll (non scoped a #dash-conceded): se un riquadro e' aperto a tutto
+  // schermo (vedi openCardZoom) la sua copia porta anch'essa la classe .gs-sec, e va
+  // tenuta allineata allo stato originale.
+  document.querySelectorAll('.gs-sec').forEach(sec => sec.setAttribute('data-w', w));
+  document.querySelectorAll('.gs-chip').forEach(b => b.classList.toggle('on', Number(b.getAttribute('data-w')) === w));
 }
 function setGsTab(t) {
   gsTab = t;
-  const sec = document.querySelector('#dash-conceded .gs-sec');
-  if (sec) sec.setAttribute('data-tab', t);
-  document.querySelectorAll('#dash-conceded .gs-tab').forEach(b => b.classList.toggle('on', b.getAttribute('data-tab') === t));
+  document.querySelectorAll('.gs-sec').forEach(sec => sec.setAttribute('data-tab', t));
+  document.querySelectorAll('.gs-tab').forEach(b => b.classList.toggle('on', b.getAttribute('data-tab') === t));
 }
+
+/* ---- Zoom a tutto schermo di un riquadro dashboard (.dash-card), al tocco ----
+ * Si clona il riquadro invece di spostarlo, cosi' la dashboard sotto resta intatta.
+ * Se il riquadro vive dentro un .gs-sec (i grafici di "Analisi gol subiti", che
+ * mostrano/nascondono i loro figli in base agli attributi data-w/data-tab
+ * dell'antenato), lo si racchiude in un .gs-sec clone con gli stessi attributi,
+ * altrimenti i suoi contenuti risulterebbero tutti nascosti (CSS di riga ~314). */
+function initCardZoom() {
+  const scope = document.getElementById('dashboard-screen');
+  if (!scope) return;
+  scope.addEventListener('click', e => {
+    if (e.target.closest('button, a, select, input, summary')) return;
+    const card = e.target.closest('.dash-card');
+    if (card) openCardZoom(card);
+  });
+}
+
+function openCardZoom(card) {
+  const body = document.getElementById('card-zoom-body');
+  const clone = card.cloneNode(true);
+  const liveSec = card.closest('.gs-sec');
+  let content = clone;
+  if (liveSec) {
+    const wrap = document.createElement('div');
+    wrap.className = 'gs-sec';
+    wrap.setAttribute('data-w', liveSec.getAttribute('data-w'));
+    wrap.setAttribute('data-tab', liveSec.getAttribute('data-tab'));
+    wrap.appendChild(clone);
+    content = wrap;
+  }
+  body.innerHTML = '';
+  body.appendChild(content);
+  document.getElementById('card-zoom-overlay').classList.add('active');
+}
+
+function closeCardZoom() {
+  document.getElementById('card-zoom-overlay').classList.remove('active');
+  document.getElementById('card-zoom-body').innerHTML = '';
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('card-zoom-overlay').classList.contains('active')) closeCardZoom();
+});
 
 let gsCtx = null;
 
@@ -3233,8 +3305,8 @@ function renderDashboard() {
     kpiEl.innerHTML =
       kpiHtml('Risultato', single.home.score + ' – ' + single.away.score, escapeHtml(single[side].name) + ' vs ' + escapeHtml(single[opp].name))
       + kpiHtml('Esito', t.win ? 'Vittoria' : (t.draw ? 'Pareggio' : 'Sconfitta'), '')
-      + kpiHtml('Gol fatti', t.gf, '')
-      + kpiHtml('Gol subiti', t.ga, '')
+      + kpiStackHtml(kpiHtml('Gol fatti', t.gf, ''), kpiHtml('Gol fatti su rigore', t.gfPen, ''))
+      + kpiStackHtml(kpiHtml('Gol subiti', t.ga, ''), kpiHtml('Gol subiti su rigore', t.gaPen, ''))
       + kpiHtml('Cartellini', t.yellows + t.reds, '🟨 ' + t.yellows + ' gialli · 🟥 ' + t.reds + ' rossi')
       + kpiHtml('Rigori parati', t.saves, '');
   } else {
@@ -3244,8 +3316,14 @@ function renderDashboard() {
       kpiHtml('Partite', t.played, '')
       + kpiHtml('Bilancio', t.win + '–' + t.draw + '–' + t.loss, 'vinte · pari · perse')
       + kpiHtml('Punti', t.win * 3 + t.draw, ptsPerMatch + ' a partita')
-      + kpiHtml('Gol fatti', t.gf, (t.played ? (t.gf / t.played).toFixed(1) : '0') + ' a partita')
-      + kpiHtml('Gol subiti', t.ga, (t.played ? (t.ga / t.played).toFixed(1) : '0') + ' a partita')
+      + kpiStackHtml(
+          kpiHtml('Gol fatti', t.gf, (t.played ? (t.gf / t.played).toFixed(1) : '0') + ' a partita'),
+          kpiHtml('Gol fatti su rigore', t.gfPen, '')
+        )
+      + kpiStackHtml(
+          kpiHtml('Gol subiti', t.ga, (t.played ? (t.ga / t.played).toFixed(1) : '0') + ' a partita'),
+          kpiHtml('Gol subiti su rigore', t.gaPen, '')
+        )
       + kpiHtml('Differenza reti', (diff > 0 ? '+' : '') + diff, '')
       + kpiHtml('Rigori parati', t.saves, '');
   }
@@ -3589,6 +3667,7 @@ async function syncToSheets() {
 
 document.getElementById('app-version').textContent = 'v' + APP_VERSION;
 renderHistory();
+initCardZoom();
 window.addEventListener('beforeunload', () => { if (state.timer.running) stopTimer(); });
 </script>
 </body>
