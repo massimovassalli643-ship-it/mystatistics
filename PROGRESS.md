@@ -19,7 +19,25 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend), `mystatistics_atlete` (copia dell'elenco tesserate) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.24 — Minuti giocati: nomi abbinati al foglio ATLETE (23/09/2026)
+## Stato attuale: v3.25 — "Cosa emerge" espandibile a tutto schermo (23/09/2026)
+
+### Novità v3.25 (23/09/2026)
+
+**Richiesta di Max**: anche il riquadro "💡 Cosa emerge" di "Analisi gol
+subiti" deve potersi aprire a tutto schermo, per leggerne meglio il testo.
+
+- `.gs-insights` non è una `.dash-card`, quindi lo zoom della v3.22 non lo
+  prendeva: `initCardZoom` ora apre al tocco sia `.dash-card` sia
+  `.gs-insights` (stessa `openCardZoom`, che lo racchiude nel `.gs-sec` clone
+  così le frasi dei gol ravvicinati seguono la finestra 5'/10' scelta).
+- Icona ⤢ in alto a destra anche su "Cosa emerge"; a tutto schermo il testo
+  passa da 15 a **24 px** (avviso "Solo N partite" da 13 a 19 px, titolo 17 px).
+- **Provato** (browser 1180×820, 2 partite di prova): apertura al tocco, solo
+  la frase della finestra attiva visibile, chiusura con Esc, gli altri
+  riquadri si aprono come prima, nessun errore in console.
+- Solo frontend (CSS + gestore del tocco).
+
+## Versione precedente: v3.24 — Minuti giocati: nomi abbinati al foglio ATLETE (23/09/2026)
 
 ### Novità v3.24 (23/09/2026)
 
@@ -892,6 +910,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 23/09/2026 | Frontend v3.25: riquadro "Cosa emerge" (Analisi gol subiti) espandibile a tutto schermo con testo a 24 px. Solo frontend |
 | 23/09/2026 | Frontend v3.24: "Minuti giocati" abbina le calciatrici della distinta al foglio ATLETE anche con nomi scritti diversamente (`sameAthlete`), usa il nome del foglio e somma i minuti. Solo frontend |
 | 23/09/2026 | Frontend v3.23 + backend v5.5: grafico Dashboard "Minuti giocati" mostra tutte le tesserate del foglio ATLETE, anche a 0' (action `atlete`, cache `mystatistics_atlete`, `barChartHtml` con `includeZero`); `BACKEND_MIN_VERSION` = 5.5. Da pubblicare sui 3 deployment |
 | 21/09/2026 | Frontend v3.20: dashboard "Chi era in campo quando subiamo" mostra un ovale con il nome di ogni calciatrice presente (tolti "Base", nomi barrati, entrate/uscite). Solo frontend |

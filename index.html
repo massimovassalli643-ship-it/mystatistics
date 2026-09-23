@@ -303,6 +303,12 @@
   .card-zoom-body .dash-card { cursor: default; font-size: 17px; padding: 22px 26px; }
   .card-zoom-body .dash-card::after { display: none; }
   .card-zoom-body .dash-card-title { font-size: 15px; }
+  /* "Cosa emerge" (Analisi gol subiti) ingrandito: testo grande per leggerlo da bordo campo */
+  .card-zoom-body .gs-insights { cursor: default; padding: 24px 30px; margin: 0; }
+  .card-zoom-body .gs-insights::after { display: none; }
+  .card-zoom-body .gs-ins-t { font-size: 17px; margin-bottom: 14px; }
+  .card-zoom-body .gs-insights ul { font-size: 24px; gap: 14px; line-height: 1.35; }
+  .card-zoom-body .gs-insights li.gs-caution { font-size: 19px; }
   .bar-row { display: grid; grid-template-columns: 1fr 100px 44px; gap: 10px; align-items: center; margin-bottom: 8px; }
   .bar-name { font-size: 12px; font-weight: 600; color: #e8f0f7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bar-track { height: 10px; background: rgba(255,255,255,0.07); border-radius: 5px; overflow: hidden; }
@@ -329,7 +335,8 @@
   .gs-chips-l { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #7a96b3; }
   .gs-chip, .gs-tab { min-height: 44px; padding: 0 18px; border-radius: 10px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: #e8f0f7; font-size: 14px; font-weight: 600; }
   .gs-chip.on, .gs-tab.on { background: #e8f0f7; color: #0a1929; border-color: #e8f0f7; font-weight: 800; }
-  .gs-insights { background: rgba(127,184,255,0.08); border: 1px solid rgba(127,184,255,0.25); border-left: 4px solid #7fb8ff; border-radius: 12px; padding: 12px 18px; margin-bottom: 16px; }
+  .gs-insights { background: rgba(127,184,255,0.08); border: 1px solid rgba(127,184,255,0.25); border-left: 4px solid #7fb8ff; border-radius: 12px; padding: 12px 18px; margin-bottom: 16px; position: relative; cursor: zoom-in; }
+  .gs-insights::after { content: '⤢'; position: absolute; top: 12px; right: 14px; font-size: 14px; color: #5a7793; pointer-events: none; }
   .gs-ins-t { font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #7fb8ff; margin-bottom: 6px; }
   .gs-insights ul { list-style: none; display: grid; gap: 4px; font-size: 15px; }
   .gs-insights li::before { content: '›'; color: #7fb8ff; margin-right: 8px; font-weight: 800; }
@@ -885,7 +892,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.24';
+const APP_VERSION = '3.25';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '5.5';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -3230,7 +3237,8 @@ function initCardZoom() {
   if (!scope) return;
   scope.addEventListener('click', e => {
     if (e.target.closest('button, a, select, input, summary')) return;
-    const card = e.target.closest('.dash-card');
+    // .gs-insights = riquadro "Cosa emerge" di Analisi gol subiti (non e' una .dash-card)
+    const card = e.target.closest('.dash-card, .gs-insights');
     if (card) openCardZoom(card);
   });
 }
