@@ -885,9 +885,9 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.22';
+const APP_VERSION = '3.23';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
-const BACKEND_MIN_VERSION = '5.4';
+const BACKEND_MIN_VERSION = '5.5';
 const STORAGE_KEY = 'mystatistics_matches_v2';
 const PERIODS = ['1° tempo', '2° tempo', '1° supplementare', '2° supplementare', 'Partita conclusa'];
 const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
@@ -2710,13 +2710,16 @@ function buildDashboardStats(matches, ourKey) {
   return { team, players: Object.values(players) };
 }
 
-/* Barre orizzontali: una sola grandezza, un solo colore, valore in chiaro a destra */
-function barChartHtml(rows, unit, limit) {
-  const top = rows.filter(r => r.value > 0).sort((a, b) => b.value - a.value).slice(0, limit || 8);
+/* Barre orizzontali: una sola grandezza, un solo colore, valore in chiaro a destra.
+   includeZero: mostra anche le righe a 0 (es. convocate mai entrate nel minutaggio) */
+function barChartHtml(rows, unit, limit, includeZero) {
+  const top = rows.filter(r => includeZero || r.value > 0)
+    .sort((a, b) => (b.value - a.value) || String(a.label).localeCompare(String(b.label)))
+    .slice(0, limit || 8);
   if (top.length === 0) return '<div class="dash-empty">Nessun dato da mostrare</div>';
   const max = top[0].value;
   return top.map(r => {
-    const pct = Math.max(3, Math.round((r.value / max) * 100));
+    const pct = r.value > 0 ? Math.max(3, Math.round((r.value / max) * 100)) : 0;
     const label = escapeHtml(r.label);
     const val = r.value + (unit || '');
     return '<div class="bar-row" title="' + label + ': ' + val + '">'
@@ -3260,6 +3263,44 @@ document.addEventListener('keydown', e => {
 
 let gsCtx = null;
 
+/* Calciatrici tesserate (foglio ATLETE di Google Sheets, action backend `atlete`).
+   Servono al grafico "Minuti giocati" per mostrare anche chi ha 0'. La lista e'
+   salvata in locale, cosi' la dashboard funziona anche offline con l'ultima
+   copia; a ogni apertura della dashboard si riscarica in background. */
+const ATLETE_CACHE_KEY = 'mystatistics_atlete';
+
+function loadAtleteCache() {
+  try { return JSON.parse(localStorage.getItem(ATLETE_CACHE_KEY) || '[]'); }
+  catch (e) { return []; }
+}
+
+async function refreshAtlete() {
+  const sheetsUrl = getSheetsUrl();
+  if (!sheetsUrl) return;
+  try {
+    const res = await fetch(sheetsUrl, {
+      method: 'POST', mode: 'cors', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'atlete' })
+    });
+    const data = await res.json();
+    if (!data.ok || !Array.isArray(data.atlete)) return;   // backend vecchio o foglio mancante: resta la cache
+    const names = data.atlete.map(a => a.name).filter(Boolean);
+    const changed = JSON.stringify(names) !== JSON.stringify(loadAtleteCache());
+    localStorage.setItem(ATLETE_CACHE_KEY, JSON.stringify(names));
+    const dash = document.getElementById('dashboard-screen');
+    if (changed && dash && dash.classList.contains('active')) renderDashboard();
+  } catch (e) { /* offline: resta la cache */ }
+}
+
+/* Chiave per riconoscere la stessa atleta tra distinta (OCR) e foglio ATLETE:
+   maiuscole, senza accenti/apostrofi, parole in ordine alfabetico
+   ("Di Gabriele Giulia" = "GIULIA DI GABRIELE") */
+function athleteKey(name) {
+  return normTeam(name).normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/['’`]/g, '').replace(/[^A-Z ]/g, ' ').split(' ').filter(Boolean).sort().join(' ');
+}
+
 function openDashboard() {
   const matches = loadMatches().filter(m => m.completed);
   const sel = document.getElementById('dash-match-select');
@@ -3269,6 +3310,7 @@ function openDashboard() {
   sel.value = '__all__';
   renderDashboard();
   showScreen('dashboard-screen');
+  refreshAtlete();
 }
 
 function renderDashboard() {
@@ -3331,13 +3373,19 @@ function renderDashboard() {
   const goals = st.players.map(p => ({ label: p.name, value: p.goals }));
   const assists = st.players.map(p => ({ label: p.name, value: p.assists }));
   const minutes = st.players.map(p => ({ label: p.name, value: p.minutes }));
+  // tesserate (foglio ATLETE) mai in distinta nelle partite considerate: 0'
+  const known = new Set(st.players.map(p => athleteKey(p.name)));
+  loadAtleteCache().forEach(name => {
+    const k = athleteKey(name);
+    if (k && !known.has(k)) { known.add(k); minutes.push({ label: name, value: 0 }); }
+  });
   const saves = st.players.map(p => ({ label: p.name, value: p.saves }));
 
   gridEl.innerHTML =
     '<div class="dash-card"><div class="dash-card-title">⚽ Marcatrici</div>' + barChartHtml(goals, '') + '</div>'
     + '<div class="dash-card"><div class="dash-card-title">🅰️ Assist</div>' + barChartHtml(assists, '') + '</div>'
     + (t.saves > 0 ? '<div class="dash-card"><div class="dash-card-title">🧤 Rigori parati</div>' + barChartHtml(saves, '') + '</div>' : '')
-    + '<div class="dash-card"><div class="dash-card-title">⏱️ Minuti giocati</div>' + barChartHtml(minutes, "'", minutes.length) + '</div>'
+    + '<div class="dash-card"><div class="dash-card-title">⏱️ Minuti giocati</div>' + barChartHtml(minutes, "'", minutes.length, true) + '</div>'
     + '<div class="dash-card wide"><div class="dash-card-title">Tutte le calciatrici</div>' + playersTableHtml(st.players) + '</div>';
 }
 

@@ -1,5 +1,11 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v5.5 (23/09/2026): action `atlete` - legge il foglio ATLETE (tutte le calciatrici
+//   tesserate) dello spreadsheet collegato e restituisce { atlete:[{name}] } (il numero
+//   progressivo a lato delle atlete e' ignorato).
+//   La Dashboard lo usa per mostrare nei "Minuti giocati" anche chi ha 0'.
+//   Nessun nuovo scope (lo script e' gia' legato allo spreadsheet): basta
+//   pubblicare la nuova versione su TUTTI e 3 i deployment.
 // v5.4 (21/09/2026): sync su Sheets - gli eventi "Rigore parato" (type penaltysave)
 //   compaiono nel foglio Eventi con tipo "Rigore parato" (prima avrebbero il tipo
 //   vuoto). Nessun nuovo scope, schema fogli invariato (Statistiche resta a 12
@@ -35,11 +41,12 @@
 
 // Aggiornare ad OGNI modifica di questo file; il frontend la confronta con
 // BACKEND_MIN_VERSION di index.html.
-const BACKEND_VERSION = '5.4';
+const BACKEND_VERSION = '5.5';
 
 const SHEET_PARTITE = 'Partite';
 const SHEET_STATISTICHE = 'Statistiche';
 const SHEET_EVENTI = 'Eventi';
+const SHEET_ATLETE = 'ATLETE';
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 const CLAUDE_MODEL = 'claude-sonnet-4-5';
 
@@ -67,6 +74,9 @@ function doPost(e) {
     if (payload.action === 'sendReport') {
       return handleSendReport(payload);
     }
+    if (payload.action === 'atlete') {
+      return handleAtlete();
+    }
     return handleSyncRequest(payload);
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err) });
@@ -80,7 +90,7 @@ function doGet() {
   return jsonResponse({
     ok: true,
     version: BACKEND_VERSION,
-    message: 'My Statistics endpoint attivo (v' + BACKEND_VERSION + ': OCR, distinte da Drive, invio report via email)',
+    message: 'My Statistics endpoint attivo (v' + BACKEND_VERSION + ': OCR, distinte da Drive, invio report via email, atlete)',
     timestamp: new Date().toISOString()
   });
 }
@@ -355,6 +365,61 @@ function handleSendReport(payload) {
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err.message || err) });
   }
+}
+
+// ============================================
+// ATLETE tesserate (foglio ATLETE)
+// ============================================
+// Si usa SOLO il nome: il numero a lato delle atlete e' un progressivo senza
+// altro significato (non e' il numero di maglia) e viene ignorato.
+// Le colonne si riconoscono dall'intestazione (prima riga, entro le prime 10,
+// che contiene "cognome", "nome", "atleta", "calciatrice" o "nominativo"):
+//  - "Cognome" + "Nome" separati -> "COGNOME NOME"
+//  - una sola colonna ("Cognome e nome", "Atleta", "Nome"...) -> quella
+// Senza intestazione riconoscibile: prima colonna che contiene testo (non numeri).
+function handleAtlete() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_ATLETE);
+  if (!sheet) return jsonResponse({ ok: false, error: 'Foglio "' + SHEET_ATLETE + '" non trovato' });
+  const rows = sheet.getDataRange().getDisplayValues();
+
+  var headerRow = -1, colCognome = -1, colNome = -1, colFull = -1;
+  for (var r = 0; r < Math.min(rows.length, 10) && headerRow < 0; r++) {
+    rows[r].forEach(function (cell, c) {
+      var h = String(cell).trim().toLowerCase();
+      if (!h) return;
+      if (/cognome/.test(h) && /nome/.test(h.replace('cognome', ''))) colFull = c;
+      else if (/cognome/.test(h)) colCognome = c;
+      else if (/^nome$/.test(h)) colNome = c;
+      else if (/atleta|calciatric|giocatric|nominativo|^nome/.test(h)) colFull = c;
+    });
+    if (colFull >= 0 || colCognome >= 0 || colNome >= 0) headerRow = r;
+  }
+  if (colFull < 0 && colCognome < 0) colFull = colNome;
+  if (colFull < 0 && colCognome < 0) {
+    // nessuna intestazione: prima colonna in cui compare testo non numerico
+    var width = rows.reduce(function (w, row) { return Math.max(w, row.length); }, 0);
+    for (var c = 0; c < width && colFull < 0; c++) {
+      if (rows.some(function (row) { var v = String(row[c] || '').trim(); return v && isNaN(Number(v)); })) colFull = c;
+    }
+    if (colFull < 0) return jsonResponse({ ok: true, atlete: [] });
+  }
+
+  const atlete = [];
+  const seen = {};
+  rows.slice(headerRow + 1).forEach(function (row) {
+    var name = colFull >= 0
+      ? String(row[colFull] || '')
+      : String(row[colCognome] || '') + ' ' + (colNome >= 0 ? String(row[colNome] || '') : '');
+    name = name.trim().replace(/\s+/g, ' ').toUpperCase();
+    if (!name || !isNaN(Number(name)) || seen[name]) return;
+    seen[name] = true;
+    atlete.push({ name: name });
+  });
+  return jsonResponse({ ok: true, atlete: atlete });
+}
+
+function testAtlete() {
+  Logger.log(handleAtlete().getContent());
 }
 
 // ============================================

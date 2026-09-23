@@ -14,12 +14,55 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Frontend | `index.html` unico (HTML + CSS + JS inline), zero build, PWA landscape per iPad |
 | Backend | Google Apps Script "MyStatisticsBackend" — copia di riferimento in `backend/Code.gs` |
 | Deployment attivi | Situazione al 20/09/2026 sera (da Gestisci deployment): attivi **"v5.3 - OCR numeri d…"** (quello usato dall'iPad: risponde v5.3) e due "v5 (13/09/2026)…" portati da Max alla versione 17 (v5.3) la sera del 20/09/2026; **"Senza titolo"** (ex deployment dell'iPad, v5.2) è stato **archiviato** e non risponde più; archiviati anche "v5.2 - ping GET c…" e le versioni v4.x. Un deployment archiviato non risponde: prima di archiviarne uno, controllare che non sia l'URL salvato sull'iPad |
-| Database | Google Sheets "My Statistics - Fiamma Monza 2026 2027" (tab Partite, Statistiche, Eventi, Marcatrici) |
+| Database | Google Sheets "My Statistics - Fiamma Monza 2026 2027" (tab Partite, Statistiche, Eventi, Marcatrici, ATLETE = elenco tesserate, compilato a mano) |
 | OCR | API Anthropic, modello `claude-sonnet-4-5`, chiave in Script Properties `CLAUDE_API_KEY` |
-| Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend) |
+| Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend), `mystatistics_atlete` (copia dell'elenco tesserate) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.22 — Riquadri Dashboard espandibili a tutto schermo (23/09/2026)
+## Stato attuale: v3.23 + backend v5.5 — Minuti giocati: tutte le tesserate, anche a 0' (23/09/2026)
+
+### Novità v3.23 + backend v5.5 (23/09/2026)
+
+**Richiesta di Max**: nel riquadro "⏱️ Minuti giocati" della Dashboard devono
+comparire tutte le atlete, anche quelle con 0 minuti (infortunate o convocate
+ma mai schierate). L'elenco delle calciatrici tesserate è il nuovo foglio
+**ATLETE** dello spreadsheet My Statistics.
+
+- **Backend v5.5 — action `atlete`** (`handleAtlete`): legge il foglio `ATLETE`
+  (`SHEET_ATLETE`) e restituisce `{ ok, atlete: [{ name }] }` (nomi in
+  maiuscolo, senza duplicati). Le colonne si riconoscono dall'intestazione:
+  "Cognome" + "Nome" separati, oppure una colonna unica ("Cognome e nome",
+  "Atleta", "Nome"…); senza intestazione si usa la prima colonna con testo.
+  **Il numero a lato delle atlete è solo un progressivo e viene ignorato**
+  (non è il numero di maglia). Funzione di prova `testAtlete()` nell'editor.
+  Nessun nuovo scope: lo script è già legato allo spreadsheet.
+- **Frontend**: all'apertura della Dashboard `refreshAtlete()` scarica la lista
+  in background e la salva in localStorage (`mystatistics_atlete`); se è
+  cambiata, la dashboard si ridisegna. Offline o con backend vecchio resta
+  l'ultima copia salvata (all'inizio vuota: il grafico si comporta come prima).
+- **Grafico "Minuti giocati"** = calciatrici delle distinte delle partite
+  considerate + tesserate del foglio ATLETE non presenti, a 0'. Vale sia per
+  "Tutta la stagione" sia per la singola partita. Chi ha giocato ma non è nel
+  foglio ATLETE resta comunque (non si perde nessun minuto).
+- **Stessa atleta tra distinta e foglio** (`athleteKey`): maiuscole, senza
+  accenti né apostrofi, parole in ordine alfabetico — "Di Gabriele Giulia" =
+  "GIULIA DI GABRIELE", "D'Angelo" = "DANGELO". Se l'OCR ha scritto un nome
+  diversamente (lettera sbagliata), l'atleta compare due volte: una con i
+  minuti, una a 0'. Si corregge sistemando il nome nella partita.
+- **`barChartHtml(rows, unit, limit, includeZero)`**: nuovo parametro
+  `includeZero`; le righe a 0 hanno la barra vuota e mostrano `0'`. A parità di
+  valore l'ordine è alfabetico. Solo "Minuti giocati" lo usa; Marcatrici,
+  Assist e Rigori parati invariati.
+- **`BACKEND_MIN_VERSION` = 5.5**: finché i deployment non sono aggiornati,
+  Verifica versioni lo segnala; il resto dell'app funziona come prima.
+- La tabella "Tutte le calciatrici" non cambia (solo atlete delle distinte).
+- **Provato** (Node, fuori dal browser): lettura del foglio con intestazione
+  Cognome/Nome separati, con colonna unica e senza intestazione (progressivo
+  in colonna A ignorato); abbinamento nomi; grafico con righe a 0'. **Non
+  provato** sul foglio ATLETE reale (il connettore Drive non ha i permessi):
+  dopo il deploy eseguire `testAtlete()` nell'editor e controllare i nomi nel log.
+
+## Versione precedente: v3.22 — Riquadri Dashboard espandibili a tutto schermo (23/09/2026)
 
 ### Novità v3.22 (23/09/2026)
 
@@ -188,7 +231,8 @@ dei grafici a barre).
 - **Grafico "Minuti giocati" allungato**: mostra tutte le calciatrici con almeno
   1 minuto invece delle prime 8 (`barChartHtml` ha ora un parametro `limit`;
   marcatrici e assist restano alle prime 8). Chi ha 0 minuti resta solo nella
-  tabella "Tutte le calciatrici".
+  tabella "Tutte le calciatrici" (superato in v3.23: ora compaiono anche le
+  atlete a 0').
 - **Costanti** (`index.html`, blocco Dashboard): `GS_WINDOWS`, `GS_MIN_FORM`,
   `GS_SMALL_FORM`, `GS_MIN_PLAYER`, `GS_SMALL_PLAYER`, `GS_RATE_MAX`,
   `GS_GOALS_SHOWN`.
@@ -823,6 +867,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 23/09/2026 | Frontend v3.23 + backend v5.5: grafico Dashboard "Minuti giocati" mostra tutte le tesserate del foglio ATLETE, anche a 0' (action `atlete`, cache `mystatistics_atlete`, `barChartHtml` con `includeZero`); `BACKEND_MIN_VERSION` = 5.5. Da pubblicare sui 3 deployment |
 | 21/09/2026 | Frontend v3.20: dashboard "Chi era in campo quando subiamo" mostra un ovale con il nome di ogni calciatrice presente (tolti "Base", nomi barrati, entrate/uscite). Solo frontend |
 | 21/09/2026 | Frontend v3.19 + backend v5.4: pulsante "Rigore parato" (squadra, atleta, minuto/tempo) con statistiche in riepilogo, dashboard, Excel e PDF; Sheets scrive il tipo "Rigore parato" nel foglio Eventi. **Backend da pubblicare sui 3 deployment** |
 | 21/09/2026 | Frontend v3.18: dashboard, nuova sezione "Analisi gol subiti" (split 1°/2° tempo, fasce da 15', gol ravvicinati, formazione in campo a ogni gol dedotta dai cambi; vista stagione e singola partita). Solo frontend |
@@ -868,6 +913,7 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [ ] Valutare: selezione automatica del ritaglio colonne anche per foto orizzontali; anteprima delle strisce prima dell'invio
 
 ## Da verificare
+- [ ] **A carico di Max**: pubblicare il backend v5.5 (incollare `backend/Code.gs` nell'editor, salvare, eseguire `testAtlete()` e controllare nel log che i nomi del foglio ATLETE siano giusti, poi nuova versione su TUTTI e 3 i deployment); sull'iPad Verifica versioni → "Backend: v5.5" e in Dashboard → Minuti giocati devono comparire anche le tesserate a 0'
 - [ ] **A carico di Max**: pubblicare il backend v5.4 (incollare `backend/Code.gs` nell'editor, salvare, nuova versione su TUTTI e 3 i deployment); poi Impostazioni → Verifica versioni → "Backend: v5.4" e, dopo una partita con un rigore parato, Sincronizza su Sheets e controllare la riga "Rigore parato" nel foglio Eventi
 - [x] Backend v5.3 pubblicato (20/09/2026) come nuovo deployment "v5.3 - OCR numeri di maglia a mano"; sull'iPad Impostazioni → Verifica versioni → "App v3.17 · Backend v5.3" e i numeri di maglia arrivano da Scatta foto e da Libreria foto
 - [x] Prova OCR reale (20/09/2026, sera, iPad con app **v3.13** e backend v5.3 su "Senza titolo"): i numeri di maglia scritti a mano arrivano correttamente sia da **"Scatta foto"** sia da **"Libreria foto"**. Prima della v5.3 la stessa distinta arrivava con 18 nomi e date corrette ma tutti i numeri vuoti (10062 token, ~$0,04)
