@@ -885,7 +885,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.23';
+const APP_VERSION = '3.24';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '5.5';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -3293,12 +3293,47 @@ async function refreshAtlete() {
   } catch (e) { /* offline: resta la cache */ }
 }
 
-/* Chiave per riconoscere la stessa atleta tra distinta (OCR) e foglio ATLETE:
-   maiuscole, senza accenti/apostrofi, parole in ordine alfabetico
-   ("Di Gabriele Giulia" = "GIULIA DI GABRIELE") */
-function athleteKey(name) {
-  return normTeam(name).normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/['’`]/g, '').replace(/[^A-Z ]/g, ' ').split(' ').filter(Boolean).sort().join(' ');
+/* Riconoscere la stessa atleta tra distinta (OCR) e foglio ATLETE, che spesso
+   la scrivono in modo un po' diverso. Parole in maiuscolo, senza accenti ne'
+   apostrofi; due nomi sono la stessa atleta se:
+   - scritti tutti attaccati coincidono ("MARIA CHIARA" = "MARIACHIARA"), oppure
+   - ogni parola del nome piu' corto (almeno 2 parole) si ritrova nel piu' lungo
+     ("GRITTI ALICE" in "GRITTI ALICE AMBRA", anche in ordine diverso),
+     tollerando 1 lettera diversa nelle parole di almeno 4 lettere
+     ("LIUBA" = "LJUBA") */
+function athleteWords(name) {
+  return normTeam(name).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/['\u2019`]/g, '').replace(/[^A-Z ]/g, ' ').split(' ').filter(Boolean);
+}
+
+function wordsAlike(a, b) {
+  if (a === b) return true;
+  if (a.length < 4 || b.length < 4 || Math.abs(a.length - b.length) > 1) return false;
+  // distanza di modifica <= 1 (una lettera cambiata, aggiunta o tolta)
+  let i = 0, j = 0, diff = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++diff > 1) return false;
+    if (a.length > b.length) i++;
+    else if (b.length > a.length) j++;
+    else { i++; j++; }
+  }
+  return diff + (a.length - i) + (b.length - j) <= 1;
+}
+
+function sameAthlete(nameA, nameB) {
+  const a = athleteWords(nameA), b = athleteWords(nameB);
+  if (!a.length || !b.length) return false;
+  if (a.join('') === b.join('') || a.slice().sort().join('') === b.slice().sort().join('')) return true;
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  if (short.length < 2) return false;
+  const used = new Array(long.length).fill(false);
+  return short.every(w => {
+    const k = long.findIndex((x, idx) => !used[idx] && wordsAlike(w, x));
+    if (k < 0) return false;
+    used[k] = true;
+    return true;
+  });
 }
 
 function openDashboard() {
@@ -3372,12 +3407,14 @@ function renderDashboard() {
 
   const goals = st.players.map(p => ({ label: p.name, value: p.goals }));
   const assists = st.players.map(p => ({ label: p.name, value: p.assists }));
-  const minutes = st.players.map(p => ({ label: p.name, value: p.minutes }));
-  // tesserate (foglio ATLETE) mai in distinta nelle partite considerate: 0'
-  const known = new Set(st.players.map(p => athleteKey(p.name)));
-  loadAtleteCache().forEach(name => {
-    const k = athleteKey(name);
-    if (k && !known.has(k)) { known.add(k); minutes.push({ label: name, value: 0 }); }
+  // Minuti: una riga per ogni tesserata del foglio ATLETE (0' se mai in campo),
+  // con il nome del foglio; i minuti di chi in distinta e' scritta diversamente
+  // si sommano sulla sua tesserata. Chi non e' nel foglio resta col suo nome.
+  const minutes = loadAtleteCache().map(name => ({ label: name, value: 0 }));
+  st.players.forEach(p => {
+    const row = minutes.find(r => sameAthlete(r.label, p.name));
+    if (row) row.value += p.minutes;
+    else minutes.push({ label: p.name, value: p.minutes });
   });
   const saves = st.players.map(p => ({ label: p.name, value: p.saves }));
 

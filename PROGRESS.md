@@ -19,7 +19,31 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend), `mystatistics_atlete` (copia dell'elenco tesserate) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.23 + backend v5.5 — Minuti giocati: tutte le tesserate, anche a 0' (23/09/2026)
+## Stato attuale: v3.24 — Minuti giocati: nomi abbinati al foglio ATLETE (23/09/2026)
+
+### Novità v3.24 (23/09/2026)
+
+Il primo `testAtlete()` sul foglio vero (22 tesserate) ha mostrato che 4
+atlete sono scritte diversamente tra distinta e foglio ATLETE: FANTOZZI MARIA
+CHIARA / MARIACHIARA, GRITTI ALICE AMBRA / ALICE, BARDELLA CHIARA RITA /
+CHIARA, CERRI LIUBA MARIA / LJUBA MARIA SOLE. Con l'abbinamento esatto della
+v3.23 sarebbero comparse due volte (con i minuti e a 0').
+
+- **`sameAthlete(a, b)`** sostituisce `athleteKey`: stessa atleta se i nomi
+  scritti attaccati coincidono (anche con parole in ordine diverso), oppure se
+  ogni parola del nome più corto (almeno 2 parole) si ritrova nel più lungo,
+  con 1 lettera di tolleranza nelle parole di almeno 4 lettere (`wordsAlike`).
+- **Grafico "Minuti giocati"**: una riga per ogni tesserata con il **nome del
+  foglio ATLETE**; i minuti delle calciatrici della distinta abbinate si
+  sommano sulla tesserata (anche se in partite diverse l'OCR l'ha scritta in
+  modi diversi). Chi non è nel foglio resta con il nome della distinta.
+- **Provato** (Node) con i 22 nomi del foglio e i 18 della dashboard dell'iPad:
+  22 righe, nessun doppione, le 4 atlete sopra abbinate, DAUSTRIA, GUIDI,
+  MONGUZZI e ROSSINI a 0'; nessun falso abbinamento tra atlete con lo stesso
+  nome proprio (MAGNI/BIGNOTTI CHIARA, GUIDI/ARNESE SOFIA...).
+- Solo frontend; backend invariato (v5.5).
+
+## Versione precedente: v3.23 + backend v5.5 — Minuti giocati: tutte le tesserate, anche a 0' (23/09/2026)
 
 ### Novità v3.23 + backend v5.5 (23/09/2026)
 
@@ -44,7 +68,7 @@ ma mai schierate). L'elenco delle calciatrici tesserate è il nuovo foglio
   considerate + tesserate del foglio ATLETE non presenti, a 0'. Vale sia per
   "Tutta la stagione" sia per la singola partita. Chi ha giocato ma non è nel
   foglio ATLETE resta comunque (non si perde nessun minuto).
-- **Stessa atleta tra distinta e foglio** (`athleteKey`): maiuscole, senza
+- **Stessa atleta tra distinta e foglio** (`athleteKey`, sostituita in v3.24 da `sameAthlete`): maiuscole, senza
   accenti né apostrofi, parole in ordine alfabetico — "Di Gabriele Giulia" =
   "GIULIA DI GABRIELE", "D'Angelo" = "DANGELO". Se l'OCR ha scritto un nome
   diversamente (lettera sbagliata), l'atleta compare due volte: una con i
@@ -61,6 +85,7 @@ ma mai schierate). L'elenco delle calciatrici tesserate è il nuovo foglio
   in colonna A ignorato); abbinamento nomi; grafico con righe a 0'. **Non
   provato** sul foglio ATLETE reale (il connettore Drive non ha i permessi):
   dopo il deploy eseguire `testAtlete()` nell'editor e controllare i nomi nel log.
+  → Eseguito da Max il 23/09/2026: 22 tesserate lette correttamente.
 
 ## Versione precedente: v3.22 — Riquadri Dashboard espandibili a tutto schermo (23/09/2026)
 
@@ -867,6 +892,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 23/09/2026 | Frontend v3.24: "Minuti giocati" abbina le calciatrici della distinta al foglio ATLETE anche con nomi scritti diversamente (`sameAthlete`), usa il nome del foglio e somma i minuti. Solo frontend |
 | 23/09/2026 | Frontend v3.23 + backend v5.5: grafico Dashboard "Minuti giocati" mostra tutte le tesserate del foglio ATLETE, anche a 0' (action `atlete`, cache `mystatistics_atlete`, `barChartHtml` con `includeZero`); `BACKEND_MIN_VERSION` = 5.5. Da pubblicare sui 3 deployment |
 | 21/09/2026 | Frontend v3.20: dashboard "Chi era in campo quando subiamo" mostra un ovale con il nome di ogni calciatrice presente (tolti "Base", nomi barrati, entrate/uscite). Solo frontend |
 | 21/09/2026 | Frontend v3.19 + backend v5.4: pulsante "Rigore parato" (squadra, atleta, minuto/tempo) con statistiche in riepilogo, dashboard, Excel e PDF; Sheets scrive il tipo "Rigore parato" nel foglio Eventi. **Backend da pubblicare sui 3 deployment** |
@@ -913,7 +939,7 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [ ] Valutare: selezione automatica del ritaglio colonne anche per foto orizzontali; anteprima delle strisce prima dell'invio
 
 ## Da verificare
-- [ ] **A carico di Max**: pubblicare il backend v5.5 (incollare `backend/Code.gs` nell'editor, salvare, eseguire `testAtlete()` e controllare nel log che i nomi del foglio ATLETE siano giusti, poi nuova versione su TUTTI e 3 i deployment); sull'iPad Verifica versioni → "Backend: v5.5" e in Dashboard → Minuti giocati devono comparire anche le tesserate a 0'
+- [ ] **A carico di Max**: pubblicare il backend v5.5 (fatto il 23/09/2026: codice incollato nell'editor, `testAtlete()` legge 22 nomi corretti; manca: nuova versione su TUTTI e 3 i deployment); sull'iPad Verifica versioni → "Backend: v5.5" e in Dashboard (con app v3.24) → Minuti giocati devono comparire anche le tesserate a 0'
 - [ ] **A carico di Max**: pubblicare il backend v5.4 (incollare `backend/Code.gs` nell'editor, salvare, nuova versione su TUTTI e 3 i deployment); poi Impostazioni → Verifica versioni → "Backend: v5.4" e, dopo una partita con un rigore parato, Sincronizza su Sheets e controllare la riga "Rigore parato" nel foglio Eventi
 - [x] Backend v5.3 pubblicato (20/09/2026) come nuovo deployment "v5.3 - OCR numeri di maglia a mano"; sull'iPad Impostazioni → Verifica versioni → "App v3.17 · Backend v5.3" e i numeri di maglia arrivano da Scatta foto e da Libreria foto
 - [x] Prova OCR reale (20/09/2026, sera, iPad con app **v3.13** e backend v5.3 su "Senza titolo"): i numeri di maglia scritti a mano arrivano correttamente sia da **"Scatta foto"** sia da **"Libreria foto"**. Prima della v5.3 la stessa distinta arrivava con 18 nomi e date corrette ma tutti i numeri vuoti (10062 token, ~$0,04)
