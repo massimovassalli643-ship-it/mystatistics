@@ -19,7 +19,35 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend), `mystatistics_atlete` (copia dell'elenco tesserate) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.25 — "Cosa emerge" espandibile a tutto schermo (23/09/2026)
+## Stato attuale: v3.26 — Dashboard esportabile in PDF (Mail / WhatsApp) (26/09/2026)
+
+### Novità v3.26 (26/09/2026)
+
+**Richiesta di Max**: il risultato della dashboard deve poter essere
+esportato in PDF e inviato via mail o WhatsApp, con un pulsante in fondo alla
+schermata (come nella dashboard dell'app Convocazioni).
+
+- Nuovo pulsante **"📤 Esporta PDF (Mail / WhatsApp)"** in fondo a
+  `#dashboard-screen` (`exportDashboardPdf`).
+- Il PDF riguarda la **vista scelta nel menu** (tutta la stagione o una
+  singola partita): intestazione come il referto, riquadri KPI (letti da
+  quanto è a schermo), per la stagione le frasi di "Cosa emerge" (solo quelle
+  della finestra 3'/5'/10' selezionata), classifiche Marcatrici, Assist,
+  Minuti giocati (stesso abbinamento al foglio ATLETE, `dashMinutesRows`) e
+  Rigori parati, poi la tabella "Tutte le calciatrici". Grafici SVG e
+  "Chi era in campo" non sono inclusi.
+- `pdfText()` toglie emoji e simboli fuori dal set WinAnsi dell'Helvetica di
+  jsPDF (′ › → ecc.), che altrimenti uscirebbero come caratteri spuri.
+- Condivisione con la Web Share API (pannello di sistema: Mail, WhatsApp…);
+  dove la condivisione di file non è supportata il PDF viene scaricato;
+  se l'utente annulla il pannello non succede nulla. Nome file
+  `dashboard_stagione_AAAA-MM-GG.pdf` oppure
+  `dashboard_<casa>_vs_<ospite>_<data>.pdf`.
+- **Provato** (browser, 2 partite di prova): PDF di 2 pagine generato senza
+  errori con tutte le sezioni. Da provare sull'iPad la condivisione reale.
+- Solo frontend.
+
+## Versione precedente: v3.25 — "Cosa emerge" espandibile a tutto schermo (23/09/2026)
 
 ### Novità v3.25 (23/09/2026)
 
@@ -910,6 +938,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 26/09/2026 | Frontend v3.26: pulsante "Esporta PDF (Mail / WhatsApp)" in fondo alla Dashboard (vista scelta: KPI, Cosa emerge, classifiche, tabella calciatrici) con condivisione di sistema. Solo frontend |
 | 23/09/2026 | Frontend v3.25: riquadro "Cosa emerge" (Analisi gol subiti) espandibile a tutto schermo con testo a 24 px. Solo frontend |
 | 23/09/2026 | Frontend v3.24: "Minuti giocati" abbina le calciatrici della distinta al foglio ATLETE anche con nomi scritti diversamente (`sameAthlete`), usa il nome del foglio e somma i minuti. Solo frontend |
 | 23/09/2026 | Frontend v3.23 + backend v5.5: grafico Dashboard "Minuti giocati" mostra tutte le tesserate del foglio ATLETE, anche a 0' (action `atlete`, cache `mystatistics_atlete`, `barChartHtml` con `includeZero`); `BACKEND_MIN_VERSION` = 5.5. Da pubblicare sui 3 deployment |
@@ -958,6 +987,7 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [ ] Valutare: selezione automatica del ritaglio colonne anche per foto orizzontali; anteprima delle strisce prima dell'invio
 
 ## Da verificare
+- [ ] Sull'iPad (app v3.26): Dashboard → "📤 Esporta PDF" → condividere via Mail e via WhatsApp, controllare impaginazione e testi del PDF
 - [ ] **A carico di Max**: pubblicare il backend v5.5 (fatto il 23/09/2026: codice incollato nell'editor, `testAtlete()` legge 22 nomi corretti; manca: nuova versione su TUTTI e 3 i deployment); sull'iPad Verifica versioni → "Backend: v5.5" e in Dashboard (con app v3.24) → Minuti giocati devono comparire anche le tesserate a 0'
 - [ ] **A carico di Max**: pubblicare il backend v5.4 (incollare `backend/Code.gs` nell'editor, salvare, nuova versione su TUTTI e 3 i deployment); poi Impostazioni → Verifica versioni → "Backend: v5.4" e, dopo una partita con un rigore parato, Sincronizza su Sheets e controllare la riga "Rigore parato" nel foglio Eventi
 - [x] Backend v5.3 pubblicato (20/09/2026) come nuovo deployment "v5.3 - OCR numeri di maglia a mano"; sull'iPad Impostazioni → Verifica versioni → "App v3.17 · Backend v5.3" e i numeri di maglia arrivano da Scatta foto e da Libreria foto

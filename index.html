@@ -321,6 +321,7 @@
   .dash-table td.n { text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; }
   .dash-table td.dim { color: #5a7793; }
   .dash-scroll { overflow-x: auto; }
+  .dash-export-btn { margin: 22px auto 0; min-width: 320px; }
 
   /* ============ ANALISI GOL SUBITI (dashboard) ============
      Due soli colori con un significato fisso: blu = 1° tempo, ambra = 2° tempo
@@ -534,6 +535,7 @@
     <div class="kpi-row" id="dash-kpis"></div>
     <div id="dash-conceded"></div>
     <div class="dash-grid" id="dash-grid"></div>
+    <button class="primary-btn dash-export-btn" id="dash-export-btn" onclick="exportDashboardPdf()">📤 Esporta PDF (Mail / WhatsApp)</button>
   </div>
 
   <div class="card-zoom-overlay" id="card-zoom-overlay" onclick="if(event.target===this) closeCardZoom()">
@@ -892,7 +894,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.25';
+const APP_VERSION = '3.26';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '5.5';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -3418,12 +3420,7 @@ function renderDashboard() {
   // Minuti: una riga per ogni tesserata del foglio ATLETE (0' se mai in campo),
   // con il nome del foglio; i minuti di chi in distinta e' scritta diversamente
   // si sommano sulla sua tesserata. Chi non e' nel foglio resta col suo nome.
-  const minutes = loadAtleteCache().map(name => ({ label: name, value: 0 }));
-  st.players.forEach(p => {
-    const row = minutes.find(r => sameAthlete(r.label, p.name));
-    if (row) row.value += p.minutes;
-    else minutes.push({ label: p.name, value: p.minutes });
-  });
+  const minutes = dashMinutesRows(st);
   const saves = st.players.map(p => ({ label: p.name, value: p.saves }));
 
   gridEl.innerHTML =
@@ -3432,6 +3429,188 @@ function renderDashboard() {
     + (t.saves > 0 ? '<div class="dash-card"><div class="dash-card-title">🧤 Rigori parati</div>' + barChartHtml(saves, '') + '</div>' : '')
     + '<div class="dash-card"><div class="dash-card-title">⏱️ Minuti giocati</div>' + barChartHtml(minutes, "'", minutes.length, true) + '</div>'
     + '<div class="dash-card wide"><div class="dash-card-title">Tutte le calciatrici</div>' + playersTableHtml(st.players) + '</div>';
+}
+
+function dashMinutesRows(st) {
+  const minutes = loadAtleteCache().map(name => ({ label: name, value: 0 }));
+  st.players.forEach(p => {
+    const row = minutes.find(r => sameAthlete(r.label, p.name));
+    if (row) row.value += p.minutes;
+    else minutes.push({ label: p.name, value: p.minutes });
+  });
+  return minutes;
+}
+
+/* ---- Esporta la dashboard in PDF (Mail / WhatsApp) ----
+ * Esporta la vista scelta nel menu (stagione o singola partita): riquadri KPI
+ * e "Cosa emerge" letti da quanto e' a schermo (stessi testi, stessa finestra
+ * dei gol ravvicinati), classifiche e tabella ricalcolate dagli stessi dati.
+ * Il file va al pannello di condivisione del sistema (Mail, WhatsApp...);
+ * dove la condivisione di file non e' supportata viene scaricato. */
+function pdfText(s) {
+  // Helvetica di jsPDF copre solo il set WinAnsi: niente emoji ne' simboli come ′ › ⚽
+  return String(s == null ? '' : s)
+    .replace(/[′’]/g, "'").replace(/›/g, '>').replace(/→/g, '->')
+    .replace(/[\u2000-\u200F\u2028-\u202F\u205F\u2060]/g, ' ')
+    .replace(/[^\x20-\x7E\u00A0-\u00FF\u2013\u2014\u2018\u201C\u201D\u2022\u2026\u20AC]/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function dashboardPdfDoc() {
+  const all = loadMatches().filter(m => m.completed);
+  const ourKey = detectOurTeam(loadMatches());
+  const sel = document.getElementById('dash-match-select');
+  const choice = sel ? sel.value : '__all__';
+  const single = choice !== '__all__' ? all.find(m => m.id === choice) : null;
+  const matches = single ? [single] : all;
+  if (matches.length === 0) throw new Error('Nessuna partita conclusa da esportare');
+  const st = buildDashboardStats(matches, ourKey);
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const L = 14, R = 196, W = R - L, BOTTOM = 282;
+  doc.setFillColor(10, 25, 41); doc.rect(0, 0, 210, 35, 'F');
+  doc.setTextColor(255, 184, 77); doc.setFontSize(22); doc.setFont('helvetica', 'bold');
+  doc.text('MY STATISTICS', 105, 14, { align: 'center' });
+  doc.setTextColor(255, 255, 255); doc.setFontSize(11); doc.setFont('helvetica', 'normal');
+  doc.text(pdfText('Dashboard — ' + (single ? matchLabel(single) : 'Tutta la stagione')), 105, 22, { align: 'center' });
+  doc.setFontSize(9);
+  doc.text(pdfText((ourKey ? ourKey + ' · ' : '') + matches.length + (matches.length === 1 ? ' partita' : ' partite concluse') + ' · generato il ' + new Date().toLocaleString('it-IT')), 105, 29, { align: 'center' });
+
+  let y = 44;
+  const need = h => { if (y + h > BOTTOM) { doc.addPage(); y = 20; } };
+  const section = title => {
+    need(14);
+    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 107, 53);
+    doc.text(pdfText(title).toUpperCase(), L, y); y += 6;
+    doc.setTextColor(20, 20, 20);
+  };
+
+  // KPI come a schermo: 4 riquadri per riga
+  const kpis = [...document.querySelectorAll('#dash-kpis .kpi')].map(k => ({
+    label: pdfText((k.querySelector('.kpi-label') || {}).textContent),
+    value: pdfText((k.querySelector('.kpi-value') || {}).textContent),
+    sub: pdfText((k.querySelector('.kpi-sub') || {}).textContent)
+  }));
+  if (kpis.length) {
+    const cols = 4, gap = 3, bw = (W - gap * (cols - 1)) / cols, bh = 19;
+    kpis.forEach((k, i) => {
+      if (i % cols === 0) { if (i) y += bh + gap; need(bh); }
+      const x = L + (i % cols) * (bw + gap);
+      doc.setDrawColor(200, 210, 222); doc.setFillColor(243, 247, 251); doc.roundedRect(x, y, bw, bh, 2, 2, 'FD');
+      doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(90, 119, 147);
+      doc.text(k.label.toUpperCase(), x + 3, y + 5, { maxWidth: bw - 6 });
+      doc.setFontSize(13); doc.setTextColor(10, 25, 41);
+      doc.text(k.value, x + 3, y + 11.5, { maxWidth: bw - 6 });
+      doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 119, 147);
+      if (k.sub) doc.text(k.sub, x + 3, y + 16, { maxWidth: bw - 6 });
+    });
+    y += bh + 8;
+  }
+
+  // "Cosa emerge" (solo vista stagione): le frasi visibili, cioe' quelle della
+  // finestra dei gol ravvicinati scelta a schermo
+  const insights = [...document.querySelectorAll('#dash-conceded .gs-insights li')]
+    .filter(li => !li.classList.contains('gs-wc') || li.classList.contains('gs-wc-' + gsWindow))
+    .map(li => pdfText(li.textContent)).filter(Boolean);
+  if (insights.length) {
+    section('Analisi gol subiti — cosa emerge');
+    doc.setFontSize(9.5); doc.setFont('helvetica', 'normal');
+    insights.forEach(t => {
+      const lines = doc.splitTextToSize('> ' + t, W);
+      need(lines.length * 4.6);
+      doc.text(lines, L, y); y += lines.length * 4.6 + 1;
+    });
+    y += 4;
+  }
+
+  // Classifiche: due colonne affiancate (nome + valore)
+  const ranking = (rows, includeZero) => rows.filter(r => includeZero || r.value > 0)
+    .sort((a, b) => (b.value - a.value) || String(a.label).localeCompare(String(b.label)));
+  const lists = [
+    { title: 'Marcatrici', rows: ranking(st.players.map(p => ({ label: p.name, value: p.goals }))), unit: '' },
+    { title: 'Assist', rows: ranking(st.players.map(p => ({ label: p.name, value: p.assists }))), unit: '' },
+    { title: 'Minuti giocati', rows: ranking(dashMinutesRows(st), true), unit: "'" }
+  ];
+  if (st.team.saves > 0) lists.push({ title: 'Rigori parati', rows: ranking(st.players.map(p => ({ label: p.name, value: p.saves }))), unit: '' });
+  const colW = (W - 8) / 2, lineH = 4.6;
+  for (let i = 0; i < lists.length; i += 2) {
+    const pair = lists.slice(i, i + 2);
+    const h = 6 + Math.max.apply(null, pair.map(l => Math.max(1, l.rows.length))) * lineH;
+    need(h);
+    const y0 = y;
+    let yMax = y;
+    pair.forEach((l, j) => {
+      const x = L + j * (colW + 8);
+      let yy = y0;
+      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 107, 53);
+      doc.text(l.title.toUpperCase(), x, yy); yy += 5.5;
+      doc.setFontSize(9); doc.setTextColor(20, 20, 20);
+      if (!l.rows.length) { doc.setFont('helvetica', 'normal'); doc.text('Nessun dato', x, yy); yy += lineH; }
+      l.rows.forEach((r, k) => {
+        doc.setFont('helvetica', 'normal');
+        doc.text((k + 1) + '. ' + pdfText(r.label).substring(0, 34), x, yy);
+        doc.setFont('helvetica', 'bold');
+        doc.text(r.value + l.unit, x + colW, yy, { align: 'right' });
+        yy += lineH;
+      });
+      yMax = Math.max(yMax, yy);
+    });
+    y = yMax + 6;
+  }
+
+  // Tabella completa, come "Tutte le calciatrici"
+  section('Tutte le calciatrici');
+  const heads = ['N°', 'CALCIATRICE', 'PRES.', 'MIN', 'GOL', 'ASSIST', 'GIALLI', 'ROSSI', 'PARATI'];
+  const xs = [L, L + 9, 112, 126, 141, 155, 169, 182, R];
+  const header = () => {
+    doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 80, 80);
+    heads.forEach((h, i) => doc.text(h, xs[i], y, i >= 2 ? { align: 'right' } : undefined));
+    doc.setLineWidth(0.2); doc.line(L, y + 1.5, R, y + 1.5); y += 5.5;
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(20, 20, 20);
+  };
+  header();
+  st.players.slice().sort((a, b) => (b.goals - a.goals) || (b.assists - a.assists) || (b.minutes - a.minutes) || String(a.name).localeCompare(String(b.name)))
+    .forEach(p => {
+      if (y > BOTTOM) { doc.addPage(); y = 20; header(); }
+      const cells = [p.num == null ? '—' : String(p.num), pdfText(p.name).substring(0, 42), String(p.apps), p.minutes + "'",
+        String(p.goals || ''), String(p.assists || ''), String(p.yellows || ''), String(p.reds || ''), String(p.saves || '')];
+      cells.forEach((c, i) => doc.text(c, xs[i], y, i >= 2 ? { align: 'right' } : undefined));
+      y += 4.8;
+    });
+
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7); doc.setTextColor(120, 120, 120);
+    doc.text(`Pagina ${i} di ${pageCount} — Generato da My Statistics`, 105, 293, { align: 'center' });
+  }
+  const fname = (single
+    ? `dashboard_${single.home.name}_vs_${single.away.name}_${new Date(single.endedAt || single.createdAt).toISOString().slice(0, 10)}.pdf`
+    : `dashboard_stagione_${new Date().toISOString().slice(0, 10)}.pdf`).replace(/\s+/g, '_').replace(/[\\/:*?"<>|]/g, '-');
+  return { doc, fname };
+}
+
+async function exportDashboardPdf() {
+  const btn = document.getElementById('dash-export-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const { doc, fname } = dashboardPdfDoc();
+    const file = new File([doc.output('blob')], fname, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: fname });
+      } catch (e) {
+        if (e && e.name !== 'AbortError') doc.save(fname); // annullato dall'utente: nessun download
+      }
+    } else {
+      doc.save(fname);
+    }
+  } catch (e) {
+    alert('Esportazione non riuscita: ' + (e.message || e));
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 /* ==================== REPORT PARTITA ==================== */
