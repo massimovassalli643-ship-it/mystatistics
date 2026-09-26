@@ -19,7 +19,29 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend), `mystatistics_atlete` (copia dell'elenco tesserate) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.28 — Solo le nostre calciatrici anche in trasferta (26/09/2026)
+## Stato attuale: v3.29 — Addio referto testuale: ogni PDF è il report grafico (26/09/2026)
+
+### Novità v3.29 (26/09/2026)
+
+**Segnalazione di Max** (foto dall'iPad, Real Trezzano – Fiamma Monza): il PDF
+aperto mostrava ancora la squadra avversaria, le sigle GK, la "Cronologia
+eventi" con gli eventi avversari e una grafica giudicata orribile. Era il
+**vecchio referto testuale** (`exportMatchPdf`), ancora raggiungibile dal
+pulsante "📄 PDF" del riepilogo di fine partita e da "📕 Referto testuale"
+nel Report.
+
+- **Rimosso `exportMatchPdf`** e la voce "Referto testuale" del Report.
+- Il pulsante del riepilogo partita diventa **"📄 PDF (Mail / WhatsApp)"**
+  (`exportSummaryPdf`): report grafico in Vista totale di quella partita
+  (serve la partita conclusa), con il pannello di condivisione.
+- Resta "📗 Excel dati" per la singola partita (invariato: contiene ancora
+  entrambe le squadre e la colonna Ruolo, è un export di dati grezzi).
+- **Provato** (browser, trasferta di prova): PDF dal riepilogo = report
+  grafico di 3 pagine; Minuti giocati con le sole 16 calciatrici nostre;
+  nessuna sigla GK.
+- Solo frontend.
+
+## Versione precedente: v3.28 — Solo le nostre calciatrici anche in trasferta (26/09/2026)
 
 ### Novità v3.28 (26/09/2026)
 
@@ -1006,6 +1028,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 26/09/2026 | Frontend v3.29: rimosso il referto testuale (`exportMatchPdf`); il PDF del riepilogo partita è il report grafico (Vista totale) con condivisione Mail/WhatsApp. Solo frontend |
 | 26/09/2026 | Frontend v3.28: riconoscimento della nostra squadra tollerante alle diverse grafie del nome (parole significative + foglio ATLETE): in trasferta non si prendono più le calciatrici avversarie in minuti, tabelle e analisi. Solo frontend |
 | 26/09/2026 | Frontend v3.27: Report grafico a sezioni (stagione o partita; 8 opzioni combinabili) con la grafica della dashboard (html2canvas, caricata al primo uso), condivisione Mail/WhatsApp; Esporta PDF della Dashboard usa lo stesso motore. Solo frontend |
 | 26/09/2026 | Frontend v3.26: pulsante "Esporta PDF (Mail / WhatsApp)" in fondo alla Dashboard (vista scelta: KPI, Cosa emerge, classifiche, tabella calciatrici) con condivisione di sistema. Solo frontend |

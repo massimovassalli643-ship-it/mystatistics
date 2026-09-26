@@ -782,7 +782,7 @@
       <button class="secondary-btn" onclick="enterMatchEditMode()">✏️ Modifica</button>
       <button class="secondary-btn" onclick="exportCurrentMatch()">📤 JSON</button>
       <button class="secondary-btn" onclick="exportMatchXlsx()">📊 Excel</button>
-      <button class="secondary-btn" onclick="exportMatchPdf()">📄 PDF</button>
+      <button class="secondary-btn" id="summary-pdf-btn" onclick="exportSummaryPdf()">📄 PDF (Mail / WhatsApp)</button>
       <button class="primary-btn" id="sync-btn" onclick="syncToSheets()">☁️ Sincronizza su Sheets</button>
     </div>
   </div>
@@ -856,9 +856,8 @@
       <div class="report-step-title">2 · Sezioni da includere</div>
       <div class="report-sections" id="report-sections"></div>
       <div class="report-alt" id="report-alt">
-        <span>Altri formati (solo singola partita):</span>
+        <span>Altro formato (solo singola partita):</span>
         <button onclick="downloadLegacyReport('xlsx')">📗 Excel dati</button>
-        <button onclick="downloadLegacyReport('pdf')">📕 Referto testuale</button>
       </div>
       <details class="report-mail">
         <summary>📧 Invia via email dal tuo account Google (senza pannello di condivisione)</summary>
@@ -914,7 +913,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.28';
+const APP_VERSION = '3.29';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '5.5';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -2577,90 +2576,6 @@ function exportMatchXlsx(match, asBase64) {
   return { filename: fname };
 }
 
-function exportMatchPdf(match, asBase64) {
-  const m = match || state.currentMatch;
-  if (!m) return null;
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  doc.setFillColor(10, 25, 41); doc.rect(0, 0, 210, 35, 'F');
-  doc.setTextColor(255, 184, 77); doc.setFontSize(22); doc.setFont('helvetica', 'bold');
-  doc.text('MY STATISTICS', 105, 14, { align: 'center' });
-  doc.setTextColor(255, 255, 255); doc.setFontSize(11); doc.setFont('helvetica', 'normal');
-  doc.text('F.I.G.C. - Lega Nazionale Dilettanti — Referto partita', 105, 22, { align: 'center' });
-  doc.setFontSize(9);
-  doc.text(new Date(m.endedAt || m.createdAt).toLocaleString('it-IT'), 105, 29, { align: 'center' });
-  doc.setTextColor(0, 0, 0); doc.setFontSize(16); doc.setFont('helvetica', 'bold');
-  doc.text(`${m.home.name}  ${m.home.score} – ${m.away.score}  ${m.away.name}`, 105, 48, { align: 'center' });
-  let y = 60;
-  const statsHome = computePlayerStats('home', m);
-  const statsAway = computePlayerStats('away', m);
-  function drawTeamStats(teamName, stats, yStart) {
-    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 107, 53);
-    doc.text(teamName.toUpperCase(), 14, yStart);
-    doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 80, 80);
-    const headers = ['N°', 'RUOLO', 'CALCIATRICE', 'G', 'A', 'Y', 'R', 'PAR', 'MIN'];
-    const xs = [14, 22, 36, 120, 131, 142, 153, 164, 178];
-    headers.forEach((h, i) => doc.text(h, xs[i], yStart + 5));
-    doc.setLineWidth(0.2); doc.line(14, yStart + 6.5, 196, yStart + 6.5);
-    doc.setFont('helvetica', 'normal'); doc.setTextColor(20, 20, 20);
-    let yy = yStart + 11;
-    stats.forEach(s => {
-      if (yy > 280) { doc.addPage(); yy = 20; }
-      doc.text(String(s.num ?? '—'), xs[0], yy);
-      doc.text(s.role || '—', xs[1], yy);
-      doc.text(s.name.substring(0, 40), xs[2], yy);
-      doc.text(String(s.goals || ''), xs[3], yy);
-      doc.text(String(s.assists || ''), xs[4], yy);
-      doc.text(String(s.yellows || ''), xs[5], yy);
-      doc.text(String(s.reds || ''), xs[6], yy);
-      doc.text(String(s.saves || ''), xs[7], yy);
-      doc.text(s.minutesPlayed ? String(s.minutesPlayed) + "'" : (s.minutesIn != null ? "0'" : '—'), xs[8], yy);
-      yy += 5;
-    });
-    return yy + 4;
-  }
-  y = drawTeamStats(m.home.name, statsHome, y);
-  if (y > 220) { doc.addPage(); y = 20; }
-  y = drawTeamStats(m.away.name, statsAway, y);
-  if (y > 240) { doc.addPage(); y = 20; }
-  doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 107, 53);
-  doc.text('CRONOLOGIA EVENTI', 14, y); y += 6;
-  doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(20, 20, 20);
-  const events = [...m.events].sort((a, b) => a.minute - b.minute);
-  events.forEach(e => {
-    if (y > 285) { doc.addPage(); y = 20; }
-    const team = m[e.team].name;
-    let line = `${e.minute}'  `;
-    if (e.type === 'goal') {
-      const t = e.goalType === 'autogol' ? `AUTOGOL (${team})` : `GOAL (${team})`;
-      line += `${t}: ${e.scorer.num ?? '?'} ${e.scorer.name}`;
-      if (e.assist) line += ` — assist: ${e.assist.num ?? '?'} ${e.assist.name}`;
-      if (e.goalType && e.goalType !== 'azione' && e.goalType !== 'autogol') line += ` (${e.goalType})`;
-    } else if (e.type === 'yellow') line += `AMMONIZIONE (${team}): ${e.player.num ?? '?'} ${e.player.name}`;
-    else if (e.type === 'red') line += `ESPULSIONE (${team}): ${e.player.num ?? '?'} ${e.player.name}`;
-    else if (e.type === 'penaltysave') line += `RIGORE PARATO (${team}): ${e.player.num ?? '?'} ${e.player.name}`;
-    else if (e.type === 'sub') line += `SOSTITUZIONE (${team}): out ${e.playerOut.num ?? '?'} ${e.playerOut.name} → in ${e.playerIn.num ?? '?'} ${e.playerIn.name} (${e.subReason})`;
-    doc.text(line, 14, y, { maxWidth: 182 });
-    y += 5;
-  });
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFontSize(7); doc.setTextColor(120, 120, 120);
-    doc.text(`Pagina ${i} di ${pageCount} — Generato da My Statistics`, 105, 293, { align: 'center' });
-  }
-  const fname = `referto_${m.home.name}_vs_${m.away.name}_${new Date(m.endedAt || m.createdAt).toISOString().slice(0,10)}.pdf`.replace(/\s+/g, '_');
-  if (asBase64) {
-    return {
-      filename: fname,
-      mimeType: 'application/pdf',
-      dataBase64: String(doc.output('datauristring')).split(',')[1]
-    };
-  }
-  doc.save(fname);
-  return { filename: fname };
-}
-
 /* ==================== DASHBOARD STATISTICHE ==================== */
 /*
  * Due viste nello stesso schermo, scelte dal menu a tendina:
@@ -3491,6 +3406,25 @@ function dashMinutesRows(st) {
   return minutes;
 }
 
+/* ---- PDF dal riepilogo di fine partita: report grafico di quella partita ----
+ * (sostituisce il vecchio referto testuale, che mostrava anche la squadra
+ * avversaria, le sigle GK e la cronologia con gli eventi avversari) */
+async function exportSummaryPdf() {
+  const m = state.currentMatch;
+  const saved = m && loadMatches().find(x => x.id === m.id && x.completed);
+  if (!saved) { alert('Il PDF grafico è disponibile a partita conclusa (dopo "Termina partita").'); return; }
+  const btn = document.getElementById('summary-pdf-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Preparazione del PDF...'; }
+  try {
+    const { doc, fname } = await buildGraphicReport(saved.id, ['all']);
+    await sharePdfDoc(doc, fname);
+  } catch (e) {
+    alert('PDF non riuscito: ' + (e.message || e));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📄 PDF (Mail / WhatsApp)'; }
+  }
+}
+
 /* ---- Esporta la dashboard in PDF (Mail / WhatsApp) ----
  * Stesso report grafico del pulsante Report, in "Vista totale", per la vista
  * scelta nel menu della dashboard. */
@@ -3811,7 +3745,7 @@ function downloadLegacyReport(fmt) {
   const m = loadMatches().find(x => x.id === reportSel.scope);
   if (!m) return;
   try {
-    if (fmt === 'pdf') exportMatchPdf(m); else exportMatchXlsx(m);
+    exportMatchXlsx(m);
     setReportStatus('✅ File generato: cerca il file tra i download del dispositivo.', 'ok');
   } catch (e) {
     setReportStatus('❌ ' + humanOcrError(e.message || e), 'err');
