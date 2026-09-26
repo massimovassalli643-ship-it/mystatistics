@@ -455,6 +455,22 @@
   .report-fmt-btn { background: rgba(255,255,255,0.05); border: 1.5px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 16px 10px; color: #e8f0f7; font-size: 13px; font-weight: 700; }
   .report-fmt-btn.selected { border-color: #7fb8ff; background: rgba(127,184,255,0.18); }
   .report-fmt-btn .big { display: block; font-size: 26px; margin-bottom: 4px; }
+  .report-sections { display: grid; gap: 6px; margin-bottom: 12px; }
+  .report-sec { display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; font-size: 14px; font-weight: 600; color: #e8f0f7; cursor: pointer; }
+  .report-sec input { width: 20px; height: 20px; accent-color: #7fb8ff; flex: none; }
+  .report-sec.main { border-color: rgba(127,184,255,0.35); }
+  .report-sec.off { opacity: 0.45; }
+  .report-sec .hint { font-size: 11px; font-weight: 500; color: #7a96b3; margin-left: auto; text-align: right; }
+  .report-alt { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; color: #7a96b3; margin-bottom: 10px; }
+  .report-alt button { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: #e8f0f7; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 600; }
+  .report-mail { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 14px; }
+  .report-mail summary { font-size: 12px; font-weight: 700; color: #b8d4ed; cursor: pointer; }
+  .report-mail[open] summary { margin-bottom: 10px; }
+  /* Report grafico: la dashboard viene disegnata fuori schermo, a colonna
+     unica e larghezza fissa, e i riquadri vengono "fotografati" (html2canvas) */
+  .screen.report-capture { display: flex !important; position: fixed; left: -20000px; top: 0; width: 1000px; height: auto; overflow: visible; padding: 20px; }
+  .report-capture .dash-grid, .report-capture .gs-grid2, .report-capture .gs-col { grid-template-columns: 1fr; }
+  .report-capture .dash-card::after, .report-capture .gs-insights::after { display: none; }
   .report-status { font-size: 12px; margin-top: 10px; padding: 10px; border-radius: 8px; display: none; line-height: 1.5; }
   .report-status.active { display: block; }
   .report-status.ok { background: rgba(46,204,113,0.15); color: #7ee2a8; }
@@ -828,37 +844,41 @@
 </div>
 
 <div class="modal-overlay" id="report-modal">
-  <div class="modal" style="max-width: 640px;">
-    <div class="modal-title">📄 Report partita</div>
+  <div class="modal" style="max-width: 680px;">
+    <div class="modal-title">📄 Report</div>
 
     <div id="report-step-match">
-      <div class="report-step-title">1 · Scegli la partita</div>
+      <div class="report-step-title">1 · Cosa analizzare</div>
       <div class="report-list" id="report-match-list"></div>
     </div>
 
     <div id="report-step-format" style="display:none">
-      <div class="report-step-title">2 · Formato del report</div>
-      <div class="report-format">
-        <button class="report-fmt-btn" id="report-fmt-pdf" onclick="setReportFormat('pdf')"><span class="big">📕</span>PDF — referto da leggere</button>
-        <button class="report-fmt-btn" id="report-fmt-xlsx" onclick="setReportFormat('xlsx')"><span class="big">📗</span>Excel — dati da rielaborare</button>
+      <div class="report-step-title">2 · Sezioni da includere</div>
+      <div class="report-sections" id="report-sections"></div>
+      <div class="report-alt" id="report-alt">
+        <span>Altri formati (solo singola partita):</span>
+        <button onclick="downloadLegacyReport('xlsx')">📗 Excel dati</button>
+        <button onclick="downloadLegacyReport('pdf')">📕 Referto testuale</button>
       </div>
-      <div class="report-step-title">3 · Invio via email</div>
-      <div class="modal-field">
-        <label class="modal-label">Destinatari (separa con la virgola)</label>
-        <input type="text" class="modal-input" id="report-to" placeholder="nome@dominio.it">
-      </div>
-      <div class="modal-field">
-        <label class="modal-label">Oggetto</label>
-        <input type="text" class="modal-input" id="report-subject">
-      </div>
-      <div style="font-size:11px;color:#7a96b3;line-height:1.5;">L'email parte dal tuo account Google collegato al backend, con il report in allegato.</div>
+      <details class="report-mail">
+        <summary>📧 Invia via email dal tuo account Google (senza pannello di condivisione)</summary>
+        <div class="modal-field">
+          <label class="modal-label">Destinatari (separa con la virgola)</label>
+          <input type="text" class="modal-input" id="report-to" placeholder="nome@dominio.it">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Oggetto</label>
+          <input type="text" class="modal-input" id="report-subject">
+        </div>
+        <button class="modal-btn confirm" id="report-send" onclick="sendReportByEmail()">📧 Invia email</button>
+      </details>
       <div class="report-status" id="report-status"></div>
     </div>
 
     <div class="modal-footer">
       <button class="modal-btn cancel" onclick="closeModal('report-modal')">Chiudi</button>
       <button class="modal-btn cancel" id="report-download" style="display:none" onclick="downloadReport()">⬇️ Scarica</button>
-      <button class="modal-btn confirm" id="report-send" style="display:none" onclick="sendReportByEmail()">📧 Invia</button>
+      <button class="modal-btn confirm" id="report-share" style="display:none" onclick="shareReport()">📤 Condividi (Mail / WhatsApp)</button>
     </div>
   </div>
 </div>
@@ -894,7 +914,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.26';
+const APP_VERSION = '3.27';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '5.5';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -3347,11 +3367,8 @@ function sameAthlete(nameA, nameB) {
 }
 
 function openDashboard() {
-  const matches = loadMatches().filter(m => m.completed);
+  fillDashSelect();
   const sel = document.getElementById('dash-match-select');
-  const opts = ['<option value="__all__">Tutta la stagione (' + matches.length + ' partite concluse)</option>'];
-  matches.forEach(m => opts.push('<option value="' + m.id + '">' + escapeHtml(matchLabel(m)) + '</option>'));
-  sel.innerHTML = opts.join('');
   sel.value = '__all__';
   renderDashboard();
   showScreen('dashboard-screen');
@@ -3442,227 +3459,107 @@ function dashMinutesRows(st) {
 }
 
 /* ---- Esporta la dashboard in PDF (Mail / WhatsApp) ----
- * Esporta la vista scelta nel menu (stagione o singola partita): riquadri KPI
- * e "Cosa emerge" letti da quanto e' a schermo (stessi testi, stessa finestra
- * dei gol ravvicinati), classifiche e tabella ricalcolate dagli stessi dati.
- * Il file va al pannello di condivisione del sistema (Mail, WhatsApp...);
- * dove la condivisione di file non e' supportata viene scaricato. */
-function pdfText(s) {
-  // Helvetica di jsPDF copre solo il set WinAnsi: niente emoji ne' simboli come ′ › ⚽
-  return String(s == null ? '' : s)
-    .replace(/[′’]/g, "'").replace(/›/g, '>').replace(/→/g, '->')
-    .replace(/[\u2000-\u200F\u2028-\u202F\u205F\u2060]/g, ' ')
-    .replace(/[^\x20-\x7E\u00A0-\u00FF\u2013\u2014\u2018\u201C\u201D\u2022\u2026\u20AC]/g, '')
-    .replace(/\s+/g, ' ').trim();
-}
-
-function dashboardPdfDoc() {
-  const all = loadMatches().filter(m => m.completed);
-  const ourKey = detectOurTeam(loadMatches());
-  const sel = document.getElementById('dash-match-select');
-  const choice = sel ? sel.value : '__all__';
-  const single = choice !== '__all__' ? all.find(m => m.id === choice) : null;
-  const matches = single ? [single] : all;
-  if (matches.length === 0) throw new Error('Nessuna partita conclusa da esportare');
-  const st = buildDashboardStats(matches, ourKey);
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const L = 14, R = 196, W = R - L, BOTTOM = 282;
-  doc.setFillColor(10, 25, 41); doc.rect(0, 0, 210, 35, 'F');
-  doc.setTextColor(255, 184, 77); doc.setFontSize(22); doc.setFont('helvetica', 'bold');
-  doc.text('MY STATISTICS', 105, 14, { align: 'center' });
-  doc.setTextColor(255, 255, 255); doc.setFontSize(11); doc.setFont('helvetica', 'normal');
-  doc.text(pdfText('Dashboard — ' + (single ? matchLabel(single) : 'Tutta la stagione')), 105, 22, { align: 'center' });
-  doc.setFontSize(9);
-  doc.text(pdfText((ourKey ? ourKey + ' · ' : '') + matches.length + (matches.length === 1 ? ' partita' : ' partite concluse') + ' · generato il ' + new Date().toLocaleString('it-IT')), 105, 29, { align: 'center' });
-
-  let y = 44;
-  const need = h => { if (y + h > BOTTOM) { doc.addPage(); y = 20; } };
-  const section = title => {
-    need(14);
-    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 107, 53);
-    doc.text(pdfText(title).toUpperCase(), L, y); y += 6;
-    doc.setTextColor(20, 20, 20);
-  };
-
-  // KPI come a schermo: 4 riquadri per riga
-  const kpis = [...document.querySelectorAll('#dash-kpis .kpi')].map(k => ({
-    label: pdfText((k.querySelector('.kpi-label') || {}).textContent),
-    value: pdfText((k.querySelector('.kpi-value') || {}).textContent),
-    sub: pdfText((k.querySelector('.kpi-sub') || {}).textContent)
-  }));
-  if (kpis.length) {
-    const cols = 4, gap = 3, bw = (W - gap * (cols - 1)) / cols, bh = 19;
-    kpis.forEach((k, i) => {
-      if (i % cols === 0) { if (i) y += bh + gap; need(bh); }
-      const x = L + (i % cols) * (bw + gap);
-      doc.setDrawColor(200, 210, 222); doc.setFillColor(243, 247, 251); doc.roundedRect(x, y, bw, bh, 2, 2, 'FD');
-      doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(90, 119, 147);
-      doc.text(k.label.toUpperCase(), x + 3, y + 5, { maxWidth: bw - 6 });
-      doc.setFontSize(13); doc.setTextColor(10, 25, 41);
-      doc.text(k.value, x + 3, y + 11.5, { maxWidth: bw - 6 });
-      doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 119, 147);
-      if (k.sub) doc.text(k.sub, x + 3, y + 16, { maxWidth: bw - 6 });
-    });
-    y += bh + 8;
-  }
-
-  // "Cosa emerge" (solo vista stagione): le frasi visibili, cioe' quelle della
-  // finestra dei gol ravvicinati scelta a schermo
-  const insights = [...document.querySelectorAll('#dash-conceded .gs-insights li')]
-    .filter(li => !li.classList.contains('gs-wc') || li.classList.contains('gs-wc-' + gsWindow))
-    .map(li => pdfText(li.textContent)).filter(Boolean);
-  if (insights.length) {
-    section('Analisi gol subiti — cosa emerge');
-    doc.setFontSize(9.5); doc.setFont('helvetica', 'normal');
-    insights.forEach(t => {
-      const lines = doc.splitTextToSize('> ' + t, W);
-      need(lines.length * 4.6);
-      doc.text(lines, L, y); y += lines.length * 4.6 + 1;
-    });
-    y += 4;
-  }
-
-  // Classifiche: due colonne affiancate (nome + valore)
-  const ranking = (rows, includeZero) => rows.filter(r => includeZero || r.value > 0)
-    .sort((a, b) => (b.value - a.value) || String(a.label).localeCompare(String(b.label)));
-  const lists = [
-    { title: 'Marcatrici', rows: ranking(st.players.map(p => ({ label: p.name, value: p.goals }))), unit: '' },
-    { title: 'Assist', rows: ranking(st.players.map(p => ({ label: p.name, value: p.assists }))), unit: '' },
-    { title: 'Minuti giocati', rows: ranking(dashMinutesRows(st), true), unit: "'" }
-  ];
-  if (st.team.saves > 0) lists.push({ title: 'Rigori parati', rows: ranking(st.players.map(p => ({ label: p.name, value: p.saves }))), unit: '' });
-  const colW = (W - 8) / 2, lineH = 4.6;
-  for (let i = 0; i < lists.length; i += 2) {
-    const pair = lists.slice(i, i + 2);
-    const h = 6 + Math.max.apply(null, pair.map(l => Math.max(1, l.rows.length))) * lineH;
-    need(h);
-    const y0 = y;
-    let yMax = y;
-    pair.forEach((l, j) => {
-      const x = L + j * (colW + 8);
-      let yy = y0;
-      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 107, 53);
-      doc.text(l.title.toUpperCase(), x, yy); yy += 5.5;
-      doc.setFontSize(9); doc.setTextColor(20, 20, 20);
-      if (!l.rows.length) { doc.setFont('helvetica', 'normal'); doc.text('Nessun dato', x, yy); yy += lineH; }
-      l.rows.forEach((r, k) => {
-        doc.setFont('helvetica', 'normal');
-        doc.text((k + 1) + '. ' + pdfText(r.label).substring(0, 34), x, yy);
-        doc.setFont('helvetica', 'bold');
-        doc.text(r.value + l.unit, x + colW, yy, { align: 'right' });
-        yy += lineH;
-      });
-      yMax = Math.max(yMax, yy);
-    });
-    y = yMax + 6;
-  }
-
-  // Tabella completa, come "Tutte le calciatrici"
-  section('Tutte le calciatrici');
-  const heads = ['N°', 'CALCIATRICE', 'PRES.', 'MIN', 'GOL', 'ASSIST', 'GIALLI', 'ROSSI', 'PARATI'];
-  const xs = [L, L + 9, 112, 126, 141, 155, 169, 182, R];
-  const header = () => {
-    doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 80, 80);
-    heads.forEach((h, i) => doc.text(h, xs[i], y, i >= 2 ? { align: 'right' } : undefined));
-    doc.setLineWidth(0.2); doc.line(L, y + 1.5, R, y + 1.5); y += 5.5;
-    doc.setFont('helvetica', 'normal'); doc.setTextColor(20, 20, 20);
-  };
-  header();
-  st.players.slice().sort((a, b) => (b.goals - a.goals) || (b.assists - a.assists) || (b.minutes - a.minutes) || String(a.name).localeCompare(String(b.name)))
-    .forEach(p => {
-      if (y > BOTTOM) { doc.addPage(); y = 20; header(); }
-      const cells = [p.num == null ? '—' : String(p.num), pdfText(p.name).substring(0, 42), String(p.apps), p.minutes + "'",
-        String(p.goals || ''), String(p.assists || ''), String(p.yellows || ''), String(p.reds || ''), String(p.saves || '')];
-      cells.forEach((c, i) => doc.text(c, xs[i], y, i >= 2 ? { align: 'right' } : undefined));
-      y += 4.8;
-    });
-
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFontSize(7); doc.setTextColor(120, 120, 120);
-    doc.text(`Pagina ${i} di ${pageCount} — Generato da My Statistics`, 105, 293, { align: 'center' });
-  }
-  const fname = (single
-    ? `dashboard_${single.home.name}_vs_${single.away.name}_${new Date(single.endedAt || single.createdAt).toISOString().slice(0, 10)}.pdf`
-    : `dashboard_stagione_${new Date().toISOString().slice(0, 10)}.pdf`).replace(/\s+/g, '_').replace(/[\\/:*?"<>|]/g, '-');
-  return { doc, fname };
-}
-
+ * Stesso report grafico del pulsante Report, in "Vista totale", per la vista
+ * scelta nel menu della dashboard. */
 async function exportDashboardPdf() {
   const btn = document.getElementById('dash-export-btn');
-  if (btn) btn.disabled = true;
+  const sel = document.getElementById('dash-match-select');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Preparazione del PDF...'; }
   try {
-    const { doc, fname } = dashboardPdfDoc();
-    const file = new File([doc.output('blob')], fname, { type: 'application/pdf' });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: fname });
-      } catch (e) {
-        if (e && e.name !== 'AbortError') doc.save(fname); // annullato dall'utente: nessun download
-      }
-    } else {
-      doc.save(fname);
-    }
+    const { doc, fname } = await buildGraphicReport(sel ? sel.value : '__all__', ['all']);
+    await sharePdfDoc(doc, fname);
   } catch (e) {
     alert('Esportazione non riuscita: ' + (e.message || e));
   } finally {
-    if (btn) btn.disabled = false;
+    if (btn) { btn.disabled = false; btn.textContent = '📤 Esporta PDF (Mail / WhatsApp)'; }
   }
 }
 
-/* ==================== REPORT PARTITA ==================== */
+/* ==================== REPORT ==================== */
 /*
- * Tre passi: partita -> formato (PDF/Excel) -> invio via email.
- * L'email parte dal backend Apps Script, che gira con l'account Google di Max:
- * il browser non puo' allegare file a una mail, mailto: non supporta allegati.
+ * Report grafico: la dashboard della vista scelta (stagione o una partita)
+ * viene disegnata fuori schermo e i riquadri delle sezioni scelte vengono
+ * "fotografati" con html2canvas e impaginati in un PDF A4 scuro, identico a
+ * quanto si vede nell'app. Il PDF va al pannello di condivisione del sistema
+ * (Mail, WhatsApp...) oppure si scarica; resta anche l'invio email dal
+ * backend. Excel e referto testuale restano per la singola partita.
  */
-let reportSel = { matchId: null, format: null };
+const REPORT_SECTIONS = [
+  { id: 'all',     label: 'Vista totale', hint: 'tutte le sezioni, con tutte le schede' },
+  { id: 'kpi',     label: 'Blocco iniziale', hint: 'riquadri di riepilogo' },
+  { id: 'gs',      label: 'Sezione analisi gol subiti', hint: 'cosa emerge e indicatori' },
+  { id: 'when',    label: 'Quando subiamo', hint: '' },
+  { id: 'ep',      label: 'Episodi ravvicinati', hint: '', seasonOnly: true },
+  { id: 'field',   label: 'Chi era in campo quando subiamo', hint: 'tutte le schede' },
+  { id: 'minutes', label: 'Minuti giocati', hint: '' },
+  { id: 'players', label: 'Tutte le calciatrici', hint: '' }
+];
+const REPORT_BG = [15, 34, 56];            // fondo pagina: tono medio del gradiente dell'app
+const HTML2CANVAS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+let reportSel = { scope: null, sections: new Set() };
 
 function openReportModal() {
-  const matches = loadMatches();
-  reportSel = { matchId: null, format: null };
+  const matches = loadMatches().filter(m => m.completed);
+  reportSel = { scope: null, sections: new Set() };
   const list = document.getElementById('report-match-list');
   if (matches.length === 0) {
-    list.innerHTML = '<div class="dash-empty">Nessuna partita in archivio.</div>';
+    list.innerHTML = '<div class="dash-empty">Nessuna partita conclusa in archivio.</div>';
   } else {
-    list.innerHTML = matches.map(m => {
-      const d = new Date(m.endedAt || m.createdAt);
-      return '<button class="report-item" data-id="' + m.id + '" onclick="setReportMatch(\'' + m.id + '\')">'
-        + '<span><span class="rm">' + escapeHtml((m.home.name || 'Casa') + ' – ' + (m.away.name || 'Ospiti')) + '</span><br>'
-        + '<span class="rd">' + d.toLocaleDateString('it-IT') + (m.completed ? '' : ' · in corso') + '</span></span>'
-        + '<span class="rs">' + m.home.score + '–' + m.away.score + '</span></button>';
-    }).join('');
+    list.innerHTML = '<button class="report-item" data-id="__all__" onclick="setReportMatch(\'__all__\')">'
+      + '<span><span class="rm">Tutta la stagione</span><br><span class="rd">' + matches.length + (matches.length === 1 ? ' partita conclusa' : ' partite concluse') + '</span></span>'
+      + '<span class="rs">📊</span></button>'
+      + matches.slice().reverse().map(m => {
+        const d = new Date(m.endedAt || m.createdAt);
+        return '<button class="report-item" data-id="' + m.id + '" onclick="setReportMatch(\'' + m.id + '\')">'
+          + '<span><span class="rm">' + escapeHtml((m.home.name || 'Casa') + ' – ' + (m.away.name || 'Ospiti')) + '</span><br>'
+          + '<span class="rd">' + d.toLocaleDateString('it-IT') + '</span></span>'
+          + '<span class="rs">' + m.home.score + '–' + m.away.score + '</span></button>';
+      }).join('');
   }
   document.getElementById('report-step-format').style.display = 'none';
-  document.getElementById('report-send').style.display = 'none';
+  document.getElementById('report-share').style.display = 'none';
   document.getElementById('report-download').style.display = 'none';
   setReportStatus('', '');
   document.getElementById('report-modal').classList.add('active');
 }
 
 function setReportMatch(id) {
-  reportSel.matchId = id;
+  reportSel.scope = id;
   document.querySelectorAll('#report-match-list .report-item').forEach(b => {
     b.className = 'report-item' + (b.getAttribute('data-id') === id ? ' selected' : '');
   });
-  const m = loadMatches().find(x => x.id === id);
+  const single = id !== '__all__';
+  const m = single ? loadMatches().find(x => x.id === id) : null;
+  if (reportSel.sections.size === 0) reportSel.sections.add('all');
+  renderReportSections();
+  document.getElementById('report-alt').style.display = single ? '' : 'none';
   document.getElementById('report-step-format').style.display = '';
+  document.getElementById('report-share').style.display = '';
+  document.getElementById('report-download').style.display = '';
   document.getElementById('report-to').value = REPORT_DEFAULT_TO;
   document.getElementById('report-subject').value = m
     ? 'Report partita ' + m.home.name + ' – ' + m.away.name + ' (' + new Date(m.endedAt || m.createdAt).toLocaleDateString('it-IT') + ')'
-    : 'Report partita';
+    : 'Report stagione';
   setReportStatus('', '');
 }
 
-function setReportFormat(fmt) {
-  reportSel.format = fmt;
-  document.getElementById('report-fmt-pdf').className = 'report-fmt-btn' + (fmt === 'pdf' ? ' selected' : '');
-  document.getElementById('report-fmt-xlsx').className = 'report-fmt-btn' + (fmt === 'xlsx' ? ' selected' : '');
-  document.getElementById('report-send').style.display = '';
-  document.getElementById('report-download').style.display = '';
+function renderReportSections() {
+  const single = reportSel.scope !== '__all__';
+  const all = reportSel.sections.has('all');
+  document.getElementById('report-sections').innerHTML = REPORT_SECTIONS.map((sec, i) => {
+    const na = sec.seasonOnly && single;
+    const checked = all || reportSel.sections.has(sec.id);
+    const off = na || (all && sec.id !== 'all');
+    return '<label class="report-sec' + (sec.id === 'all' ? ' main' : '') + (off ? ' off' : '') + '">'
+      + '<input type="checkbox" ' + (checked && !na ? 'checked ' : '') + (off ? 'disabled ' : '') + 'onchange="toggleReportSection(\'' + sec.id + '\', this.checked)">'
+      + '<span>' + (i + 1) + ') ' + sec.label + '</span>'
+      + '<span class="hint">' + (na ? 'solo per la stagione' : sec.hint) + '</span></label>';
+  }).join('');
+}
+
+function toggleReportSection(id, on) {
+  if (on) reportSel.sections.add(id); else reportSel.sections.delete(id);
+  renderReportSections();
 }
 
 function setReportStatus(text, kind) {
@@ -3672,33 +3569,230 @@ function setReportStatus(text, kind) {
   el.className = 'report-status' + (text ? ' active ' + (kind || '') : '');
 }
 
-function buildReportFile(asBase64) {
-  const m = loadMatches().find(x => x.id === reportSel.matchId);
-  if (!m) throw new Error('Partita non trovata');
-  if (!reportSel.format) throw new Error('Scegli il formato del report');
-  return reportSel.format === 'pdf' ? exportMatchPdf(m, asBase64) : exportMatchXlsx(m, asBase64);
+function loadHtml2canvas() {
+  if (window.html2canvas) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const sc = document.createElement('script');
+    sc.src = HTML2CANVAS_URL;
+    sc.onload = () => resolve();
+    sc.onerror = () => reject(new Error('Impossibile caricare il generatore di PDF grafici: serve la connessione a internet.'));
+    document.head.appendChild(sc);
+  });
+}
+
+function fillDashSelect() {
+  const matches = loadMatches().filter(m => m.completed);
+  const sel = document.getElementById('dash-match-select');
+  const opts = ['<option value="__all__">Tutta la stagione (' + matches.length + ' partite concluse)</option>'];
+  matches.forEach(m => opts.push('<option value="' + m.id + '">' + escapeHtml(matchLabel(m)) + '</option>'));
+  sel.innerHTML = opts.join('');
+}
+
+// Pausa per far applicare stili e cambi di scheda prima della "foto" (un timer, non
+// requestAnimationFrame: con la pagina in secondo piano non scatterebbe mai)
+const nextFrame = () => new Promise(r => setTimeout(r, 80));
+
+/* Riquadro .dash-card il cui titolo contiene il testo indicato */
+function findDashCard(root, text) {
+  return [...root.querySelectorAll('.dash-card')].find(c => {
+    const t = c.querySelector(':scope > .dash-card-title');
+    return t && t.textContent.includes(text);
+  }) || null;
+}
+
+/* scope: '__all__' o id partita; sections: id di REPORT_SECTIONS */
+async function buildGraphicReport(scope, sections) {
+  await loadHtml2canvas();
+  const screen = document.getElementById('dashboard-screen');
+  const sel = document.getElementById('dash-match-select');
+  const prevScope = sel.value || '__all__', prevTab = gsTab;
+  fillDashSelect(); // sempre: include anche le partite concluse dopo l'ultima apertura
+  sel.value = scope;
+  if (sel.value !== scope) throw new Error('Partita non trovata tra quelle concluse');
+  const single = scope !== '__all__';
+  const want = id => sections.includes('all') || sections.includes(id);
+  const full = sections.includes('all');
+
+  renderDashboard();
+  screen.classList.add('report-capture');
+  const opened = [];
+  try {
+    // i "Mostra gli altri N gol" vanno aperti, altrimenti nel PDF mancano
+    screen.querySelectorAll('details:not(.gs-how)').forEach(d => { if (!d.open) { d.open = true; opened.push(d); } });
+    await nextFrame();
+    const conceded = document.getElementById('dash-conceded');
+    const gsSec = conceded.querySelector('.gs-sec');
+    const shot = el => html2canvas(el, { scale: 2, backgroundColor: 'rgb(' + REPORT_BG.join(',') + ')', logging: false, windowWidth: 1200 });
+
+    // blocchi: { title, els: [elementi | funzione che prepara e ritorna l'elemento] }.
+    // Il titolo serve solo dove il riquadro non ne ha uno suo (i riepiloghi in alto).
+    const blocks = [];
+    if (want('kpi')) blocks.push({ title: 'Blocco iniziale', els: [document.getElementById('dash-kpis')] });
+    if (gsSec) {
+      if (want('gs')) blocks.push({ els: [gsSec.querySelector('.gs-head'), gsSec.querySelector(':scope > .gs-insights'), gsSec.querySelector(':scope > .kpi-row')] });
+      if (want('when')) blocks.push({ els: single
+        ? [findDashCard(gsSec, 'Minuto per minuto')]
+        : [findDashCard(gsSec, 'Quando subiamo'), findDashCard(gsSec, '1° tempo vs 2° tempo')] });
+      if (want('ep') && !single) blocks.push({ els: [findDashCard(gsSec, 'Episodi ravvicinati')] });
+      if (want('field')) {
+        if (single) {
+          blocks.push({ els: [findDashCard(gsSec, 'Gol per gol'), findDashCard(gsSec, 'tratto per tratto')] });
+        } else {
+          const card = findDashCard(gsSec, 'Chi era in campo quando subiamo');
+          // tutte e tre le schede, una dopo l'altra
+          blocks.push({ els: card ? ['goals', 'forms', 'players'].map(t => async () => { setGsTab(t); await nextFrame(); return card; }) : [] });
+        }
+      }
+    }
+    const grid = document.getElementById('dash-grid');
+    if (full) blocks.push({ els: [findDashCard(grid, 'Marcatrici'), findDashCard(grid, 'Assist'), findDashCard(grid, 'Rigori parati')] });
+    if (want('minutes')) blocks.push({ els: [findDashCard(grid, 'Minuti giocati')] });
+    if (want('players')) blocks.push({ els: [findDashCard(grid, 'Tutte le calciatrici')] });
+
+    // ---- PDF ----
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const PW = 210, PH = 297, M = 8, W = PW - 2 * M, TOP = 12, BOTTOM = PH - 12;
+    const paint = () => { doc.setFillColor(...REPORT_BG); doc.rect(0, 0, PW, PH, 'F'); };
+    const newPage = () => { doc.addPage(); paint(); return TOP; };
+    paint();
+    const ourKey = detectOurTeam(loadMatches());
+    const m = single ? loadMatches().find(x => x.id === scope) : null;
+    doc.setTextColor(255, 184, 77); doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
+    doc.text('MY STATISTICS', M, 18);
+    doc.setTextColor(232, 240, 247); doc.setFontSize(12);
+    doc.text(single ? (m.home.name + '  ' + m.home.score + ' - ' + m.away.score + '  ' + m.away.name) : ('Tutta la stagione' + (ourKey ? ' - ' + ourKey : '')), M, 26);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(122, 150, 179);
+    doc.text((single ? new Date(m.endedAt || m.createdAt).toLocaleDateString('it-IT') + ' - ' : '') + 'Report generato il ' + new Date().toLocaleString('it-IT'), M, 32);
+    let y = 40;
+    let placed = 0;
+
+    for (const b of blocks) {
+      // ogni elemento va preparato e fotografato subito (le schede di "Chi era
+      // in campo" condividono lo stesso riquadro: si cambia scheda e si scatta)
+      const canvases = [];
+      for (const e of b.els) {
+        const el = typeof e === 'function' ? await e() : e;
+        if (el) canvases.push(await shot(el));
+      }
+      if (!canvases.length) continue;
+      if (b.title) {
+        // il titolo non resta mai da solo in fondo alla pagina
+        const firstMm = Math.min(canvases[0].height * W / canvases[0].width, BOTTOM - TOP - 10);
+        if (y + 8 + firstMm > BOTTOM) y = newPage();
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(255, 107, 53);
+        doc.text(b.title.toUpperCase(), M, y + 4); y += 8;
+      }
+      for (const canvas of canvases) {
+        const pxPerMm = canvas.width / W;
+        let srcY = 0;
+        while (srcY < canvas.height) {
+          let room = BOTTOM - y;
+          const restMm = (canvas.height - srcY) / pxPerMm;
+          // un riquadro che sta in una pagina non si spezza: va a capo pagina
+          if (restMm > room && restMm <= BOTTOM - TOP && srcY === 0) { y = newPage(); room = BOTTOM - y; }
+          if (room < 15) { y = newPage(); room = BOTTOM - y; }
+          const sliceMm = Math.min(restMm, room);
+          const slicePx = Math.round(sliceMm * pxPerMm);
+          const part = document.createElement('canvas');
+          part.width = canvas.width; part.height = slicePx;
+          part.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, slicePx, 0, 0, canvas.width, slicePx);
+          doc.addImage(part.toDataURL('image/jpeg', 0.88), 'JPEG', M, y, W, sliceMm);
+          y += sliceMm + 3;
+          srcY += slicePx;
+        }
+        placed++;
+      }
+      y += 3;
+    }
+    if (!placed) throw new Error('Nessuna delle sezioni scelte ha dati da mostrare per questa vista');
+
+    const pages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(122, 150, 179);
+      doc.text('Pagina ' + i + ' di ' + pages + ' - My Statistics - A.S.D. Fiamma Monza 1970', PW / 2, PH - 5, { align: 'center' });
+    }
+    const fname = (single
+      ? 'report_' + m.home.name + '_vs_' + m.away.name + '_' + new Date(m.endedAt || m.createdAt).toISOString().slice(0, 10)
+      : 'report_stagione_' + new Date().toISOString().slice(0, 10)).replace(/\s+/g, '_').replace(/[\\/:*?"<>|]/g, '-') + '.pdf';
+    return { doc, fname };
+  } finally {
+    opened.forEach(d => { d.open = false; });
+    screen.classList.remove('report-capture');
+    setGsTab(prevTab);
+    sel.value = prevScope;
+    renderDashboard();
+  }
+}
+
+/* Pannello di condivisione (Mail, WhatsApp...); dove non c'e', download.
+ * Ritorna 'shared' | 'saved' | 'cancelled'. */
+async function sharePdfDoc(doc, fname) {
+  const file = new File([doc.output('blob')], fname, { type: 'application/pdf' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: fname });
+      return 'shared';
+    } catch (e) {
+      if (e && e.name === 'AbortError') return 'cancelled';
+    }
+  }
+  doc.save(fname);
+  return 'saved';
+}
+
+async function buildSelectedReport() {
+  if (!reportSel.scope) throw new Error('Scegli la stagione o una partita');
+  const sections = [...reportSel.sections];
+  if (!sections.length) throw new Error('Scegli almeno una sezione');
+  setReportStatus('⏳ Preparazione del PDF (qualche secondo)...', 'wait');
+  return buildGraphicReport(reportSel.scope, sections);
+}
+
+async function withReportBusy(fn) {
+  const btns = ['report-share', 'report-download', 'report-send'].map(id => document.getElementById(id));
+  btns.forEach(b => { if (b) b.disabled = true; });
+  try { await fn(); }
+  catch (e) { setReportStatus('❌ ' + humanOcrError(e.message || e), 'err'); }
+  finally { btns.forEach(b => { if (b) b.disabled = false; }); }
+}
+
+function shareReport() {
+  return withReportBusy(async () => {
+    const { doc, fname } = await buildSelectedReport();
+    const res = await sharePdfDoc(doc, fname);
+    setReportStatus(res === 'shared' ? '✅ Report condiviso.' : res === 'saved' ? '✅ Condivisione non disponibile: il PDF è stato scaricato.' : 'Condivisione annullata.', res === 'cancelled' ? '' : 'ok');
+  });
 }
 
 function downloadReport() {
-  try {
-    buildReportFile(false);
+  return withReportBusy(async () => {
+    const { doc, fname } = await buildSelectedReport();
+    doc.save(fname);
     setReportStatus('✅ Report generato: cerca il file tra i download del dispositivo.', 'ok');
+  });
+}
+
+function downloadLegacyReport(fmt) {
+  const m = loadMatches().find(x => x.id === reportSel.scope);
+  if (!m) return;
+  try {
+    if (fmt === 'pdf') exportMatchPdf(m); else exportMatchXlsx(m);
+    setReportStatus('✅ File generato: cerca il file tra i download del dispositivo.', 'ok');
   } catch (e) {
     setReportStatus('❌ ' + humanOcrError(e.message || e), 'err');
   }
 }
 
-async function sendReportByEmail() {
+function sendReportByEmail() {
   const to = document.getElementById('report-to').value.trim();
   const subject = document.getElementById('report-subject').value.trim();
   if (!to) { setReportStatus('❌ Inserisci almeno un destinatario.', 'err'); return; }
   const sheetsUrl = getSheetsUrl();
   if (!sheetsUrl) { setReportStatus('❌ URL del backend non impostato: vai in ⚙️ Impostazioni.', 'err'); return; }
-  const btn = document.getElementById('report-send');
-  btn.disabled = true;
-  try {
-    setReportStatus('⏳ Generazione del report...', 'wait');
-    const file = buildReportFile(true);
+  return withReportBusy(async () => {
+    const { doc, fname } = await buildSelectedReport();
     setReportStatus('⏳ Invio dell\'email in corso...', 'wait');
     const res = await fetch(sheetsUrl, {
       method: 'POST', mode: 'cors', redirect: 'follow',
@@ -3706,22 +3800,18 @@ async function sendReportByEmail() {
       body: JSON.stringify({
         action: 'sendReport',
         to: to,
-        subject: subject || 'Report partita',
+        subject: subject || 'Report',
         body: 'In allegato il report generato con My Statistics.\n\n— A.S.D. Fiamma Monza 1970',
-        filename: file.filename,
-        mimeType: file.mimeType,
-        dataBase64: file.dataBase64
+        filename: fname,
+        mimeType: 'application/pdf',
+        dataBase64: String(doc.output('datauristring')).split(',')[1]
       })
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'Errore dal backend');
     setReportStatus('✅ Email inviata a ' + escapeHtml(to) + '.'
       + (data.remainingQuota != null ? '<br><span style="color:#7a96b3">Email ancora inviabili oggi: ' + data.remainingQuota + '</span>' : ''), 'ok');
-  } catch (e) {
-    setReportStatus('❌ ' + humanOcrError(e.message || e), 'err');
-  } finally {
-    btn.disabled = false;
-  }
+  });
 }
 
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }

@@ -19,7 +19,51 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend), `mystatistics_atlete` (copia dell'elenco tesserate) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.26 — Dashboard esportabile in PDF (Mail / WhatsApp) (26/09/2026)
+## Stato attuale: v3.27 — Report grafico a sezioni (Mail / WhatsApp) (26/09/2026)
+
+### Novità v3.27 (26/09/2026)
+
+**Richiesta di Max**: il referto PDF (`exportMatchPdf`, solo testo) era "molto
+al di sotto delle aspettative". Il pulsante **Report** deve offrire più
+opzioni con la **grafica originale della dashboard**, e il PDF deve potersi
+inviare via mail o WhatsApp.
+
+- **Nuovo Report** (`openReportModal`): 1) *Cosa analizzare*: "Tutta la
+  stagione" oppure una partita conclusa; 2) *Sezioni* combinabili:
+  1 Vista totale (seleziona tutto) · 2 Blocco iniziale · 3 Sezione analisi
+  gol subiti (intestazione, Cosa emerge, indicatori) · 4 Quando subiamo (per
+  la stagione anche "1° tempo vs 2° tempo"; per la partita "Minuto per
+  minuto") · 5 Episodi ravvicinati (solo stagione) · 6 Chi era in campo
+  quando subiamo (stagione: **tutte e 3 le schede**; partita: gol per gol e
+  tratto per tratto) · 7 Minuti giocati · 8 Tutte le calciatrici. La Vista
+  totale aggiunge Marcatrici, Assist e Rigori parati.
+- **Come funziona** (`buildGraphicReport`): la dashboard della vista scelta
+  viene disegnata **fuori schermo** (classe `.report-capture`: 1000 px,
+  colonna unica, niente icone ⤢), i "Mostra gli altri N gol" vengono aperti,
+  e ogni riquadro viene "fotografato" con **html2canvas** (scala 2) e
+  impaginato in un A4 con fondo scuro come l'app (`REPORT_BG`). Un riquadro
+  che sta in una pagina non si spezza; quelli più lunghi di una pagina sì.
+  Alla fine vista, scheda e menu della dashboard tornano come prima.
+- **html2canvas 1.4.1** da cdnjs, caricata **solo al primo report**
+  (`loadHtml2canvas`): senza internet il report grafico dà un errore chiaro.
+  Nuova dipendenza approvata da Max (26/09/2026), regola aggiornata in CLAUDE.md.
+- **Invio**: "📤 Condividi (Mail / WhatsApp)" → pannello di sistema
+  (`sharePdfDoc`; dove non c'è, download); "⬇️ Scarica"; resta l'invio email
+  dal backend (`sendReport`, ora con il PDF grafico) in un riquadro
+  richiudibile. **Altri formati** per la singola partita: Excel dati e
+  referto testuale (download, come prima).
+- Il pulsante "📤 Esporta PDF" in fondo alla Dashboard (v3.26) ora produce lo
+  stesso report grafico in Vista totale per la vista scelta nel menu;
+  rimosso l'export testuale della v3.26 (`dashboardPdfDoc`, `pdfText`).
+- Il Report elenca solo le partite **concluse** (come la dashboard).
+- **Provato** (browser, 2 partite di prova con formazione, cambio, rigore
+  parato): stagione in Vista totale 4 pagine (~1,1 MB, ~10 s), singola
+  partita con 4 sezioni 2 pagine; testi, grafici e ovali con i nomi
+  identici all'app; nessun errore in console. Da provare sull'iPad la
+  condivisione reale e i tempi con molte partite.
+- Solo frontend.
+
+## Versione precedente: v3.26 — Dashboard esportabile in PDF (Mail / WhatsApp) (26/09/2026)
 
 ### Novità v3.26 (26/09/2026)
 
@@ -938,6 +982,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 26/09/2026 | Frontend v3.27: Report grafico a sezioni (stagione o partita; 8 opzioni combinabili) con la grafica della dashboard (html2canvas, caricata al primo uso), condivisione Mail/WhatsApp; Esporta PDF della Dashboard usa lo stesso motore. Solo frontend |
 | 26/09/2026 | Frontend v3.26: pulsante "Esporta PDF (Mail / WhatsApp)" in fondo alla Dashboard (vista scelta: KPI, Cosa emerge, classifiche, tabella calciatrici) con condivisione di sistema. Solo frontend |
 | 23/09/2026 | Frontend v3.25: riquadro "Cosa emerge" (Analisi gol subiti) espandibile a tutto schermo con testo a 24 px. Solo frontend |
 | 23/09/2026 | Frontend v3.24: "Minuti giocati" abbina le calciatrici della distinta al foglio ATLETE anche con nomi scritti diversamente (`sameAthlete`), usa il nome del foglio e somma i minuti. Solo frontend |
@@ -987,7 +1032,7 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [ ] Valutare: selezione automatica del ritaglio colonne anche per foto orizzontali; anteprima delle strisce prima dell'invio
 
 ## Da verificare
-- [ ] Sull'iPad (app v3.26): Dashboard → "📤 Esporta PDF" → condividere via Mail e via WhatsApp, controllare impaginazione e testi del PDF
+- [ ] Sull'iPad (app v3.27): Home → 📄 Report → Tutta la stagione / una partita → sezioni → "📤 Condividi" via Mail e via WhatsApp; controllare impaginazione, tempi di generazione e peso del PDF con tutte le partite vere; provare anche "📤 Esporta PDF" in fondo alla Dashboard
 - [ ] **A carico di Max**: pubblicare il backend v5.5 (fatto il 23/09/2026: codice incollato nell'editor, `testAtlete()` legge 22 nomi corretti; manca: nuova versione su TUTTI e 3 i deployment); sull'iPad Verifica versioni → "Backend: v5.5" e in Dashboard (con app v3.24) → Minuti giocati devono comparire anche le tesserate a 0'
 - [ ] **A carico di Max**: pubblicare il backend v5.4 (incollare `backend/Code.gs` nell'editor, salvare, nuova versione su TUTTI e 3 i deployment); poi Impostazioni → Verifica versioni → "Backend: v5.4" e, dopo una partita con un rigore parato, Sincronizza su Sheets e controllare la riga "Rigore parato" nel foglio Eventi
 - [x] Backend v5.3 pubblicato (20/09/2026) come nuovo deployment "v5.3 - OCR numeri di maglia a mano"; sull'iPad Impostazioni → Verifica versioni → "App v3.17 · Backend v5.3" e i numeri di maglia arrivano da Scatta foto e da Libreria foto

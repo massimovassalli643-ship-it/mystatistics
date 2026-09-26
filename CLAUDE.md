@@ -27,7 +27,9 @@ Full functional/technical documentation: PDF "MyStatistics_Documentazione"
 
 ## Conventions
 
-- No frameworks, no build step, no external deps beyond jsPDF and SheetJS CDNs
+- No frameworks, no build step, no external deps beyond jsPDF and SheetJS CDNs,
+  plus html2canvas (cdnjs, loaded lazily by `loadHtml2canvas` only for the
+  graphic Report — approved 26/09/2026)
 - Keep the logical module structure of `index.html` (Storage, Navigazione,
   Home, Setup, OCR, Lineup, Match, Eventi, Statistiche, Summary, Export, Sync,
   Impostazioni, Utility) — add code inside the matching block
