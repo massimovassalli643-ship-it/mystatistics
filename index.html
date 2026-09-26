@@ -914,7 +914,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.27';
+const APP_VERSION = '3.28';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '5.5';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -2671,27 +2671,60 @@ function exportMatchPdf(match, asBase64) {
  * viene dedotta come il nome squadra che ricorre piu' spesso nello storico.
  * Con un campionato e' sempre la propria, e non c'e' un'impostazione in piu'
  * da ricordarsi di mettere a posto.
+ *
+ * I nomi letti dalle distinte non sono sempre scritti uguali ("A.S.D. FIAMMA
+ * MONZA 1970" / "FIAMMA MONZA"): si confrontano le PAROLE significative del
+ * nome (senza sigle societarie e numeri). Prima il confronto era esatto e in
+ * una trasferta con il nome scritto diversamente si prendeva la squadra di
+ * casa, cioe' gli avversari: le loro calciatrici finivano in minuti,
+ * tabelle e analisi.
  */
 
 function normTeam(name) {
   return String(name == null ? '' : name).trim().toUpperCase().replace(/\s+/g, ' ');
 }
 
+const TEAM_STOPWORDS = ['ASD', 'SSD', 'USD', 'ASDC', 'SSDARL', 'POL', 'CALCIO', 'FEMMINILE', 'SRL', 'ARL', 'ONLUS'];
+function teamWords(name) {
+  return normTeam(name).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z ]/g, ' ').split(' ')
+    .filter(w => w.length >= 3 && TEAM_STOPWORDS.indexOf(w) < 0);
+}
+function teamOverlap(a, b) {
+  const wb = teamWords(b);
+  return teamWords(a).filter(w => wb.indexOf(w) >= 0).length;
+}
+
 function detectOurTeam(matches) {
-  const count = {};
+  // si contano i nomi "simili" insieme; si restituisce la grafia piu' frequente
+  const groups = [];
   matches.forEach(m => {
     [m.home && m.home.name, m.away && m.away.name].forEach(n => {
       const k = normTeam(n);
-      if (k) count[k] = (count[k] || 0) + 1;
+      if (!k) return;
+      let g = groups.find(x => teamOverlap(x.key, k) > 0 || x.key === k);
+      if (!g) { g = { key: k, n: 0, names: {} }; groups.push(g); }
+      g.n++;
+      g.names[k] = (g.names[k] || 0) + 1;
     });
   });
-  let best = '', bestN = 0;
-  Object.keys(count).forEach(k => { if (count[k] > bestN) { bestN = count[k]; best = k; } });
-  return best;
+  let best = null;
+  groups.forEach(g => { if (!best || g.n > best.n) best = g; });
+  if (!best) return '';
+  return Object.keys(best.names).sort((a, b) => best.names[b] - best.names[a])[0];
 }
 
 function ourSideOf(m, ourKey) {
-  if (normTeam(m.away && m.away.name) === ourKey) return 'away';
+  const h = teamOverlap(m.home && m.home.name, ourKey);
+  const a = teamOverlap(m.away && m.away.name, ourKey);
+  if (a > h) return 'away';
+  if (h > a) return 'home';
+  // nomi non decisivi: vince la squadra con piu' calciatrici del foglio ATLETE
+  const atlete = loadAtleteCache();
+  if (atlete.length) {
+    const known = side => ((m[side] && m[side].roster) || []).filter(p => atlete.some(n => sameAthlete(n, p.name))).length;
+    if (known('away') > known('home')) return 'away';
+  }
   return 'home';
 }
 

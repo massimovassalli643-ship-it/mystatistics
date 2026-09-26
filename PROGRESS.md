@@ -19,7 +19,31 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend), `mystatistics_atlete` (copia dell'elenco tesserate) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.27 — Report grafico a sezioni (Mail / WhatsApp) (26/09/2026)
+## Stato attuale: v3.28 — Solo le nostre calciatrici anche in trasferta (26/09/2026)
+
+### Novità v3.28 (26/09/2026)
+
+**Segnalazione di Max**: nel Report, "Minuti giocati" mostrava anche le
+calciatrici della squadra avversaria.
+
+- **Causa**: la nostra squadra (`detectOurTeam`) si riconosceva dal nome
+  scritto *esattamente* uguale in tutte le partite, e `ourSideOf` in caso di
+  dubbio sceglieva la squadra di casa. Con i nomi letti dalle distinte
+  ("A.S.D. FIAMMA MONZA 1970" / "FIAMMA MONZA") una trasferta prendeva la
+  rosa avversaria: le sue calciatrici finivano in Minuti giocati, Tutte le
+  calciatrici, classifiche e Analisi gol subiti.
+- **Correzione**: `teamWords` / `teamOverlap` confrontano le parole
+  significative del nome (senza sigle come A.S.D., SSD, POL, CALCIO e senza
+  numeri); `detectOurTeam` raggruppa le grafie simili; `ourSideOf` sceglie il
+  lato con più parole in comune e, a parità, quello con più calciatrici del
+  foglio ATLETE (`sameAthlete`); solo se ancora indeciso resta "casa".
+- Vale per tutta la Dashboard e per il Report, non solo per i minuti.
+- **Provato** (browser): trasferta "A.S.D. REAL TREZZANO – A.S.D. FIAMMA
+  MONZA 1970" con la stagione salvata come "FIAMMA MONZA" → lato riconosciuto
+  "away", 0 avversarie in minuti e tabelle (prima: tutta la rosa avversaria).
+- Solo frontend.
+
+## Versione precedente: v3.27 — Report grafico a sezioni (Mail / WhatsApp) (26/09/2026)
 
 ### Novità v3.27 (26/09/2026)
 
@@ -982,6 +1006,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 26/09/2026 | Frontend v3.28: riconoscimento della nostra squadra tollerante alle diverse grafie del nome (parole significative + foglio ATLETE): in trasferta non si prendono più le calciatrici avversarie in minuti, tabelle e analisi. Solo frontend |
 | 26/09/2026 | Frontend v3.27: Report grafico a sezioni (stagione o partita; 8 opzioni combinabili) con la grafica della dashboard (html2canvas, caricata al primo uso), condivisione Mail/WhatsApp; Esporta PDF della Dashboard usa lo stesso motore. Solo frontend |
 | 26/09/2026 | Frontend v3.26: pulsante "Esporta PDF (Mail / WhatsApp)" in fondo alla Dashboard (vista scelta: KPI, Cosa emerge, classifiche, tabella calciatrici) con condivisione di sistema. Solo frontend |
 | 23/09/2026 | Frontend v3.25: riquadro "Cosa emerge" (Analisi gol subiti) espandibile a tutto schermo con testo a 24 px. Solo frontend |
