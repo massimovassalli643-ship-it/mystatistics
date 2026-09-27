@@ -19,7 +19,51 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend), `mystatistics_atlete` (copia dell'elenco tesserate) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.29 — Addio referto testuale: ogni PDF è il report grafico (26/09/2026)
+## Stato attuale: v3.30 + backend v5.6 — Distinte con righe barrate o scritte a mano (27/09/2026)
+
+### Novità v3.30 + backend v5.6 (27/09/2026)
+
+**Richiesta di Max** (foto della distinta Calcio Desenzano del 27/09/2026): una
+calciatrice con la riga **barrata** (FRACCARO CAMILLA, riga 12, sottolineata e
+tirata via) deve essere scartata; una calciatrice **aggiunta a penna**
+(CAREDDU GIULIA, riga 19, in stampatello) deve essere letta. In entrambi i casi
+il caricamento (Scatta foto, Libreria foto, Drive) deve concludersi senza
+bloccarsi.
+
+- **Backend v5.6 — prompt OCR**: nuove sezioni "RIGHE BARRATE" (nome o dati
+  attraversati da una linea, sottolineati e barrati, X o scarabocchio → fuori
+  da `players`, riportata in `excluded`, non contata in `rowsCounted`; una
+  semplice sottolineatura sotto il nome non conta) e "RIGHE SCRITTE A MANO"
+  (stampatello o corsivo = atlete valide, lettere incerte con "?", mai saltare
+  la riga né fermarsi). Nuovo campo di risposta `excluded: [{name, reason}]`.
+- **Backend v5.6 — risposta robusta**: `parseOcrJson` / `cleanJson` tollerano
+  testo attorno al JSON, blocchi markdown, commenti `//` e `/* */`, virgole
+  finali e risposte troncate (tiene le righe complete già lette, segnala
+  `truncated`); `sanitizeOcrPlayers` scarta righe senza nome testuale o marcate
+  barrate. `max_tokens` 3000 → 4000. Prima un commento dell'AI ("// barrata")
+  bastava a far fallire `JSON.parse` e l'intero caricamento.
+- **Frontend v3.30** (`applyOcrResult`): scarta anche lato app i nomi presenti
+  in `excluded` o con `struck:true`; salta righe malformate senza interrompere
+  le altre; il messaggio finale mostra "🚫 N barrate scartate (nomi)" ed
+  eventualmente "⚠️ lettura incompleta". `BACKEND_MIN_VERSION` = 5.6.
+- **Seconda passata (stesso giorno)**: prima prova di Max sull'iPad (app
+  ancora v3.29, versione del backend in uso non verificata): FRACCARO caricata
+  comunque, 19 atlete. Rinforzi: ogni riga ha ora il flag **obbligatorio
+  `struck`** (true/false), così l'AI deve decidere riga per riga invece di
+  compilare una lista a parte; il backend (`isStruckRow`) sposta le
+  `struck:true` in `excluded`; il prompt descrive la barratura sottile (linea a
+  metà altezza dei caratteri su nome, matricola, documento). Il frontend ora
+  **toglie dalla rosa** un'atleta barrata già presente da una scansione
+  precedente (prima l'unione per nome la lasciava lì), purché non sia già in
+  formazione o in un evento.
+- **Provato**: parser del backend con risposte sporche (testo attorno, commento
+  in coda a una riga, virgola finale, risposta troncata a metà riga, URL nel
+  testo) → sempre JSON valido con le righe complete. **Non ancora provato** con
+  la foto vera: serve il backend v5.6 pubblicato.
+- **Da pubblicare**: incollare `backend/Code.gs` nell'editor, salvare, nuova
+  versione su TUTTI e 3 i deployment (nessun nuovo scope).
+
+## Versione precedente: v3.29 — Addio referto testuale: ogni PDF è il report grafico (26/09/2026)
 
 ### Novità v3.29 (26/09/2026)
 
@@ -997,15 +1041,16 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `OCR_STRIP_OVERLAP` | 0.08 | sovrapposizione tra strisce (frazione dell'altezza) |
 | `OCR_LEFT_CROP` | 0.62 | frazione di larghezza tenuta per le strisce (foto verticali) |
 | `OCR_JPEG_QUALITY` | 0.9 | qualità JPEG delle immagini inviate |
-| `APP_VERSION` | 3.20 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
+| `APP_VERSION` | 3.30 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
 | `GS_WINDOWS` | 3, 5, 10 | soglie (minuti) dei "gol ravvicinati" nella dashboard; predefinita 5 (`gsWindow`) |
 | `GS_MIN_FORM` / `GS_SMALL_FORM` | 30 / 60 | minuti minimi per confrontare una formazione / sotto i quali compare "campione piccolo" |
 | `GS_MIN_PLAYER` / `GS_SMALL_PLAYER` | 60 / 180 | come sopra, per le singole calciatrici |
 | `GS_RATE_MAX` | 5 | fondo scala delle barre "gol ogni 90'" |
 | `GS_GOALS_SHOWN` | 12 | righe di "Gol per gol" visibili prima di "Mostra gli altri" |
-| `BACKEND_MIN_VERSION` | 5.4 | versione minima di backend richiesta dal frontend (Verifica versioni) |
-| `BACKEND_VERSION` (`Code.gs`) | 5.4 | versione del backend, restituita dal ping GET |
+| `BACKEND_MIN_VERSION` | 5.6 | versione minima di backend richiesta dal frontend (Verifica versioni) |
+| `BACKEND_VERSION` (`Code.gs`) | 5.6 | versione del backend, restituita dal ping GET |
 | `WAKE_SCREENS` | setup, lineup, match | schermate su cui lo schermo resta acceso (Wake Lock) |
+| OCR `max_tokens` (`Code.gs`) | 4000 | limite di token della risposta OCR (era 3000) |
 | `TIMER_RECOVERY_MAX_MS` | 2 h | oltre questo intervallo un cronometro "in marcia" salvato non viene ripristinato |
 
 ## Changelog
@@ -1028,6 +1073,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 27/09/2026 | Frontend v3.30 + backend v5.6: OCR scarta le righe barrate (`excluded`), legge le righe aggiunte a penna (stampatello/corsivo), parsing della risposta tollerante (commenti, virgole finali, troncamento) così il caricamento non si blocca; `BACKEND_MIN_VERSION` = 5.6. **Backend da pubblicare sui 3 deployment** |
 | 26/09/2026 | Frontend v3.29: rimosso il referto testuale (`exportMatchPdf`); il PDF del riepilogo partita è il report grafico (Vista totale) con condivisione Mail/WhatsApp. Solo frontend |
 | 26/09/2026 | Frontend v3.28: riconoscimento della nostra squadra tollerante alle diverse grafie del nome (parole significative + foglio ATLETE): in trasferta non si prendono più le calciatrici avversarie in minuti, tabelle e analisi. Solo frontend |
 | 26/09/2026 | Frontend v3.27: Report grafico a sezioni (stagione o partita; 8 opzioni combinabili) con la grafica della dashboard (html2canvas, caricata al primo uso), condivisione Mail/WhatsApp; Esporta PDF della Dashboard usa lo stesso motore. Solo frontend |
@@ -1080,6 +1126,7 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [ ] Valutare: selezione automatica del ritaglio colonne anche per foto orizzontali; anteprima delle strisce prima dell'invio
 
 ## Da verificare
+- [ ] **A carico di Max**: pubblicare il backend v5.6 (incollare `backend/Code.gs`, salvare, nuova versione su TUTTI e 3 i deployment); poi Verifica versioni → "Backend: v5.6" e ricaricare la distinta Desenzano del 27/09/2026: FRACCARO CAMILLA deve comparire solo in "🚫 barrate scartate", CAREDDU GIULIA deve essere in rosa
 - [ ] Sull'iPad (app v3.27): Home → 📄 Report → Tutta la stagione / una partita → sezioni → "📤 Condividi" via Mail e via WhatsApp; controllare impaginazione, tempi di generazione e peso del PDF con tutte le partite vere; provare anche "📤 Esporta PDF" in fondo alla Dashboard
 - [ ] **A carico di Max**: pubblicare il backend v5.5 (fatto il 23/09/2026: codice incollato nell'editor, `testAtlete()` legge 22 nomi corretti; manca: nuova versione su TUTTI e 3 i deployment); sull'iPad Verifica versioni → "Backend: v5.5" e in Dashboard (con app v3.24) → Minuti giocati devono comparire anche le tesserate a 0'
 - [ ] **A carico di Max**: pubblicare il backend v5.4 (incollare `backend/Code.gs` nell'editor, salvare, nuova versione su TUTTI e 3 i deployment); poi Impostazioni → Verifica versioni → "Backend: v5.4" e, dopo una partita con un rigore parato, Sincronizza su Sheets e controllare la riga "Rigore parato" nel foglio Eventi

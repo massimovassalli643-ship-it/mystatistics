@@ -1,5 +1,14 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v5.6 (27/09/2026): OCR - righe BARRATE (nome/dati tirati via con una riga,
+//   anche sottolineati e barrati) = atleta tolta dalla distinta: esclusa da
+//   players e riportata in `excluded`. Ogni riga ha il flag obbligatorio
+//   `struck` (true/false): l'AI deve decidere riga per riga, e il backend sposta
+//   le struck:true in `excluded`. Righe AGGIUNTE A PENNA (stampatello o
+//   corsivo) lette come le altre. Parsing della risposta tollerante (testo
+//   attorno al JSON, commenti, virgole finali, risposta troncata; max_tokens
+//   4000): una riga anomala non blocca piu' il caricamento. Nessun nuovo scope:
+//   pubblicare su TUTTI e 3 i deployment.
 // v5.5 (23/09/2026): action `atlete` - legge il foglio ATLETE (tutte le calciatrici
 //   tesserate) dello spreadsheet collegato e restituisce { atlete:[{name}] } (il numero
 //   progressivo a lato delle atlete e' ignorato).
@@ -41,7 +50,7 @@
 
 // Aggiornare ad OGNI modifica di questo file; il frontend la confronta con
 // BACKEND_MIN_VERSION di index.html.
-const BACKEND_VERSION = '5.5';
+const BACKEND_VERSION = '5.6';
 
 const SHEET_PARTITE = 'Partite';
 const SHEET_STATISTICHE = 'Statistiche';
@@ -148,14 +157,23 @@ function handleOcrRequest(payload) {
   prompt += 'IL NUMERO DI MAGLIA sta SOLO nella colonna che ha l intestazione "N del Ruolo" (la prima colonna DENTRO il bordo della tabella, subito a sinistra di "Data di nascita"). E di norma SCRITTO A MANO con penna o pennarello poco prima della gara: cifre grandi, di 1 o 2 cifre, che possono uscire dai bordi della cella e sconfinare verso il margine. Leggilo comunque: e uno dei dati piu importanti. Solo nelle distinte interamente digitali e non ancora compilate la cella puo essere vuota.\n';
   prompt += 'PUNTO DI RIFERIMENTO: il numero di maglia di una riga e sempre la cella immediatamente a SINISTRA della data di nascita della stessa riga. La colonnina SENZA intestazione ancora piu a sinistra, fuori dal bordo della tabella, NON e MAI il numero di maglia: non prendere il valore da li, nemmeno se una cifra a penna la sfiora o la tocca.\n';
   prompt += 'Sotto la colonna "Cognome e nome" puo apparire "(P)" = Portiere.\n\n';
+  prompt += 'RIGHE BARRATE (atlete tolte dalla distinta):\n';
+  prompt += 'Una riga il cui cognome e nome (e di solito anche data di nascita, matricola, tipo e numero documento, "LND") e ATTRAVERSATO da una linea tracciata SOPRA le lettere (anche sottile, a penna o a matita, anche leggermente storta), oppure SOTTOLINEATO E BARRATO, oppure cancellato con una X o uno scarabocchio, indica un atleta TOLTA dalla distinta.\n';
+  prompt += 'Per OGNI riga controlla con attenzione, nelle strisce ad alta risoluzione E nella pagina intera, se una linea passa in mezzo alle lettere del nome o delle cifre della matricola / del documento: una linea orizzontale che taglia a meta l altezza dei caratteri e una barratura. Basta che il nome OPPURE la maggior parte dei dati della riga siano tirati via.\n';
+  prompt += 'Una semplice sottolineatura SOTTO il nome, senza alcun tratto che passi sopra le lettere, e le linee della griglia della tabella NON sono barrature.\n';
+  prompt += 'Riporta comunque OGNI riga con un cognome in players, con "struck": true se e barrata e "struck": false se non lo e. Le righe barrate NON si contano in rowsCounted. Dopo una riga barrata continua a leggere normalmente le righe successive.\n\n';
+  prompt += 'RIGHE SCRITTE A MANO (atlete aggiunte a penna):\n';
+  prompt += 'Sotto le righe stampate possono esserci righe compilate A PENNA: data di nascita, cognome e nome in STAMPATELLO MAIUSCOLO o in CORSIVO, a volte il documento (es. "CI" = carta d identita). Sono atlete valide a tutti gli effetti: includile in players come le altre, leggendo il nome lettera per lettera e scrivendolo in MAIUSCOLO. La scrittura a mano puo uscire dai bordi delle celle: assegna ogni dato alla riga in cui sta la maggior parte del tratto. Se una lettera scritta a mano e incerta usa "?" per quella lettera; se il nome intero e illeggibile scrivi "ILLEGGIBILE", ma NON saltare la riga e NON interrompere la lettura.\n\n';
   prompt += 'OUTPUT - SOLO QUESTO JSON, niente altro:\n';
   prompt += '{\n';
   prompt += '  "teamName": "<una sola squadra, dall intestazione in alto, senza matricola e senza avversaria>",\n';
   prompt += '  "rowsCounted": <numero di righe con cognome contate nella pagina intera>,\n';
   prompt += '  "players": [\n';
-  prompt += '    {"num": <numero di maglia (intero) scritto nella cella "N del Ruolo" DENTRO la tabella; null se la cella e vuota o la cifra e illeggibile; mai il contatore di riga stampato nel margine>, "birthDate": "<GG/MM/AAAA come scritto>", "name": "<COGNOME NOME esatto>", "role": "<GK se (P), altrimenti stringa vuota>"}\n';
-  prompt += '  ]\n';
-  prompt += '}\n\n';
+  prompt += '    {"num": <numero di maglia (intero) scritto nella cella "N del Ruolo" DENTRO la tabella; null se la cella e vuota o la cifra e illeggibile; mai il contatore di riga stampato nel margine>, "birthDate": "<GG/MM/AAAA come scritto>", "name": "<COGNOME NOME esatto>", "role": "<GK se (P), altrimenti stringa vuota>", "struck": <true se la riga e barrata, altrimenti false>}\n';
+  prompt += '  ],\n';
+  prompt += '  "excluded": [ {"name": "<COGNOME NOME di ogni riga con struck true>", "reason": "barrata"} ]\n';
+  prompt += '}\n';
+  prompt += 'Se non ci sono righe barrate: "excluded": [].\n\n';
   prompt += 'NOTE:\n';
   prompt += '- NUMERI A SINISTRA: a sinistra ci sono DUE tipi di numeri, da non confondere. (a) Il CONTATORE DI RIGA: stampato in piccolo in carattere tipografico, FUORI dal bordo della tabella, progressivo 1, 2, 3, ... una per riga: NON e il numero di maglia, ignoralo. (b) Il NUMERO DI MAGLIA: DENTRO la tabella, nella cella "N del Ruolo", di solito scritto a mano con tratto di penna, cifre grandi e irregolari. num = SOLO (b), cioe il contenuto della colonna intitolata "N del Ruolo". Un numero scritto a mano nella cella e il numero di maglia anche se per caso coincide con il contatore della riga; una cifra a penna che sconfina oltre il bordo verso il margine appartiene comunque alla cella "N del Ruolo" della sua riga.\n';
   prompt += '- Se le celle (b) sono vuote su TUTTE le righe (distinta digitale non compilata), num = null per tutte. Se le uniche cifre che vedi sono quelle stampate nel margine e sono esattamente 1, 2, 3, ... nell ordine delle righe, hai letto il contatore: num = null su TUTTE le righe.\n';
@@ -164,7 +182,7 @@ function handleOcrRequest(payload) {
   prompt += '- Salta righe Assistente, Dirigente, Allenatore, Massaggiatore, Medico in fondo.\n';
   prompt += '- Non aggiungere ruoli DEF/MID/FWD/LM da te: la distinta FIGC non li indica, quindi role="" per chi non ha (P).\n';
   prompt += '- teamName: UNA sola squadra, dalla riga con la matricola in cima alla pagina, es. "A.S.D. FIAMMA MONZA 1970" o "CITTA DI BRUGHERIO". Mai due nomi, mai con il trattino.\n\n';
-  prompt += 'Restituisci SOLO il JSON valido, senza commenti, senza markdown, senza backtick.';
+  prompt += 'Restituisci SOLO il JSON valido, senza commenti, senza markdown, senza backtick. Niente note dentro il JSON: i dubbi si esprimono SOLO con "?" nei valori.';
 
   var content = [];
   if (pdfBase64) {
@@ -185,7 +203,7 @@ function handleOcrRequest(payload) {
 
   var requestBody = {
     model: CLAUDE_MODEL,
-    max_tokens: 3000,
+    max_tokens: 4000,
     messages: [{ role: 'user', content: content }]
   };
 
@@ -205,16 +223,29 @@ function handleOcrRequest(payload) {
       return jsonResponse({ ok: false, error: 'Claude API error ' + responseCode + ': ' + responseText.substring(0, 500) });
     }
     var claudeResponse = JSON.parse(responseText);
-    var claudeText = claudeResponse.content[0].text.trim();
-    var jsonText = claudeText;
-    var jsonMatch = claudeText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) jsonText = jsonMatch[0];
-    var result = JSON.parse(jsonText);
+    var claudeText = (claudeResponse.content || [])
+      .filter(function (c) { return c && c.type === 'text'; })
+      .map(function (c) { return c.text; }).join('\n').trim();
+    var result = parseOcrJson(claudeText);
+    var excluded = (Array.isArray(result.excluded) ? result.excluded : []).slice();
+    // Le righe con struck:true passano in excluded (se l'AI non l'ha gia' fatto)
+    (Array.isArray(result.players) ? result.players : []).forEach(function (p) {
+      if (!p || !isStruckRow(p) || typeof p.name !== 'string') return;
+      var key = p.name.toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+      var dup = excluded.some(function (x) {
+        return x && String(x.name || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim() === key;
+      });
+      if (!dup) excluded.push({ name: p.name, reason: 'barrata' });
+    });
     return jsonResponse({
       ok: true,
-      teamName: result.teamName || '',
+      teamName: typeof result.teamName === 'string' ? result.teamName : '',
       rowsCounted: result.rowsCounted || null,
-      players: result.players || [],
+      players: sanitizeOcrPlayers(result.players),
+      excluded: excluded.map(function (x) {
+        return { name: String((x && x.name) || '').trim(), reason: String((x && x.reason) || 'barrata') };
+      }),
+      truncated: claudeResponse.stop_reason === 'max_tokens',
       usage: claudeResponse.usage,
       imagesReceived: images.length,
       pdfReceived: pdfBase64 ? true : false
@@ -222,6 +253,61 @@ function handleOcrRequest(payload) {
   } catch (err) {
     return jsonResponse({ ok: false, error: 'Errore chiamata Claude: ' + err.toString() });
   }
+}
+
+// v5.6: la risposta dell'AI puo' avere testo attorno al JSON, commenti
+// (// riga barrata), virgole finali, oppure essere troncata a meta' di una
+// riga: si ripulisce e, se serve, si tengono le righe complete gia' lette
+// invece di far fallire l'intero caricamento della distinta.
+function parseOcrJson(text) {
+  var start = text.indexOf('{');
+  if (start < 0) throw new Error('JSON assente nella risposta: ' + text.substring(0, 160));
+  var end = text.lastIndexOf('}');
+  var body = end > start ? text.substring(start, end + 1) : text.substring(start);
+  var attempts = [body, cleanJson(body)];
+  // Risposta troncata: chiude l'array players dopo l'ultimo oggetto completo
+  var cut = body.lastIndexOf('}');
+  while (cut > 0 && attempts.length < 40) {
+    var head = cleanJson(body.substring(0, cut + 1));
+    attempts.push(head + ']}');
+    attempts.push(head + '}');
+    cut = body.lastIndexOf('}', cut - 1);
+  }
+  for (var i = 0; i < attempts.length; i++) {
+    try { return JSON.parse(attempts[i]); } catch (e) { /* tentativo successivo */ }
+  }
+  throw new Error('JSON non valido nella risposta: ' + text.substring(0, 160));
+}
+
+function cleanJson(s) {
+  return s
+    .replace(/```(json)?/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')                  // righe di commento
+    .replace(/([,\[{}\]]\s*)\/\/[^\n"]*$/gm, '$1') // commento in coda a una riga JSON
+    .replace(/,\s*([\]}])/g, '$1');                // virgole finali
+}
+
+function isStruckRow(p) {
+  return p.struck === true || p.struck === 'true' || p.excluded === true
+    || /barrat|cancellat/i.test(String(p.note || p.reason || ''));
+}
+
+// Solo righe con un nome testuale; scartate quelle che l'AI ha marcato barrate
+function sanitizeOcrPlayers(list) {
+  if (!Array.isArray(list)) return [];
+  return list.filter(function (p) {
+    if (!p || typeof p !== 'object') return false;
+    if (isStruckRow(p)) return false;
+    return typeof p.name === 'string' && p.name.trim() !== '';
+  }).map(function (p) {
+    return {
+      num: p.num == null ? null : p.num,
+      birthDate: p.birthDate == null ? '' : String(p.birthDate),
+      name: p.name.trim(),
+      role: typeof p.role === 'string' ? p.role : ''
+    };
+  });
 }
 
 // ============================================

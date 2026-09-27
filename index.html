@@ -913,9 +913,9 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.29';
+const APP_VERSION = '3.30';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
-const BACKEND_MIN_VERSION = '5.5';
+const BACKEND_MIN_VERSION = '5.6';
 const STORAGE_KEY = 'mystatistics_matches_v2';
 const PERIODS = ['1° tempo', '2° tempo', '1° supplementare', '2° supplementare', 'Partita conclusa'];
 const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
@@ -1406,8 +1406,22 @@ function applyOcrResult(result, side, progressEl) {
       throw new Error((result && result.error) || 'Errore sconosciuto dal backend');
     }
 
-    const players = (result.players || []).filter(p => p.name && p.name.trim());
-    const teamName = result.teamName || '';
+    // Righe barrate sulla distinta = atlete tolte: il backend (v5.6) le mette in
+    // `excluded`; per sicurezza si scartano anche se arrivassero pure in players.
+    // Una riga malformata (nome non testuale, campi mancanti) viene saltata
+    // senza interrompere il caricamento delle altre.
+    const excluded = (Array.isArray(result.excluded) ? result.excluded : [])
+      .map(x => String((x && x.name) || '').trim()).filter(Boolean);
+    const excludedKeys = new Set(excluded.map(normalizeOcrName));
+    const players = (Array.isArray(result.players) ? result.players : [])
+      .filter(p => p && typeof p.name === 'string' && p.name.trim()
+        && p.struck !== true && p.struck !== 'true' && !excludedKeys.has(normalizeOcrName(p.name)));
+    const teamName = typeof result.teamName === 'string' ? result.teamName : '';
+    const scartate = excluded.length
+      ? ' • 🚫 ' + excluded.length + ' barrat' + (excluded.length === 1 ? 'a' : 'e') + ' scartat' + (excluded.length === 1 ? 'a' : 'e')
+        + ' (' + excluded.map(escapeHtml).join(', ') + ')'
+      : '';
+    const troncata = result.truncated ? ' • ⚠️ lettura incompleta: controlla le ultime righe' : '';
 
     // Il nome letto dalla distinta ha la precedenza su quello gia presente:
     // se una lettura precedente aveva sbagliato riga, la nuova la corregge.
@@ -1417,8 +1431,28 @@ function applyOcrResult(result, side, progressEl) {
       state.currentMatch[side].name = teamName;
     }
 
+    // Un'atleta barrata gia' in rosa (es. da una scansione precedente) viene
+    // tolta, purche' non sia gia' in formazione o in un evento.
+    let rimosse = 0;
+    if (excludedKeys.size) {
+      const m = state.currentMatch;
+      const refs = new Set();
+      (m.lineup[side] || []).forEach(l => l && refs.add(normalizeOcrName(l.name)));
+      m.events.forEach(e => {
+        if (e.team !== side) return;
+        ['scorer', 'assist', 'player', 'playerOut', 'playerIn'].forEach(k => { if (e[k]) refs.add(normalizeOcrName(e[k].name)); });
+      });
+      const before = m[side].roster.length;
+      m[side].roster = m[side].roster.filter(p => {
+        const key = normalizeOcrName(p.name);
+        return !key || !excludedKeys.has(key) || refs.has(key);
+      });
+      rimosse = before - m[side].roster.length;
+      if (rimosse) { persistCurrent(); renderRoster(side); }
+    }
+
     if (players.length === 0) {
-      progressEl.innerHTML = '⚠️ Nessuna calciatrice riconosciuta. Inserisci manualmente.';
+      progressEl.innerHTML = '⚠️ Nessuna calciatrice riconosciuta. Inserisci manualmente.' + scartate;
     } else {
       // Le strisce si sovrappongono: una riga può arrivare due volte
       const seen = new Set();
@@ -1431,7 +1465,7 @@ function applyOcrResult(result, side, progressEl) {
         formatted.push({
           num: Number.isFinite(n) ? n : null,
           name: (p.name || '').trim(),
-          birthDate: (p.birthDate || '').trim(),
+          birthDate: String(p.birthDate || '').trim(),
           role: ['GK', 'DEF', 'MID', 'FWD', 'LM'].includes(p.role) ? p.role : ''
         });
       });
@@ -1481,6 +1515,7 @@ function applyOcrResult(result, side, progressEl) {
         + (corrette ? ' • ' + corrette + ' corrette' : '')
         + (teamName ? ' • ' + teamName : '')
         + (dubbi ? ' • ⚠️ ' + dubbi + ' da verificare' : '')
+        + scartate + troncata
         + costInfo;
     }
 }
