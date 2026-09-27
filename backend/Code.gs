@@ -1,5 +1,11 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v5.7 (27/09/2026): OCR - ogni riga riporta anche `row`, il numero di riga
+//   PRESTAMPATO nel margine sinistro (contatore 1, 2, 3...). `num` resta SOLO
+//   la cella "N del Ruolo". Serve alle distinte senza numeri a mano (es.
+//   Desenzano): il frontend, su conferma dell'utente, usa `row` come numero di
+//   maglia dove la cella e' vuota. Nessun nuovo scope: pubblicare su TUTTI e 3
+//   i deployment.
 // v5.6 (27/09/2026): OCR - righe BARRATE (nome/dati tirati via con una riga,
 //   anche sottolineati e barrati) = atleta tolta dalla distinta: esclusa da
 //   players e riportata in `excluded`. Ogni riga ha il flag obbligatorio
@@ -50,7 +56,7 @@
 
 // Aggiornare ad OGNI modifica di questo file; il frontend la confronta con
 // BACKEND_MIN_VERSION di index.html.
-const BACKEND_VERSION = '5.6';
+const BACKEND_VERSION = '5.7';
 
 const SHEET_PARTITE = 'Partite';
 const SHEET_STATISTICHE = 'Statistiche';
@@ -169,7 +175,7 @@ function handleOcrRequest(payload) {
   prompt += '  "teamName": "<una sola squadra, dall intestazione in alto, senza matricola e senza avversaria>",\n';
   prompt += '  "rowsCounted": <numero di righe con cognome contate nella pagina intera>,\n';
   prompt += '  "players": [\n';
-  prompt += '    {"num": <numero di maglia (intero) scritto nella cella "N del Ruolo" DENTRO la tabella; null se la cella e vuota o la cifra e illeggibile; mai il contatore di riga stampato nel margine>, "birthDate": "<GG/MM/AAAA come scritto>", "name": "<COGNOME NOME esatto>", "role": "<GK se (P), altrimenti stringa vuota>", "struck": <true se la riga e barrata, altrimenti false>}\n';
+  prompt += '    {"num": <numero di maglia (intero) scritto nella cella "N del Ruolo" DENTRO la tabella; null se la cella e vuota o la cifra e illeggibile; mai il contatore di riga stampato nel margine>, "birthDate": "<GG/MM/AAAA come scritto>", "name": "<COGNOME NOME esatto>", "role": "<GK se (P), altrimenti stringa vuota>", "struck": <true se la riga e barrata, altrimenti false>, "row": <numero di riga PRESTAMPATO nel margine sinistro fuori dalla tabella (contatore 1, 2, 3, ...) sulla stessa riga; intero; null se non si legge>}\n';
   prompt += '  ],\n';
   prompt += '  "excluded": [ {"name": "<COGNOME NOME di ogni riga con struck true>", "reason": "barrata"} ]\n';
   prompt += '}\n';
@@ -177,6 +183,7 @@ function handleOcrRequest(payload) {
   prompt += 'NOTE:\n';
   prompt += '- NUMERI A SINISTRA: a sinistra ci sono DUE tipi di numeri, da non confondere. (a) Il CONTATORE DI RIGA: stampato in piccolo in carattere tipografico, FUORI dal bordo della tabella, progressivo 1, 2, 3, ... una per riga: NON e il numero di maglia, ignoralo. (b) Il NUMERO DI MAGLIA: DENTRO la tabella, nella cella "N del Ruolo", di solito scritto a mano con tratto di penna, cifre grandi e irregolari. num = SOLO (b), cioe il contenuto della colonna intitolata "N del Ruolo". Un numero scritto a mano nella cella e il numero di maglia anche se per caso coincide con il contatore della riga; una cifra a penna che sconfina oltre il bordo verso il margine appartiene comunque alla cella "N del Ruolo" della sua riga.\n';
   prompt += '- Se le celle (b) sono vuote su TUTTE le righe (distinta digitale non compilata), num = null per tutte. Se le uniche cifre che vedi sono quelle stampate nel margine e sono esattamente 1, 2, 3, ... nell ordine delle righe, hai letto il contatore: num = null su TUTTE le righe.\n';
+  prompt += '- CAMPO row: e il CONTATORE DI RIGA (a) stampato nel margine, letto sulla stessa riga del nome. Va riportato SEMPRE, anche per le righe barrate e per quelle scritte a mano, e NON va mai copiato in num: num resta solo la cella "N del Ruolo" (null se vuota). Le righe consecutive hanno row consecutivi: se una riga e barrata o saltata, la successiva mantiene comunque il suo numero prestampato.\n';
   prompt += '- I numeri di maglia di una squadra sono TUTTI DIVERSI tra loro (da 1 a 99): se ne leggi due uguali, ricontrolla quelle righe. Se una cifra scritta a mano e davvero ambigua metti null: meglio vuoto che sbagliato.\n';
   prompt += '- Includi SOLO righe con un cognome scritto, nell\'ordine della distinta. Salta righe completamente vuote.\n';
   prompt += '- Salta righe Assistente, Dirigente, Allenatore, Massaggiatore, Medico in fondo.\n';
@@ -305,7 +312,8 @@ function sanitizeOcrPlayers(list) {
       num: p.num == null ? null : p.num,
       birthDate: p.birthDate == null ? '' : String(p.birthDate),
       name: p.name.trim(),
-      role: typeof p.role === 'string' ? p.role : ''
+      role: typeof p.role === 'string' ? p.role : '',
+      row: p.row == null ? null : p.row
     };
   });
 }

@@ -913,9 +913,9 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.30';
+const APP_VERSION = '3.31';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
-const BACKEND_MIN_VERSION = '5.6';
+const BACKEND_MIN_VERSION = '5.7';
 const STORAGE_KEY = 'mystatistics_matches_v2';
 const PERIODS = ['1° tempo', '2° tempo', '1° supplementare', '2° supplementare', 'Partita conclusa'];
 const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
@@ -1462,13 +1462,36 @@ function applyOcrResult(result, side, progressEl) {
         if (!key || seen.has(key)) return;
         seen.add(key);
         const n = parseInt(p.num, 10);
+        const r = parseInt(p.row, 10);
         formatted.push({
+          row: Number.isFinite(r) && r > 0 ? r : null,
           num: Number.isFinite(n) ? n : null,
           name: (p.name || '').trim(),
           birthDate: String(p.birthDate || '').trim(),
           role: ['GK', 'DEF', 'MID', 'FWD', 'LM'].includes(p.role) ? p.role : ''
         });
       });
+
+      // Distinte senza numeri nella cella "N° del Ruolo" (es. numerazione di
+      // default del modulo LND): su conferma di chi carica, il numero di maglia
+      // e' quello prestampato a sinistra della riga (`row`, backend v5.7). Un
+      // numero scritto nella cella vince sempre; un prestampato che coincide con
+      // un numero gia' scritto per un'altra atleta resta vuoto.
+      const blanks = formatted.filter(p => p.num == null && p.row != null);
+      let daPrestampati = 0, conflitti = 0;
+      if (blanks.length && confirm(
+        'La colonna "N° del Ruolo" è vuota per ' + blanks.length + ' atlet' + (blanks.length === 1 ? 'a' : 'e') + '.\n\n'
+        + 'Usare come numero di maglia il numero PRESTAMPATO a sinistra di ogni riga (1, 2, 3, ...)?\n\n'
+        + 'I numeri scritti a mano nella colonna restano quelli scritti.')) {
+        const used = new Set(formatted.filter(p => p.num != null).map(p => p.num));
+        blanks.forEach(p => {
+          if (used.has(p.row)) { conflitti++; return; }
+          p.num = p.row;
+          used.add(p.row);
+          daPrestampati++;
+        });
+      }
+      formatted.forEach(p => { delete p.row; });
 
       // Unione con la rosa esistente per NOME (non semplice accodamento):
       // se una calciatrice è già in rosa, questa lettura la corregge invece
@@ -1515,6 +1538,8 @@ function applyOcrResult(result, side, progressEl) {
         + (corrette ? ' • ' + corrette + ' corrette' : '')
         + (teamName ? ' • ' + teamName : '')
         + (dubbi ? ' • ⚠️ ' + dubbi + ' da verificare' : '')
+        + (daPrestampati ? ' • 🔢 ' + daPrestampati + ' numeri prestampati' : '')
+        + (conflitti ? ' • ⚠️ ' + conflitti + ' numeri già usati: da inserire a mano' : '')
         + scartate + troncata
         + costInfo;
     }

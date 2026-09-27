@@ -19,7 +19,35 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend), `mystatistics_atlete` (copia dell'elenco tesserate) |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.30 + backend v5.6 — Distinte con righe barrate o scritte a mano (27/09/2026)
+## Stato attuale: v3.31 + backend v5.7 — Numeri di maglia prestampati (27/09/2026)
+
+### Novità v3.31 + backend v5.7 (27/09/2026)
+
+**Richiesta di Max**: la distinta Calcio Desenzano del 27/09/2026 non ha numeri
+nella colonna "N° del Ruolo": la società usa la numerazione di default del
+modulo LND, cioè il contatore prestampato a sinistra di ogni riga. Max fa da
+garante al momento del caricamento.
+
+- **Backend v5.7**: ogni riga riporta anche `row` = numero di riga prestampato
+  nel margine (anche per righe barrate e scritte a mano). `num` resta SOLO la
+  cella "N° del Ruolo" (null se vuota): le regole v4.2/v5.3 sul contatore sono
+  invariate.
+- **Frontend v3.31** (`applyOcrResult`): se ci sono atlete con la cella vuota e
+  `row` letto, compare la conferma *"Usare come numero di maglia il numero
+  PRESTAMPATO…?"*. Sì → `num = row` dove la cella è vuota; il numero scritto a
+  mano vince sempre (caso misto Desenzano: 18 sulla riga 15, 15 sulla riga 18);
+  un prestampato già usato da un'altra atleta resta vuoto ("⚠️ N numeri già
+  usati: da inserire a mano"). No → come prima, numeri vuoti. Una riga barrata
+  non sposta la numerazione (nessuna prende il 12, CAREDDU resta 19). Messaggio
+  "🔢 N numeri prestampati". `row` non viene salvato in rosa.
+  `BACKEND_MIN_VERSION` = 5.7.
+- **Provato** (node, logica frontend con la risposta simulata della distinta
+  Desenzano e FRACCARO già in rosa): 18 atlete, FRACCARO tolta, numeri 1–11,
+  13, 14, 18 (Schivalocchi), 16, 17, 15 (Pasini), 19 (Careddu). **Non ancora
+  provato** con la foto vera: serve il backend v5.7 pubblicato.
+- **Da pubblicare**: backend v5.7 su TUTTI e 3 i deployment (nessun nuovo scope).
+
+## Versione precedente: v3.30 + backend v5.6 — Distinte con righe barrate o scritte a mano (27/09/2026)
 
 ### Novità v3.30 + backend v5.6 (27/09/2026)
 
@@ -1041,14 +1069,14 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `OCR_STRIP_OVERLAP` | 0.08 | sovrapposizione tra strisce (frazione dell'altezza) |
 | `OCR_LEFT_CROP` | 0.62 | frazione di larghezza tenuta per le strisce (foto verticali) |
 | `OCR_JPEG_QUALITY` | 0.9 | qualità JPEG delle immagini inviate |
-| `APP_VERSION` | 3.30 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
+| `APP_VERSION` | 3.31 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
 | `GS_WINDOWS` | 3, 5, 10 | soglie (minuti) dei "gol ravvicinati" nella dashboard; predefinita 5 (`gsWindow`) |
 | `GS_MIN_FORM` / `GS_SMALL_FORM` | 30 / 60 | minuti minimi per confrontare una formazione / sotto i quali compare "campione piccolo" |
 | `GS_MIN_PLAYER` / `GS_SMALL_PLAYER` | 60 / 180 | come sopra, per le singole calciatrici |
 | `GS_RATE_MAX` | 5 | fondo scala delle barre "gol ogni 90'" |
 | `GS_GOALS_SHOWN` | 12 | righe di "Gol per gol" visibili prima di "Mostra gli altri" |
-| `BACKEND_MIN_VERSION` | 5.6 | versione minima di backend richiesta dal frontend (Verifica versioni) |
-| `BACKEND_VERSION` (`Code.gs`) | 5.6 | versione del backend, restituita dal ping GET |
+| `BACKEND_MIN_VERSION` | 5.7 | versione minima di backend richiesta dal frontend (Verifica versioni) |
+| `BACKEND_VERSION` (`Code.gs`) | 5.7 | versione del backend, restituita dal ping GET |
 | `WAKE_SCREENS` | setup, lineup, match | schermate su cui lo schermo resta acceso (Wake Lock) |
 | OCR `max_tokens` (`Code.gs`) | 4000 | limite di token della risposta OCR (era 3000) |
 | `TIMER_RECOVERY_MAX_MS` | 2 h | oltre questo intervallo un cronometro "in marcia" salvato non viene ripristinato |
@@ -1073,6 +1101,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 27/09/2026 | Frontend v3.31 + backend v5.7: campo `row` (numero di riga prestampato); con la cella "N° del Ruolo" vuota, su conferma, il numero di maglia è il prestampato (lo scritto a mano vince); `BACKEND_MIN_VERSION` = 5.7. **Backend da pubblicare sui 3 deployment** |
 | 27/09/2026 | Frontend v3.30 + backend v5.6: OCR scarta le righe barrate (`excluded`), legge le righe aggiunte a penna (stampatello/corsivo), parsing della risposta tollerante (commenti, virgole finali, troncamento) così il caricamento non si blocca; `BACKEND_MIN_VERSION` = 5.6. **Backend da pubblicare sui 3 deployment** |
 | 26/09/2026 | Frontend v3.29: rimosso il referto testuale (`exportMatchPdf`); il PDF del riepilogo partita è il report grafico (Vista totale) con condivisione Mail/WhatsApp. Solo frontend |
 | 26/09/2026 | Frontend v3.28: riconoscimento della nostra squadra tollerante alle diverse grafie del nome (parole significative + foglio ATLETE): in trasferta non si prendono più le calciatrici avversarie in minuti, tabelle e analisi. Solo frontend |
@@ -1126,6 +1155,7 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [ ] Valutare: selezione automatica del ritaglio colonne anche per foto orizzontali; anteprima delle strisce prima dell'invio
 
 ## Da verificare
+- [ ] **A carico di Max**: pubblicare il backend v5.7 su TUTTI e 3 i deployment; poi con app v3.31, rosa Ospiti svuotata, ricaricare la distinta Desenzano: alla domanda sui numeri prestampati rispondere Sì → 18 atlete, numeri 1–11, 13, 14, 16, 17, 19 dai prestampati, 18 (Schivalocchi) e 15 (Pasini) scritti a mano, FRACCARO scartata
 - [ ] **A carico di Max**: pubblicare il backend v5.6 (incollare `backend/Code.gs`, salvare, nuova versione su TUTTI e 3 i deployment); poi Verifica versioni → "Backend: v5.6" e ricaricare la distinta Desenzano del 27/09/2026: FRACCARO CAMILLA deve comparire solo in "🚫 barrate scartate", CAREDDU GIULIA deve essere in rosa
 - [ ] Sull'iPad (app v3.27): Home → 📄 Report → Tutta la stagione / una partita → sezioni → "📤 Condividi" via Mail e via WhatsApp; controllare impaginazione, tempi di generazione e peso del PDF con tutte le partite vere; provare anche "📤 Esporta PDF" in fondo alla Dashboard
 - [ ] **A carico di Max**: pubblicare il backend v5.5 (fatto il 23/09/2026: codice incollato nell'editor, `testAtlete()` legge 22 nomi corretti; manca: nuova versione su TUTTI e 3 i deployment); sull'iPad Verifica versioni → "Backend: v5.5" e in Dashboard (con app v3.24) → Minuti giocati devono comparire anche le tesserate a 0'
