@@ -41,8 +41,18 @@ dai suggerimenti della tastiera iOS, non verificabile dalle foto).
 - Provato in node con il backend simulato: `"action ":"Voice "` → "✅ Giallo
   Fiamma GARGARO"; corpo a modulo → OK; chiavi estranee → messaggio diagnostico;
   parser 29/29. `BACKEND_MIN_VERSION` resta 5.8 (il frontend non cambia).
-- **Da pubblicare**: incollare `Code.gs`, salvare, nuova versione su TUTTI e 3
-  i deployment; poi rieseguire la scorciatoia (con "Mostra Contenuti URL").
+- **Pubblicato** da Max sui 3 deployment ("v5.9 - comandi vocali Watch
+  tolleranti", 03/10/2026 sera). Subito dopo, la scorciatoia dall'iPhone ha
+  risposto "✅ Giallo Fiamma BIGNOTTI" e l'iPad ha registrato l'ammonizione
+  (3 BIGNOTTI CHIARA). Durante la pubblicazione il badge dell'iPad ha mostrato
+  per un momento "Watch non collegato: The string did not match the expected
+  pattern" (risposta non JSON di Google mentre i deployment si aggiornavano;
+  l'app riprova da sola).
+- Scorciatoia "Statistiche" (iPhone, iOS con le azioni "Detta testo",
+  "Ottieni contenuti di", "Ottieni valore del dizionario", "Mostra contenuto"):
+  in questa versione di iOS "Mostra risultato" si chiama **"Mostra contenuto"**;
+  per diagnosticare, "Mostra" con la variabile **Contenuti URL** fa vedere la
+  risposta completa del backend.
 
 
 ### Novità v3.32 + backend v5.8 (03/10/2026)
@@ -1210,7 +1220,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
-| 03/10/2026 | Backend v5.9: `doPost` tollerante per la scorciatoia del Watch (`voice` con spazi/maiuscole, chiavi ripulite, corpo a modulo) e messaggio diagnostico "Richiesta non riconosciuta. Ricevuto: …" al posto di "Payload mancante". **Da pubblicare sui 3 deployment** |
+| 03/10/2026 | Backend v5.9: `doPost` tollerante per la scorciatoia del Watch (`voice` con spazi/maiuscole, chiavi ripulite, corpo a modulo) e messaggio diagnostico "Richiesta non riconosciuta. Ricevuto: …" al posto di "Payload mancante". Pubblicato sui 3 deployment; scorciatoia dall'iPhone → evento sull'iPad OK |
 | 03/10/2026 | Frontend v3.32 + backend v5.8 (branch `comandi-vocali`): comandi vocali da Apple Watch — action `voice`/`voicePoll`/`voiceAck` con token `VOICE_TOKEN`, foglio "Comandi" come coda, parser con test (29 frasi, matrice di Max: squadra per nome, Fiamma per cognome), iPad in ascolto ogni 4 s nella schermata partita, riquadro di conferma con Annulla, "annulla" dettato, badge di stato, impostazioni token; guida `COMANDI_VOCALI.md`; `BACKEND_MIN_VERSION` = 5.8. Backend v5.8 pubblicato da Max sui 3 deployment (test dall'editor 29/29) |
 | 27/09/2026 | Frontend v3.31 + backend v5.7: campo `row` (numero di riga prestampato); con la cella "N° del Ruolo" vuota, su conferma, il numero di maglia è il prestampato (lo scritto a mano vince); `BACKEND_MIN_VERSION` = 5.7. **Backend da pubblicare sui 3 deployment** |
 | 27/09/2026 | Frontend v3.30 + backend v5.6: OCR scarta le righe barrate (`excluded`), legge le righe aggiunte a penna (stampatello/corsivo), parsing della risposta tollerante (commenti, virgole finali, troncamento) così il caricamento non si blocca; `BACKEND_MIN_VERSION` = 5.6. **Backend da pubblicare sui 3 deployment** |
