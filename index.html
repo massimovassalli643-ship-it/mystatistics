@@ -214,7 +214,22 @@
   .timer-btn.pause { background: #f39c12; color: white; }
   .timer-btn.next { background: rgba(127,184,255,0.2); color: #7fb8ff; }
   .timer-btn:active { transform: scale(0.95); }
-  .actions-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; flex: 1; align-content: start; }
+  .actions-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; flex: none; align-content: start; }
+  /* Silos (v3.33): sostituzioni e ammonizioni divise per squadra sotto i pulsanti,
+     stesso aspetto della colonna "Eventi partita"; il colore del bordo alto e'
+     quello del pulsante (blu sostituzioni, giallo ammonizioni) */
+  .silos { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+  .silo { min-height: 0; display: flex; flex-direction: column; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-top: 3px solid #7fb8ff; border-radius: 12px; overflow: hidden; }
+  .silo.sub { border-top-color: #3498db; }
+  .silo.yellow { border-top-color: #f1c40f; }
+  .silo-head { padding: 10px 12px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .silo-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #7fb8ff; line-height: 1.3; }
+  .silo-list { flex: 1; overflow-y: auto; padding: 8px; }
+  .silo-list .event-item { padding: 8px; gap: 6px; margin-bottom: 6px; }
+  .silo-list .event-min { min-width: 26px; font-size: 12px; }
+  .silo-list .event-content { font-size: 12px; min-width: 0; }
+  .silo-list .event-actions { flex-direction: column; }
+  .silo-empty { text-align: center; padding: 16px 6px; color: #5a7793; font-size: 12px; }
   .action-btn { aspect-ratio: 1; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: white; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); padding: 12px 6px; min-width: 0; text-align: center; line-height: 1.1; }
   .action-btn:active { transform: scale(0.95); }
   .action-btn .ico { font-size: 30px; line-height: 1.1; }
@@ -749,11 +764,30 @@
           <span class="ico">➕</span><span>Atleta</span>
         </button>
       </div>
+
+      <div class="silos">
+        <div class="silo sub">
+          <div class="silo-head"><div class="silo-title">🔄 Sostituzioni Fiamma</div><div class="roster-count" id="silo-count-sub-ours">0</div></div>
+          <div class="silo-list" id="silo-sub-ours"></div>
+        </div>
+        <div class="silo sub">
+          <div class="silo-head"><div class="silo-title">🔄 Sostituzioni avversarie</div><div class="roster-count" id="silo-count-sub-opp">0</div></div>
+          <div class="silo-list" id="silo-sub-opp"></div>
+        </div>
+        <div class="silo yellow">
+          <div class="silo-head"><div class="silo-title">🟨 Ammonizioni Fiamma</div><div class="roster-count" id="silo-count-yellow-ours">0</div></div>
+          <div class="silo-list" id="silo-yellow-ours"></div>
+        </div>
+        <div class="silo yellow">
+          <div class="silo-head"><div class="silo-title">🟨 Ammonizioni avversarie</div><div class="roster-count" id="silo-count-yellow-opp">0</div></div>
+          <div class="silo-list" id="silo-yellow-opp"></div>
+        </div>
+      </div>
     </div>
 
     <div class="events-sidebar">
       <div class="events-header">
-        <div class="events-title">Eventi partita</div>
+        <div class="events-title">Goal · Espulsioni · Rigori parati</div>
         <div class="roster-count" id="events-count">0</div>
       </div>
       <div class="voice-badge" id="voice-badge" style="display:none;"></div>
@@ -942,7 +976,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.32';
+const APP_VERSION = '3.33';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '5.8';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -952,6 +986,9 @@ const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
 const PERIOD_DURATIONS = [45, 45, 15, 15, 0];
 // Oltre questo intervallo un cronometro "in marcia" salvato non viene ripristinato
 const TIMER_RECOVERY_MAX_MS = 2 * 60 * 60 * 1000;
+// La nostra squadra: la riconosce ourSideOf anche con grafie diverse (silos della
+// schermata partita, comandi vocali "fiamma")
+const OUR_TEAM_NAME = 'FIAMMA MONZA';
 // Destinatario predefinito dei report (modificabile nella modale prima dell'invio)
 const REPORT_DEFAULT_TO = 'massimo.vassalli643@gmail.com';
 
@@ -2250,18 +2287,32 @@ function removeEvent(id) {
   renderMatchInfo();   // NON renderMatchScreen: il cronometro deve continuare a correre
 }
 
+/* v3.33: colonna destra = goal, espulsioni, rigori parati; sostituzioni e
+   ammonizioni nei 4 silos sotto i pulsanti, divise tra Fiamma (ourSideOf) e
+   avversarie. Stesse schede evento (✏️ / ×) ovunque, piu' recenti in alto. */
+const SILOS = [['sub', 'ours'], ['sub', 'opp'], ['yellow', 'ours'], ['yellow', 'opp']];
 function renderEvents() {
+  const m = state.currentMatch;
+  const events = [...m.events].sort((a, b) => b.minute - a.minute);
+  const inSilo = e => e.type === 'sub' || e.type === 'yellow';
+  const main = events.filter(e => !inSilo(e));
   const list = document.getElementById('events-list');
-  const events = [...state.currentMatch.events].sort((a, b) => b.minute - a.minute);
-  document.getElementById('events-count').textContent = events.length;
-  if (events.length === 0) {
-    list.innerHTML = '<div class="events-empty">Nessun evento registrato</div>';
-    return;
-  }
-  list.innerHTML = events.map(e => eventCardHtml(e)).join('');
+  document.getElementById('events-count').textContent = main.length;
+  list.innerHTML = main.length
+    ? main.map(e => eventCardHtml(e)).join('')
+    : '<div class="events-empty">Nessun goal, espulsione o rigore parato</div>';
+  const ours = ourSideOf(m, OUR_TEAM_NAME);
+  SILOS.forEach(([type, who]) => {
+    const side = who === 'ours' ? ours : (ours === 'home' ? 'away' : 'home');
+    const items = events.filter(e => e.type === type && e.team === side);
+    document.getElementById('silo-count-' + type + '-' + who).textContent = items.length;
+    document.getElementById('silo-' + type + '-' + who).innerHTML = items.length
+      ? items.map(e => eventCardHtml(e, true)).join('')
+      : '<div class="silo-empty">Nessuna</div>';
+  });
 }
 
-function eventCardHtml(e) {
+function eventCardHtml(e, compact) {
   const teamName = state.currentMatch[e.team].name;
   let typeLabel = '', detail = '', subDetail = '';
   if (e.type === 'goal') {
@@ -2289,7 +2340,7 @@ function eventCardHtml(e) {
     <div class="event-item ${e.type}">
       <div class="event-min">${e.minute}'</div>
       <div class="event-content">
-        <div class="event-type">${typeLabel}</div>
+        ${compact ? '' : `<div class="event-type">${typeLabel}</div>`}
         <div class="event-detail">${detail}</div>
         ${subDetail ? `<div class="event-sub-detail">${subDetail}</div>` : ''}
       </div>
@@ -2328,7 +2379,7 @@ const VOICE_TOKEN_KEY = 'mystatistics_voice_token';
 const VOICE_ON_KEY = 'mystatistics_voice_on';
 const VOICE_DONE_KEY = 'mystatistics_voice_done';
 const VOICE_DONE_MAX = 200;
-const VOICE_OUR_TEAM = 'FIAMMA MONZA';      // "fiamma" = la squadra con questo nome; "avversario" = l'altra
+const VOICE_OUR_TEAM = OUR_TEAM_NAME;       // "fiamma" = la nostra squadra; "avversario" = l'altra
 const VOICE_UNKNOWN_PLAYER = 'Non indicata'; // avversaria senza numero ("gol avversario azione")
 let voice = { busy: false, lastOkAt: null, lastError: '', last: null, pendingAck: [], toast: null, toastTimer: null };
 

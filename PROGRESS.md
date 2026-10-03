@@ -20,7 +20,32 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Comandi vocali | Guida completa (scorciatoia Watch, frasi, checklist): `COMANDI_VOCALI.md`. Token in Script Property `VOICE_TOKEN` e nelle Impostazioni dell'iPad, **mai nel repository** |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.32 + backend v5.9 — Comandi vocali da Apple Watch (03/10/2026)
+## Stato attuale: v3.33 + backend v5.9 — Schermata partita a silos (03/10/2026)
+
+### Novità v3.33 (03/10/2026, sera)
+
+**Richiesta di Max** (mockup sulla schermata partita): non avere tutto insieme
+nella colonna di destra.
+
+- Sotto i pulsanti, **4 silos** affiancati che riempiono lo spazio fino in
+  fondo: 🔄 Sostituzioni Fiamma · 🔄 Sostituzioni avversarie · 🟨 Ammonizioni
+  Fiamma · 🟨 Ammonizioni avversarie, ciascuno con contatore e scorrimento
+  proprio. Fiamma / avversarie con `ourSideOf` (nuova costante `OUR_TEAM_NAME`
+  = FIAMMA MONZA, usata anche da `VOICE_OUR_TEAM`).
+- **Colonna di destra** ("Goal · Espulsioni · Rigori parati"): solo goal,
+  espulsioni e rigori parati; il contatore conta quelli.
+- Stesso aspetto della pagina: fondo scuro e bordi della colonna eventi, bordo
+  alto del colore del pulsante (blu sostituzioni, giallo ammonizioni), stesse
+  schede evento con ✏️ e × (versione compatta senza la riga del tipo, che è nel
+  titolo del silo). I silos occupano tutta la larghezza (4 colonne) invece
+  delle sole prime 4 colonne dei pulsanti come nel mockup: a 1/6 della
+  larghezza i nomi non ci starebbero.
+- Pulsanti, modali, riepilogo e comandi vocali invariati (`renderEvents` divide
+  gli eventi; `eventCardHtml(e, compact)`).
+- **Provato** nel browser a 1180×820 (iPad landscape) con una partita di prova:
+  eventi nei silos e nella colonna giusti, contatori, modifica ed eliminazione
+  dai silos.
+
 
 ### Correzione backend v5.9 (03/10/2026, sera)
 
@@ -1179,7 +1204,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `OCR_STRIP_OVERLAP` | 0.08 | sovrapposizione tra strisce (frazione dell'altezza) |
 | `OCR_LEFT_CROP` | 0.62 | frazione di larghezza tenuta per le strisce (foto verticali) |
 | `OCR_JPEG_QUALITY` | 0.9 | qualità JPEG delle immagini inviate |
-| `APP_VERSION` | 3.32 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
+| `APP_VERSION` | 3.33 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
 | `GS_WINDOWS` | 3, 5, 10 | soglie (minuti) dei "gol ravvicinati" nella dashboard; predefinita 5 (`gsWindow`) |
 | `GS_MIN_FORM` / `GS_SMALL_FORM` | 30 / 60 | minuti minimi per confrontare una formazione / sotto i quali compare "campione piccolo" |
 | `GS_MIN_PLAYER` / `GS_SMALL_PLAYER` | 60 / 180 | come sopra, per le singole calciatrici |
@@ -1192,7 +1217,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `TIMER_RECOVERY_MAX_MS` | 2 h | oltre questo intervallo un cronometro "in marcia" salvato non viene ripristinato |
 | `VOICE_POLL_MS` | 4000 | ogni quanto l'iPad legge i comandi vocali nuovi (solo schermata partita, gara in corso) |
 | `VOICE_UNDO_MS` / `VOICE_ERROR_MS` | 8 s / 12 s | durata del riquadro di conferma (con Annulla) / del riquadro d'errore |
-| `VOICE_OUR_TEAM` | FIAMMA MONZA | nome che identifica "fiamma" nei comandi vocali; "avversario" = l'altra squadra |
+| `OUR_TEAM_NAME` / `VOICE_OUR_TEAM` | FIAMMA MONZA | nome che identifica "fiamma" nei comandi vocali; "avversario" = l'altra squadra |
 | `VOICE_UNKNOWN_PLAYER` | Non indicata | nome usato per l'avversaria senza numero ("gol avversario azione") |
 | `VOICE_DONE_MAX` | 200 | comandi vocali già elaborati ricordati sull'iPad (contro la doppia applicazione) |
 | `VOICE_MAX_AGE_MS` (`Code.gs`) | 2 min | oltre: comando "Scaduto", mai applicato |
@@ -1220,6 +1245,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 03/10/2026 | Frontend v3.33: schermata partita con 4 silos sotto i pulsanti (sostituzioni e ammonizioni, Fiamma / avversarie) e colonna destra solo per goal, espulsioni e rigori parati; costante `OUR_TEAM_NAME`. Solo frontend |
 | 03/10/2026 | Backend v5.9: `doPost` tollerante per la scorciatoia del Watch (`voice` con spazi/maiuscole, chiavi ripulite, corpo a modulo) e messaggio diagnostico "Richiesta non riconosciuta. Ricevuto: …" al posto di "Payload mancante". Pubblicato sui 3 deployment; scorciatoia dall'iPhone → evento sull'iPad OK |
 | 03/10/2026 | Frontend v3.32 + backend v5.8 (branch `comandi-vocali`): comandi vocali da Apple Watch — action `voice`/`voicePoll`/`voiceAck` con token `VOICE_TOKEN`, foglio "Comandi" come coda, parser con test (29 frasi, matrice di Max: squadra per nome, Fiamma per cognome), iPad in ascolto ogni 4 s nella schermata partita, riquadro di conferma con Annulla, "annulla" dettato, badge di stato, impostazioni token; guida `COMANDI_VOCALI.md`; `BACKEND_MIN_VERSION` = 5.8. Backend v5.8 pubblicato da Max sui 3 deployment (test dall'editor 29/29) |
 | 27/09/2026 | Frontend v3.31 + backend v5.7: campo `row` (numero di riga prestampato); con la cella "N° del Ruolo" vuota, su conferma, il numero di maglia è il prestampato (lo scritto a mano vince); `BACKEND_MIN_VERSION` = 5.7. **Backend da pubblicare sui 3 deployment** |
