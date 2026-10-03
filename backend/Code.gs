@@ -1,5 +1,16 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v5.8 (03/10/2026): COMANDI VOCALI da Apple Watch. Nuove action:
+//   'voice'     (dal Watch, scorciatoia Comandi) - frase dettata -> parser ->
+//               riga nel foglio "Comandi" (creato da solo se manca). Non tocca
+//               MAI i dati di partita: li applica l'iPad.
+//   'voicePoll' (dall'iPad ogni 4 s) - comandi con stato "nuovo"; quelli piu'
+//               vecchi di VOICE_MAX_AGE_MS passano a "errore" (scaduto).
+//   'voiceAck'  (dall'iPad) - stato finale: applicato / errore / annullato.
+//   Tutte e tre richiedono `token` = Script Property VOICE_TOKEN (da creare a
+//   mano: Impostazioni progetto > Proprieta' script). Nessun nuovo scope
+//   (Sheets gia' autorizzato, LockService non ne chiede): pubblicare su TUTTI
+//   e 3 i deployment. Test dall'editor: testParserComandi(), testComandoVocale().
 // v5.7 (27/09/2026): OCR - ogni riga riporta anche `row`, il numero di riga
 //   PRESTAMPATO nel margine sinistro (contatore 1, 2, 3...). `num` resta SOLO
 //   la cella "N del Ruolo". Serve alle distinte senza numeri a mano (es.
@@ -56,12 +67,13 @@
 
 // Aggiornare ad OGNI modifica di questo file; il frontend la confronta con
 // BACKEND_MIN_VERSION di index.html.
-const BACKEND_VERSION = '5.7';
+const BACKEND_VERSION = '5.8';
 
 const SHEET_PARTITE = 'Partite';
 const SHEET_STATISTICHE = 'Statistiche';
 const SHEET_EVENTI = 'Eventi';
 const SHEET_ATLETE = 'ATLETE';
+const SHEET_COMANDI = 'Comandi';
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 const CLAUDE_MODEL = 'claude-sonnet-4-5';
 
@@ -92,6 +104,9 @@ function doPost(e) {
     if (payload.action === 'atlete') {
       return handleAtlete();
     }
+    if (payload.action === 'voice' || payload.action === 'voicePoll' || payload.action === 'voiceAck') {
+      return handleVoiceRequest(payload);
+    }
     return handleSyncRequest(payload);
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err) });
@@ -105,7 +120,7 @@ function doGet() {
   return jsonResponse({
     ok: true,
     version: BACKEND_VERSION,
-    message: 'My Statistics endpoint attivo (v' + BACKEND_VERSION + ': OCR, distinte da Drive, invio report via email, atlete)',
+    message: 'My Statistics endpoint attivo (v' + BACKEND_VERSION + ': OCR, distinte da Drive, invio report via email, atlete, comandi vocali)',
     timestamp: new Date().toISOString()
   });
 }
@@ -514,6 +529,451 @@ function handleAtlete() {
 
 function testAtlete() {
   Logger.log(handleAtlete().getContent());
+}
+
+// ============================================
+// COMANDI VOCALI da Apple Watch (v5.8)
+// ============================================
+// Il Watch (scorciatoia Comandi: Detta testo -> Ottieni contenuti URL, POST)
+// manda { action:'voice', token, text }. La frase viene interpretata qui e
+// scritta come riga del foglio "Comandi": e' una CODA, i dati di partita non
+// vengono mai toccati. L'iPad la legge con 'voicePoll', risolve numero di maglia
+// o cognome sulla rosa della partita aperta (la rosa sta solo sull'iPad: cambia
+// a ogni distinta), registra l'evento con la stessa logica dei pulsanti e
+// conferma con 'voiceAck'.
+//
+// Foglio "Comandi" (creato al primo comando):
+//   A ID | B Ricevuto | C Testo dettato | D Evento | E Squadra | F Maglia |
+//   G Dettaglio | H Stato (nuovo/applicato/errore/annullato) | I Messaggio |
+//   J Dati (JSON per l'app)
+// Prova senza Watch: scrivere una frase in colonna C di una riga nuova e
+// lasciare vuoto il resto; al giro successivo l'iPad la tratta come dettata ora.
+const VOICE_MAX_AGE_MS = 2 * 60 * 1000;  // oltre: "scaduto", mai applicato in ritardo
+const VOICE_DUP_MS = 15 * 1000;          // stessa frase entro 15 s = invio doppio
+const VOICE_SCAN_ROWS = 300;             // righe recenti lette a ogni giro
+const VOICE_HEADERS = ['ID', 'Ricevuto', 'Testo dettato', 'Evento', 'Squadra', 'Maglia', 'Dettaglio', 'Stato', 'Messaggio', 'Dati'];
+const VOICE_COL = { id: 1, ts: 2, text: 3, evento: 4, squadra: 5, maglia: 6, dettaglio: 7, stato: 8, msg: 9, data: 10 };
+
+function handleVoiceRequest(payload) {
+  var expected = PropertiesService.getScriptProperties().getProperty('VOICE_TOKEN');
+  if (!expected) {
+    return jsonResponse({ ok: false, error: 'Comandi vocali non configurati: manca la Script Property VOICE_TOKEN', message: '❌ Token non configurato nel backend' });
+  }
+  if (String(payload.token || '') !== expected) {
+    return jsonResponse({ ok: false, error: 'Token comandi vocali non valido', message: '❌ Token non valido' });
+  }
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch (e) {
+    return jsonResponse({ ok: false, error: 'Backend occupato, riprova', message: '❌ Backend occupato, riprova' });
+  }
+  try {
+    var sheet = getComandiSheet();
+    if (payload.action === 'voice') return handleVoiceCommand(sheet, payload);
+    if (payload.action === 'voicePoll') return handleVoicePoll(sheet, payload);
+    return handleVoiceAck(sheet, payload);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function getComandiSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_COMANDI);
+  if (!sheet) sheet = ss.insertSheet(SHEET_COMANDI);
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, VOICE_HEADERS.length).setValues([VOICE_HEADERS]).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidth(VOICE_COL.text, 260);
+    sheet.setColumnWidth(VOICE_COL.msg, 320);
+  }
+  return sheet;
+}
+
+// Dal Watch: interpreta e accoda. La risposta `message` e' quella che la
+// scorciatoia mostra sul quadrante.
+function handleVoiceCommand(sheet, payload) {
+  var text = String(payload.text || '').replace(/\s+/g, ' ').trim().substring(0, 300);
+  if (!text) return jsonResponse({ ok: false, error: 'Frase vuota', message: '❌ Nessuna frase ricevuta' });
+  var now = new Date();
+  var cmd = parseVoiceCommand(text);
+  var stato = cmd.ok ? 'nuovo' : 'errore';
+  var msg = cmd.ok ? '' : cmd.message;
+  if (cmd.ok && isDuplicateVoice(sheet, text, now.getTime())) {
+    stato = 'errore';
+    msg = 'Doppione: stessa frase ricevuta meno di ' + Math.round(VOICE_DUP_MS / 1000) + ' s fa, ignorata';
+  }
+  var id = 'v' + now.getTime() + Math.random().toString(36).slice(2, 5);
+  sheet.appendRow([
+    id, now, /^[=+\-@]/.test(text) ? "'" + text : text,
+    cmd.ok ? cmd.evento : '', cmd.ok ? cmd.squadra : '', cmd.ok ? cmd.maglia : '', cmd.ok ? cmd.dettaglio : '',
+    stato, msg, cmd.ok ? JSON.stringify(cmd.data) : ''
+  ]);
+  return jsonResponse({
+    ok: stato === 'nuovo',
+    id: id,
+    stato: stato,
+    message: stato === 'nuovo' ? '✅ ' + cmd.label : '❌ ' + msg,
+    command: cmd.ok ? cmd.data : null
+  });
+}
+
+function isDuplicateVoice(sheet, text, nowMs) {
+  var last = sheet.getLastRow();
+  if (last < 2) return false;
+  var first = Math.max(2, last - 19);
+  var key = voiceNormalize(text);
+  var rows = sheet.getRange(first, 1, last - first + 1, VOICE_HEADERS.length).getValues();
+  return rows.some(function (r) {
+    var ts = r[VOICE_COL.ts - 1] instanceof Date ? r[VOICE_COL.ts - 1].getTime() : NaN;
+    return nowMs - ts < VOICE_DUP_MS
+      && String(r[VOICE_COL.stato - 1]).trim().toLowerCase() !== 'errore'
+      && voiceNormalize(r[VOICE_COL.text - 1]) === key;
+  });
+}
+
+// Dall'iPad: comandi "nuovo" (o righe scritte a mano senza stato). Con
+// `peek` conta soltanto, senza modificare nulla (Impostazioni > Prova).
+function handleVoicePoll(sheet, payload) {
+  var nowMs = Date.now();
+  var last = sheet.getLastRow();
+  var commands = [], expired = 0, pending = 0;
+  if (last >= 2) {
+    var first = Math.max(2, last - VOICE_SCAN_ROWS + 1);
+    var rows = sheet.getRange(first, 1, last - first + 1, VOICE_HEADERS.length).getValues();
+    rows.forEach(function (r, i) {
+      var rowNum = first + i;
+      var text = String(r[VOICE_COL.text - 1] || '').trim();
+      var stato = String(r[VOICE_COL.stato - 1] || '').trim().toLowerCase();
+      if (!text || (stato && stato !== 'nuovo')) return;
+      pending++;
+      if (payload.peek) return;
+      var cell = function (col) { return sheet.getRange(rowNum, col); };
+      var id = String(r[VOICE_COL.id - 1] || '').trim();
+      if (!id) {
+        id = 'm' + nowMs + '_' + rowNum;
+        cell(VOICE_COL.id).setValue(id);
+      }
+      var ts = r[VOICE_COL.ts - 1] instanceof Date ? r[VOICE_COL.ts - 1].getTime() : NaN;
+      if (isNaN(ts)) {
+        ts = nowMs;
+        cell(VOICE_COL.ts).setValue(new Date(nowMs));
+      }
+      if (nowMs - ts > VOICE_MAX_AGE_MS) {
+        sheet.getRange(rowNum, VOICE_COL.stato, 1, 2).setValues([['errore',
+          'Scaduto: l\'iPad non l\'ha ricevuto entro ' + Math.round(VOICE_MAX_AGE_MS / 60000) + ' minuti (partita non aperta o iPad offline)']]);
+        expired++;
+        return;
+      }
+      var data = null, label = '';
+      try { data = JSON.parse(String(r[VOICE_COL.data - 1] || '')); } catch (e) { data = null; }
+      if (data && data.type) {
+        label = describeVoiceCommand(data);
+      } else {
+        // riga scritta a mano: si interpreta adesso
+        var cmd = parseVoiceCommand(text);
+        if (!cmd.ok) {
+          sheet.getRange(rowNum, VOICE_COL.stato, 1, 2).setValues([['errore', cmd.message]]);
+          return;
+        }
+        data = cmd.data;
+        label = cmd.label;
+        sheet.getRange(rowNum, VOICE_COL.evento, 1, 4).setValues([[cmd.evento, cmd.squadra, cmd.maglia, cmd.dettaglio]]);
+        cell(VOICE_COL.data).setValue(JSON.stringify(data));
+      }
+      if (!stato) cell(VOICE_COL.stato).setValue('nuovo');
+      commands.push({ id: id, ts: ts, text: text, label: label, command: data });
+    });
+  }
+  return jsonResponse({ ok: true, commands: commands, pending: pending, expired: expired, serverTime: nowMs });
+}
+
+// Dall'iPad: esito di ogni comando, { results:[{ id, stato, messaggio }] }
+function handleVoiceAck(sheet, payload) {
+  var results = Array.isArray(payload.results) ? payload.results : [];
+  var last = sheet.getLastRow();
+  var updated = 0;
+  if (last >= 2 && results.length) {
+    var first = Math.max(2, last - VOICE_SCAN_ROWS + 1);
+    var ids = sheet.getRange(first, VOICE_COL.id, last - first + 1, 1).getValues();
+    var rowOf = {};
+    ids.forEach(function (r, i) { if (r[0]) rowOf[String(r[0])] = first + i; });
+    results.forEach(function (res) {
+      var row = res && rowOf[String(res.id)];
+      if (!row) return;
+      var st = ['applicato', 'errore', 'annullato'].indexOf(res.stato) >= 0 ? res.stato : 'errore';
+      sheet.getRange(row, VOICE_COL.stato, 1, 2).setValues([[st, String(res.messaggio || '').substring(0, 300)]]);
+      updated++;
+    });
+  }
+  return jsonResponse({ ok: true, updated: updated });
+}
+
+// ---- Parser delle frasi dettate ----
+// Matrice di Max (03/10/2026): evento + squadra + giocatrice + campi facoltativi
+//   "goal fiamma Gargaro [assist Bignotti] [su azione|rigore|punizione|autogol]"
+//   "goal Brugherio 7" / "goal avversario 7"     (avversarie: di norma il numero)
+//   "giallo fiamma Gargaro", "rosso Brugherio 5", "rigore parato fiamma Porta"
+//   "sostituzione fiamma esce Gargaro entra Bignotti [tattica|infortunio]"
+//   "sostituzione Brugherio esce 7 entra 13", "annulla"
+// Squadra: "fiamma" (o noi), "avversario" (o loro) oppure il NOME della squadra
+// avversaria: il backend non lo conosce, quindi le prime parole non riconosciute
+// arrivano all'iPad come `lead`, e l'iPad le confronta con i nomi delle due
+// squadre (cio' che avanza e' il cognome). Squadra non detta: l'iPad la deduce
+// dalla rosa in cui si trova la giocatrice; se e' ambigua, il comando e' rifiutato.
+// Giocatrice: cognome oppure numero di maglia (cifre o parole: "nove"),
+// risolti dall'iPad sulla rosa della partita.
+// Restituisce { ok:false, message } oppure
+// { ok:true, data:{ type, team, lead, player, assist, playerIn, goalType, subReason },
+//   evento, squadra, maglia, dettaglio, label }  (player = { num } oppure { name };
+//   team = 'fiamma' | 'avversario' | null).
+var VOICE_NUMBERS = (function () {
+  var units = ['zero', 'uno', 'due', 'tre', 'quattro', 'cinque', 'sei', 'sette', 'otto', 'nove'];
+  var teens = ['dieci', 'undici', 'dodici', 'tredici', 'quattordici', 'quindici', 'sedici', 'diciassette', 'diciotto', 'diciannove'];
+  var tens = ['', '', 'venti', 'trenta', 'quaranta', 'cinquanta', 'sessanta', 'settanta', 'ottanta', 'novanta'];
+  var map = {};
+  units.forEach(function (w, i) { map[w] = i; });
+  teens.forEach(function (w, i) { map[w] = 10 + i; });
+  for (var t = 2; t < 10; t++) {
+    map[tens[t]] = t * 10;
+    for (var u = 1; u < 10; u++) {
+      // ventuno, ventotto: la vocale finale cade davanti a uno/otto
+      map[(u === 1 || u === 8 ? tens[t].slice(0, -1) : tens[t]) + units[u]] = t * 10 + u;
+    }
+  }
+  return map;
+})();
+
+var VOICE_WORDS = (function () {
+  var groups = {
+    undo: ['annulla', 'annullare', 'annullato', 'cancella', 'elimina'],
+    save: ['parato', 'parata', 'para'],
+    owngoal: ['autogol', 'autogoal', 'autorete'],
+    goal: ['gol', 'goal', 'gool', 'goool', 'gold', 'rete'],
+    yellow: ['ammonizione', 'ammonizioni', 'ammonita', 'ammonito', 'ammonite', 'ammonisce', 'giallo', 'gialla'],
+    red: ['espulsione', 'espulsioni', 'espulsa', 'espulso', 'rosso', 'rossa'],
+    sub: ['sostituzione', 'sostituzioni', 'sostituita', 'sostituito', 'sostituisce', 'cambio', 'cambia'],
+    us: ['fiamma', 'monza', 'noi', 'nostra', 'nostro', 'nostre'],
+    them: ['avversario', 'avversaria', 'avversari', 'avversarie', 'loro'],
+    inMark: ['entra', 'entrata', 'entrano', 'dentro'],
+    outMark: ['esce', 'uscita', 'escono', 'fuori'],
+    assist: ['assist', 'assistenza'],
+    filler: ['il', 'lo', 'la', 'i', 'gli', 'le', 'l', 'un', 'una', 'di', 'del', 'della', 'dello', 'dei', 'delle',
+      'da', 'dal', 'dalla', 'su', 'sul', 'sulla', 'con', 'numero', 'num', 'n', 'nr', 'maglia', 'e', 'ed', 'a',
+      'al', 'alla', 'in', 'ha', 'cartellino', 'giocatrice', 'calciatrice', 'squadra', 'tiro', 'calcio', 'd',
+      'motivo', 'per', 'testa', 'destro', 'sinistro']
+  };
+  var map = {};
+  Object.keys(groups).forEach(function (g) { groups[g].forEach(function (w) { map[w] = g; }); });
+  return map;
+})();
+
+// Gli stessi tipi dei pulsanti dell'app (autogol e' gestito come evento a parte)
+var VOICE_GOAL_TYPES = { azione: 'azione', rigore: 'rigore', punizione: 'punizione' };
+var VOICE_SUB_REASONS = { tattica: 'tattica', tattico: 'tattica', infortunio: 'infortunio', infortunata: 'infortunio', infortunato: 'infortunio', altro: 'altro' };
+
+function voiceNormalize(text) {
+  return String(text == null ? '' : text).toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/(\d)([a-z])/g, '$1 $2').replace(/([a-z])(\d)/g, '$1 $2')
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function parseVoiceCommand(text) {
+  var tokens = voiceNormalize(text).split(' ').filter(function (t) { return t; });
+  if (!tokens.length) return { ok: false, message: 'Frase vuota' };
+  var found = {};
+  tokens.forEach(function (t) { var g = VOICE_WORDS[t]; if (g) found[g] = true; });
+
+  if (found.undo) return voiceResult({ type: 'undo' }, 'Annulla', '', '', '');
+
+  var type = null, goalType = null, subReason = null;
+  if (found.save && (tokens.indexOf('rigore') >= 0 || !(found.goal || found.yellow || found.red || found.sub))) {
+    type = 'penaltysave';
+  } else {
+    var kinds = ['owngoal', 'goal', 'yellow', 'red', 'sub'].filter(function (k) { return found[k]; });
+    if (kinds.length === 2 && found.owngoal && found.goal) kinds = ['owngoal'];   // "goal ... su autogol"
+    if (kinds.length === 0 && found.inMark && found.outMark) kinds = ['sub'];     // "esce 7 entra 13"
+    if (kinds.length === 0) return { ok: false, message: 'Evento non riconosciuto (di\' goal, giallo, rosso, sostituzione, rigore parato o annulla)' };
+    if (kinds.length > 1) return { ok: false, message: 'Piu\' eventi nella stessa frase: dettane uno alla volta' };
+    type = kinds[0] === 'owngoal' ? 'goal' : kinds[0];
+    if (kinds[0] === 'owngoal') goalType = 'autogol';
+  }
+  if (found.us && found.them) return { ok: false, message: 'Squadra ambigua: hai detto sia fiamma sia avversario' };
+  var team = found.us ? 'fiamma' : found.them ? 'avversario' : null;
+
+  // Segmenti separati dai marcatori (esce / entra / assist); in ogni segmento
+  // le giocatrici: ogni numero e' una giocatrice, parole consecutive = un nome
+  var segs = [{ mark: null, items: [] }];
+  var cur = segs[0], words = [];
+  var flush = function () {
+    if (words.length) { cur.items.push({ name: words.join(' ').toUpperCase() }); words = []; }
+  };
+  var badNumber = null;
+  tokens.forEach(function (t) {
+    var g = VOICE_WORDS[t];
+    if (g === 'inMark' || g === 'outMark' || g === 'assist') {
+      flush();
+      cur = { mark: g, items: [] };
+      segs.push(cur);
+      return;
+    }
+    if (g === 'filler') return;    // non spezza i nomi: "citta di Brugherio"
+    if (g) { flush(); return; }    // evento, squadra
+    if (type === 'goal' && VOICE_GOAL_TYPES[t]) { flush(); if (!goalType) goalType = VOICE_GOAL_TYPES[t]; return; }
+    if (type === 'sub' && VOICE_SUB_REASONS[t]) { flush(); subReason = VOICE_SUB_REASONS[t]; return; }
+    if (type === 'penaltysave' && t === 'rigore') { flush(); return; }
+    var n = /^\d+$/.test(t) ? parseInt(t, 10) : (VOICE_NUMBERS.hasOwnProperty(t) ? VOICE_NUMBERS[t] : null);
+    if (n != null) {
+      flush();
+      if (n < 1 || n > 99) badNumber = n;
+      cur.items.push({ num: n });
+      return;
+    }
+    if (t.length < 2) return;
+    words.push(t);
+  });
+  flush();
+  if (badNumber != null) return { ok: false, message: 'Numero di maglia non valido: ' + badNumber + ' (deve essere tra 1 e 99)' };
+
+  var itemsOf = function (mark) {
+    return segs.filter(function (s) { return s.mark === mark; })
+      .reduce(function (all, s) { return all.concat(s.items); }, []);
+  };
+  var main = itemsOf(null);
+  // Squadra non detta con una parola chiave: il primo nome puo' essere il nome
+  // della squadra avversaria (o squadra + cognome): lo decide l'iPad
+  var lead = null;
+  if (!team && main.length && main[0].name) {
+    lead = main[0].name;
+    main = main.slice(1);
+  }
+  var data = { type: type, team: team, lead: lead };
+
+  if (type === 'sub') {
+    var hasIn = segs.some(function (s) { return s.mark === 'inMark'; });
+    var hasOut = segs.some(function (s) { return s.mark === 'outMark'; });
+    if (itemsOf('assist').length) return { ok: false, message: '"assist" vale solo per i goal' };
+    var outItems = hasOut ? itemsOf('outMark') : main;
+    var inItems = itemsOf('inMark');
+    if (hasOut && main.length) return { ok: false, message: 'Sostituzione: parole in piu\' prima di "esce" (' + main.map(voiceRefText).join(', ') + ')' };
+    if (!hasIn || outItems.length !== 1 || inItems.length !== 1) {
+      return { ok: false, message: 'Sostituzione: di\' chi esce e chi entra (es. "sostituzione fiamma esce Gargaro entra Bignotti")' };
+    }
+    var out = outItems[0], pin = inItems[0];
+    if (out.num != null && out.num === pin.num) return { ok: false, message: 'Sostituzione: esce ed entra la stessa maglia ' + out.num };
+    data.player = out;
+    data.playerIn = pin;
+    data.subReason = subReason || 'tattica';
+    return voiceResult(data, 'Sostituzione', voiceTeamCell(data), voiceRefCell(out), 'entra ' + voiceRefText(pin) + ' · ' + data.subReason);
+  }
+
+  if (itemsOf('inMark').length || itemsOf('outMark').length) {
+    return { ok: false, message: '"entra"/"esce" vale solo per le sostituzioni' };
+  }
+  if (main.length > 1) {
+    return { ok: false, message: 'Troppe giocatrici nella frase (' + main.map(voiceRefText).join(', ') + '): ne serve una' };
+  }
+  if (!main.length && !lead && team !== 'avversario') {
+    var esempio = { goal: 'goal fiamma Gargaro', yellow: 'giallo fiamma Gargaro', red: 'rosso fiamma Gargaro', penaltysave: 'rigore parato fiamma Porta' }[type];
+    return { ok: false, message: 'Manca la giocatrice (es. "' + esempio + '")' };
+  }
+  data.player = main[0] || null;   // avversaria non indicata: la registra l'iPad come "Non indicata"
+  if (type === 'goal') {
+    var assist = itemsOf('assist');
+    if (assist.length > 1) return { ok: false, message: 'Assist: una sola giocatrice' };
+    if (goalType === 'autogol' && assist.length) return { ok: false, message: 'Un autogol non ha assist' };
+    data.goalType = goalType || 'azione';
+    data.assist = assist[0] || null;
+    var det = data.goalType + (data.assist ? ' · assist ' + voiceRefText(data.assist) : '');
+    return voiceResult(data, data.goalType === 'autogol' ? 'Autogol' : 'Goal', voiceTeamCell(data), voiceRefCell(data.player), det);
+  }
+  var ev = { yellow: 'Giallo', red: 'Rosso', penaltysave: 'Rigore parato' }[type];
+  return voiceResult(data, ev, voiceTeamCell(data), voiceRefCell(data.player), '');
+}
+
+function voiceResult(data, evento, squadra, maglia, dettaglio) {
+  return { ok: true, data: data, evento: evento, squadra: squadra, maglia: maglia, dettaglio: dettaglio, label: describeVoiceCommand(data) };
+}
+function voiceTeamLabel(team) { return team === 'avversario' ? 'Avversario' : team === 'fiamma' ? 'Fiamma' : ''; }
+// Colonna "Squadra": la parola chiave, oppure le parole da riconoscere sull'iPad
+function voiceTeamCell(d) { return d.team ? voiceTeamLabel(d.team) : (d.lead ? d.lead + ' ?' : '?'); }
+function voiceRefText(ref) {
+  if (!ref) return '';
+  return ref.num != null ? '#' + ref.num : String(ref.name || '');
+}
+// Colonna "Maglia": il numero, oppure il cognome dettato (lo risolve l'iPad)
+function voiceRefCell(ref) {
+  if (!ref) return '';
+  return ref.num != null ? ref.num : String(ref.name || '');
+}
+function describeVoiceCommand(d) {
+  if (!d || d.type === 'undo') return 'Annulla l\'ultimo comando vocale';
+  var head = [voiceTeamLabel(d.team), d.lead].filter(function (x) { return x; }).join(' ');
+  var who = (head ? ' ' + head : '') + (d.player ? ' ' + voiceRefText(d.player) : '');
+  if (d.type === 'goal') {
+    return (d.goalType === 'autogol' ? 'Autogol' : 'Goal') + who +
+      (d.goalType && d.goalType !== 'autogol' ? ', ' + d.goalType : '') +
+      (d.assist ? ', assist ' + voiceRefText(d.assist) : '');
+  }
+  if (d.type === 'sub') return 'Sostituzione' + (head ? ' ' + head : '') + ': esce ' + voiceRefText(d.player) + ', entra ' + voiceRefText(d.playerIn) + ' (' + d.subReason + ')';
+  return ({ yellow: 'Giallo', red: 'Rosso', penaltysave: 'Rigore parato' }[d.type] || '') + who;
+}
+
+// TEST dall'editor (nessuna scrittura): frasi di esempio -> interpretazione
+var VOICE_TEST_PHRASES = [
+  ['goal fiamma Gargaro', 'Goal Fiamma GARGARO, azione'],
+  ['goal fiamma Gargàro assist Bignotti su rigore', 'Goal Fiamma GARGARO, rigore, assist BIGNOTTI'],
+  ['Goal fiamma Gargaro su punizione', 'Goal Fiamma GARGARO, punizione'],
+  ['goal fiamma Gargaro su autogoal', 'Autogol Fiamma GARGARO'],
+  ['goal Brugherio 7', 'Goal BRUGHERIO #7, azione'],
+  ['goal città di Brugherio sette', 'Goal CITTA BRUGHERIO #7, azione'],
+  ['goal avversario 7', 'Goal Avversario #7, azione'],
+  ['goal avversario', 'Goal Avversario, azione'],
+  ['goal Brugherio Rossi', 'Goal BRUGHERIO ROSSI, azione'],
+  ['giallo fiamma Gargaro', 'Giallo Fiamma GARGARO'],
+  ['ammonizione Brugherio 5', 'Giallo BRUGHERIO #5'],
+  ['ammonita la numero tre avversario', 'Giallo Avversario #3'],
+  ['rosso fiamma Bignotti', 'Rosso Fiamma BIGNOTTI'],
+  ['espulsione avversario ventuno', 'Rosso Avversario #21'],
+  ['rigore parato fiamma Porta', 'Rigore parato Fiamma PORTA'],
+  ['sostituzione fiamma esce Gargaro entra Bignotti', 'Sostituzione Fiamma: esce GARGARO, entra BIGNOTTI (tattica)'],
+  ['sostituzione fiamma esce Gargaro entra Bignotti infortunio', 'Sostituzione Fiamma: esce GARGARO, entra BIGNOTTI (infortunio)'],
+  ['sostituzione Brugherio esce 7 entra 13', 'Sostituzione BRUGHERIO: esce #7, entra #13 (tattica)'],
+  ['sostituzione esce Gargaro entra Bignotti', 'Sostituzione: esce GARGARO, entra BIGNOTTI (tattica)'],
+  ['cambio avversario esce sette entra tredici', 'Sostituzione Avversario: esce #7, entra #13 (tattica)'],
+  ['annulla', 'Annulla l\'ultimo comando vocale'],
+  ['goal fiamma', null],
+  ['ciao come stai', null],
+  ['giallo fiamma Gargaro rosso fiamma Bignotti', null],
+  ['sostituzione fiamma esce Gargaro', null],
+  ['giallo avversario 3 5', null],
+  ['goal avversario 120', null],
+  ['goal fiamma avversario 9', null],
+  ['goal fiamma Gargaro su autogol assist Bignotti', null]
+];
+
+function testParserComandi() {
+  var fails = 0;
+  VOICE_TEST_PHRASES.forEach(function (c) {
+    var r = parseVoiceCommand(c[0]);
+    var got = r.ok ? r.label : null;
+    var pass = got === c[1];
+    if (!pass) fails++;
+    Logger.log((pass ? 'OK   ' : 'FAIL ') + '"' + c[0] + '" -> ' + (r.ok ? r.label : 'ERRORE: ' + r.message) +
+      (pass ? '' : '   (atteso: ' + (c[1] || 'errore') + ')'));
+  });
+  Logger.log(fails === 0 ? 'Tutte le ' + VOICE_TEST_PHRASES.length + ' frasi OK' : fails + ' frasi NON OK');
+  return fails;
+}
+
+// TEST dall'editor: simula il Watch e SCRIVE una riga nel foglio "Comandi"
+// (con l'iPad in partita, il comando arriva davvero: provarlo a partita di prova)
+function testComandoVocale() {
+  var token = PropertiesService.getScriptProperties().getProperty('VOICE_TOKEN');
+  Logger.log(handleVoiceRequest({ action: 'voice', token: token, text: 'giallo fiamma Gargaro' }).getContent());
+  Logger.log(handleVoiceRequest({ action: 'voicePoll', token: token, peek: true }).getContent());
 }
 
 // ============================================

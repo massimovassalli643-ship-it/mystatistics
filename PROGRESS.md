@@ -14,12 +14,89 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Frontend | `index.html` unico (HTML + CSS + JS inline), zero build, PWA landscape per iPad |
 | Backend | Google Apps Script "MyStatisticsBackend" — copia di riferimento in `backend/Code.gs` |
 | Deployment attivi | Situazione al 20/09/2026 sera (da Gestisci deployment): attivi **"v5.3 - OCR numeri d…"** (quello usato dall'iPad: risponde v5.3) e due "v5 (13/09/2026)…" portati da Max alla versione 17 (v5.3) la sera del 20/09/2026; **"Senza titolo"** (ex deployment dell'iPad, v5.2) è stato **archiviato** e non risponde più; archiviati anche "v5.2 - ping GET c…" e le versioni v4.x. Un deployment archiviato non risponde: prima di archiviarne uno, controllare che non sia l'URL salvato sull'iPad |
-| Database | Google Sheets "My Statistics - Fiamma Monza 2026 2027" (tab Partite, Statistiche, Eventi, Marcatrici, ATLETE = elenco tesserate, compilato a mano) |
+| Database | Google Sheets "My Statistics - Fiamma Monza 2026 2027" (tab Partite, Statistiche, Eventi, Marcatrici, ATLETE = elenco tesserate, compilato a mano, Comandi = coda dei comandi vocali, creato dal backend v5.8) |
 | OCR | API Anthropic, modello `claude-sonnet-4-5`, chiave in Script Properties `CLAUDE_API_KEY` |
-| Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend), `mystatistics_atlete` (copia dell'elenco tesserate) |
+| Chiavi localStorage | `mystatistics_matches_v2` (storico), `mystatistics_sheets_url` (URL backend), `mystatistics_atlete` (copia dell'elenco tesserate), `mystatistics_voice_token` / `mystatistics_voice_on` (comandi vocali: token e attivazione), `mystatistics_voice_done` (ultimi 200 comandi vocali già elaborati) |
+| Comandi vocali | Guida completa (scorciatoia Watch, frasi, checklist): `COMANDI_VOCALI.md`. Token in Script Property `VOICE_TOKEN` e nelle Impostazioni dell'iPad, **mai nel repository** |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.31 + backend v5.7 — Numeri di maglia prestampati (27/09/2026)
+## Stato attuale: v3.32 + backend v5.8 — Comandi vocali da Apple Watch (03/10/2026)
+
+### Novità v3.32 + backend v5.8 (03/10/2026)
+
+**Richiesta di Max** (brief "comandi vocali da Apple Watch"): registrare gli
+eventi dettando una frase all'Apple Watch Ultra invece di toccare l'iPad, con i
+pulsanti che restano identici. Sviluppato sul branch `comandi-vocali`.
+
+- **Architettura**: Watch (Comandi: Detta testo → Ottieni contenuti URL, POST) →
+  backend `voice` → riga nel nuovo foglio **"Comandi"** (coda; i dati di
+  partita non vengono mai scritti dal backend) → l'iPad legge con `voicePoll`
+  ogni 4 s, registra l'evento e risponde con `voiceAck`.
+- **Backend v5.8**: action `voice` / `voicePoll` / `voiceAck`, tutte protette da
+  `token` = Script Property `VOICE_TOKEN` (da creare a mano) e da `LockService`.
+  Parser `parseVoiceCommand` (numeri a parole, accenti, sinonimi
+  ammonita/giallo, espulsa/rosso, cambio; "assist", "entra/esce/per", "annulla").
+  Frase non interpretabile → riga `errore` con il motivo, mostrato anche sul
+  Watch. Stessa frase entro 15 s = doppione (`errore`). Un comando non ritirato
+  entro 2 min scade (`errore`), mai applicato in ritardo. Una riga scritta a mano
+  in colonna C (resto vuoto) viene interpretata al giro successivo (prova senza
+  Watch). Foglio creato da solo con le colonne ID · Ricevuto · Testo dettato ·
+  Evento · Squadra · Maglia · Dettaglio · Stato · Messaggio · Dati (JSON).
+  Test dall'editor: `testParserComandi()` (29 frasi), `testComandoVocale()`.
+  Nessun nuovo scope.
+- **Scelta tecnica**: il numero di maglia / cognome si risolve sull'**iPad**,
+  non nel backend come previsto dal brief, perché la rosa con i numeri esiste
+  solo nella partita aperta (arriva dalla distinta, cambia ogni gara). Il
+  foglio "Rose calciatrici" citato nel brief non esiste: le tesserate stanno in
+  ATLETE, senza numeri di maglia.
+- **Frontend v3.32**: "fiamma" = la squadra il cui nome contiene FIAMMA MONZA
+  (`ourSideOf`, vale anche in trasferta), "avversario" = l'altra. Numero → atleta
+  con quella maglia; cognome → confronto tollerante (`athleteWords`/`wordsAlike`),
+  ambiguo o assente = errore e nessun evento. Avversaria senza numero = "Non
+  indicata". Evento creato con `addMatchEvent` (stessa logica del ramo "nuovo
+  evento" di `confirmEvent`, minuto dal cronometro), marcato `voiceCmd`.
+  Riquadro di conferma in basso per 8 s con **↩️ Annulla** (errori in rosso per
+  12 s); "annulla" dettato toglie l'ultimo evento **vocale** (mai quelli a
+  mano). Badge di stato sopra l'elenco eventi (in ascolto / in attesa / non
+  collegato + ultimo comando). Con una finestra aperta i comandi aspettano.
+  Comandi già elaborati ricordati in `mystatistics_voice_done`: se la conferma
+  al backend non passa, il comando non viene applicato due volte.
+  Impostazioni: token (solo sul dispositivo) + "Ricevi i comandi durante la
+  partita" + "Prova token". `deleteEvent` ora usa `removeEvent` (stesso
+  comportamento, senza conferma per l'Annulla). `BACKEND_MIN_VERSION` = 5.8.
+- **Matrice dei comandi di Max** (03/10/2026, stessa versione, prima del
+  rilascio): evento · squadra · giocatrice · facoltativi. Goal: `goal fiamma
+  Gargaro [assist Bignotti] [su azione|rigore|punizione|autogol]`; giallo,
+  rosso, rigore parato: `giallo fiamma Gargaro`; sostituzione: `sostituzione
+  fiamma esce Gargaro entra Bignotti [tattica|infortunio]`. Avversarie: nome
+  della squadra come da distinta (o `avversario`) + numero di maglia (o
+  cognome). Fiamma di norma per cognome (in rosa non ci sono omonimie). Autogol
+  = autogol della nostra giocatrice, punto all'avversaria. Tolti il "corner"
+  (non esiste nei pulsanti) e "cambio 7 per 14"; nessun motivo per il rosso.
+  Squadra detta per nome: il backend la passa come `lead`, l'iPad la confronta
+  con i nomi delle due squadre (`voiceTarget`, `voiceNameIsTeam`); squadra non
+  detta: dedotta dalla rosa che contiene la giocatrice, rifiutata se ambigua.
+  Parser: 29 frasi di prova. Guida aggiornata in `COMANDI_VOCALI.md`.
+- **Provato** (03/10/2026, nel browser con il backend v5.8 simulato in memoria):
+  con la matrice: assist + rigore, "città di Brugherio sette", "Brugherio
+  Bruni" (squadra + cognome), squadra dedotta dalla rosa ("giallo Gritti"),
+  autogol (punto all'avversaria), sostituzioni Fiamma con motivo e avversarie con
+  numeri, "giallo 7" presente in entrambe le rose → rifiutato, cognome doppio
+  avversario → rifiutato, "rosso avversario 22", squadra sconosciuta → rifiutata.
+  Prima versione:
+  parser; Fiamma in trasferta; gol, gol avversario senza numero,
+  ammonizione per cognome accentato, sostituzione; maglia fuori rosa e cognome
+  ambiguo → errore senza evento; Annulla dal riquadro e "annulla" dettato
+  (punteggio corretto, righe `annullato`); doppione; comando scaduto; modale
+  aperta → comando in attesa; conferma fallita (offline) → nessuna doppia
+  applicazione; pulsanti Goal e cestino invariati. **Non ancora provato** con il
+  backend vero né con il Watch.
+- **Backend v5.8 pubblicato** da Max sui 3 deployment (03/10/2026), con
+  `VOICE_TOKEN` e test dall'editor OK.
+- **Da fare (Max)**: vedi `COMANDI_VOCALI.md` — token nelle Impostazioni dell'iPad,
+  scorciatoia sul Watch, checklist di prova.
+
+## Versione precedente: v3.31 + backend v5.7 — Numeri di maglia prestampati (27/09/2026)
 
 ### Novità v3.31 + backend v5.7 (27/09/2026)
 
@@ -1069,17 +1146,26 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `OCR_STRIP_OVERLAP` | 0.08 | sovrapposizione tra strisce (frazione dell'altezza) |
 | `OCR_LEFT_CROP` | 0.62 | frazione di larghezza tenuta per le strisce (foto verticali) |
 | `OCR_JPEG_QUALITY` | 0.9 | qualità JPEG delle immagini inviate |
-| `APP_VERSION` | 3.31 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
+| `APP_VERSION` | 3.32 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
 | `GS_WINDOWS` | 3, 5, 10 | soglie (minuti) dei "gol ravvicinati" nella dashboard; predefinita 5 (`gsWindow`) |
 | `GS_MIN_FORM` / `GS_SMALL_FORM` | 30 / 60 | minuti minimi per confrontare una formazione / sotto i quali compare "campione piccolo" |
 | `GS_MIN_PLAYER` / `GS_SMALL_PLAYER` | 60 / 180 | come sopra, per le singole calciatrici |
 | `GS_RATE_MAX` | 5 | fondo scala delle barre "gol ogni 90'" |
 | `GS_GOALS_SHOWN` | 12 | righe di "Gol per gol" visibili prima di "Mostra gli altri" |
-| `BACKEND_MIN_VERSION` | 5.7 | versione minima di backend richiesta dal frontend (Verifica versioni) |
-| `BACKEND_VERSION` (`Code.gs`) | 5.7 | versione del backend, restituita dal ping GET |
+| `BACKEND_MIN_VERSION` | 5.8 | versione minima di backend richiesta dal frontend (Verifica versioni) |
+| `BACKEND_VERSION` (`Code.gs`) | 5.8 | versione del backend, restituita dal ping GET |
 | `WAKE_SCREENS` | setup, lineup, match | schermate su cui lo schermo resta acceso (Wake Lock) |
 | OCR `max_tokens` (`Code.gs`) | 4000 | limite di token della risposta OCR (era 3000) |
 | `TIMER_RECOVERY_MAX_MS` | 2 h | oltre questo intervallo un cronometro "in marcia" salvato non viene ripristinato |
+| `VOICE_POLL_MS` | 4000 | ogni quanto l'iPad legge i comandi vocali nuovi (solo schermata partita, gara in corso) |
+| `VOICE_UNDO_MS` / `VOICE_ERROR_MS` | 8 s / 12 s | durata del riquadro di conferma (con Annulla) / del riquadro d'errore |
+| `VOICE_OUR_TEAM` | FIAMMA MONZA | nome che identifica "fiamma" nei comandi vocali; "avversario" = l'altra squadra |
+| `VOICE_UNKNOWN_PLAYER` | Non indicata | nome usato per l'avversaria senza numero ("gol avversario azione") |
+| `VOICE_DONE_MAX` | 200 | comandi vocali già elaborati ricordati sull'iPad (contro la doppia applicazione) |
+| `VOICE_MAX_AGE_MS` (`Code.gs`) | 2 min | oltre: comando "Scaduto", mai applicato |
+| `VOICE_DUP_MS` (`Code.gs`) | 15 s | stessa frase entro questo intervallo = doppione |
+| `VOICE_SCAN_ROWS` (`Code.gs`) | 300 | righe recenti del foglio Comandi lette a ogni giro |
+| `VOICE_TOKEN` (Script Property) | — | token condiviso Watch/iPad/backend; da creare a mano, mai nel repository |
 
 ## Changelog
 | Data | Modifica |
@@ -1101,6 +1187,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 03/10/2026 | Frontend v3.32 + backend v5.8 (branch `comandi-vocali`): comandi vocali da Apple Watch — action `voice`/`voicePoll`/`voiceAck` con token `VOICE_TOKEN`, foglio "Comandi" come coda, parser con test (29 frasi, matrice di Max: squadra per nome, Fiamma per cognome), iPad in ascolto ogni 4 s nella schermata partita, riquadro di conferma con Annulla, "annulla" dettato, badge di stato, impostazioni token; guida `COMANDI_VOCALI.md`; `BACKEND_MIN_VERSION` = 5.8. Backend v5.8 pubblicato da Max sui 3 deployment (test dall'editor 29/29) |
 | 27/09/2026 | Frontend v3.31 + backend v5.7: campo `row` (numero di riga prestampato); con la cella "N° del Ruolo" vuota, su conferma, il numero di maglia è il prestampato (lo scritto a mano vince); `BACKEND_MIN_VERSION` = 5.7. **Backend da pubblicare sui 3 deployment** |
 | 27/09/2026 | Frontend v3.30 + backend v5.6: OCR scarta le righe barrate (`excluded`), legge le righe aggiunte a penna (stampatello/corsivo), parsing della risposta tollerante (commenti, virgole finali, troncamento) così il caricamento non si blocca; `BACKEND_MIN_VERSION` = 5.6. **Backend da pubblicare sui 3 deployment** |
 | 26/09/2026 | Frontend v3.29: rimosso il referto testuale (`exportMatchPdf`); il PDF del riepilogo partita è il report grafico (Vista totale) con condivisione Mail/WhatsApp. Solo frontend |
@@ -1149,12 +1236,17 @@ da solo. Nei mockup è già così.
 Nessuna modifica al codice finché Max non scegle la direzione.
 
 ## Roadmap / backlog
+- [x] **Comandi vocali, fase 1** (parser + foglio "Comandi" + endpoint) e **fase 2** (ascolto e conferma sull'iPad) — v3.32 + backend v5.8, provati con il backend simulato
+- [ ] **Comandi vocali, fase 3**: pubblicare il backend v5.8, creare `VOICE_TOKEN`, scorciatoia sul Watch Ultra (Tasto Azione) e prova in allenamento con la checklist di `COMANDI_VOCALI.md`; poi unire `comandi-vocali` in `main`
+- [ ] **Comandi vocali, fase 4**: rivedere le righe `errore` del foglio "Comandi" dopo le prime partite e aggiungere sinonimi / trascrizioni frequenti a `VOICE_WORDS`
 - [ ] **Analisi gol subiti (v3.18)**: verificare sull'iPad con le partite vere man mano che si accumulano; valutare il confronto con i gol segnati (es. gol subiti subito dopo aver segnato)
 - [ ] **Restyling UX**: scelta direzione A o B da parte di Max, poi implementazione in `index.html` (solo CSS + markup, nessuna modifica alla logica)
 - [ ] Dalla documentazione (2.10): statistiche stagionali aggregate, check-list pre-partita, confronto formazioni, sharing veloce PDF via WhatsApp/email dal Summary, multi-stagione, modalità coach
 - [ ] Valutare: selezione automatica del ritaglio colonne anche per foto orizzontali; anteprima delle strisce prima dell'invio
 
 ## Da verificare
+- [x] Backend v5.8 (03/10/2026, mattina, da Max): Script Property `VOICE_TOKEN` creata; `Code.gs` v5.8 incollato e salvato; `testParserComandi()` → 29/29 OK; `testComandoVocale()` → "✅ Giallo Fiamma GARGARO", foglio "Comandi" creato (pending 1, la riga di prova scade da sola); nuova versione pubblicata su TUTTI e 3 i deployment (dichiarato da Max)
+- [ ] **A carico di Max (comandi vocali, v5.8)**: Verifica versioni → "Backend: v5.8"; token + "Ricevi i comandi" nelle Impostazioni dell'iPad → "Prova token" ✅; scorciatoia "Statistiche" sul Watch; checklist di `COMANDI_VOCALI.md` (frasi scritte a mano nel foglio prima, Watch poi)
 - [x] Backend v5.7 pubblicato e **provato da Max sull'iPad** (27/09/2026 sera) con la distinta Desenzano: numeri prestampati e riga barrata OK. Nota: il primo tentativo girava ancora con l'app in cache (numeri e barrata ignorati); dopo aver ricaricato la nuova versione tutto funziona. Dopo ogni push, chiudere e riaprire l'app e controllare Verifica versioni prima di provare. Prova prevista: backend v5.7 su TUTTI e 3 i deployment; poi con app v3.31, rosa Ospiti svuotata, ricaricare la distinta Desenzano: alla domanda sui numeri prestampati rispondere Sì → 18 atlete, numeri 1–11, 13, 14, 16, 17, 19 dai prestampati, 18 (Schivalocchi) e 15 (Pasini) scritti a mano, FRACCARO scartata
 - [x] (superato dalla v5.7, provata) pubblicare il backend v5.6 (incollare `backend/Code.gs`, salvare, nuova versione su TUTTI e 3 i deployment); poi Verifica versioni → "Backend: v5.6" e ricaricare la distinta Desenzano del 27/09/2026: FRACCARO CAMILLA deve comparire solo in "🚫 barrate scartate", CAREDDU GIULIA deve essere in rosa
 - [ ] Sull'iPad (app v3.27): Home → 📄 Report → Tutta la stagione / una partita → sezioni → "📤 Condividi" via Mail e via WhatsApp; controllare impaginazione, tempi di generazione e peso del PDF con tutte le partite vere; provare anche "📤 Esporta PDF" in fondo alla Dashboard

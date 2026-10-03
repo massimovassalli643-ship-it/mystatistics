@@ -228,6 +228,18 @@
   .events-header { padding: 18px 20px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; }
   .events-title { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #7fb8ff; }
   .events-list { flex: 1; overflow-y: auto; padding: 12px 16px; }
+  /* Comandi vocali (v3.32): stato del collegamento con il Watch e conferma con Annulla */
+  .voice-badge { margin: 10px 16px 0; font-size: 11px; font-weight: 700; padding: 6px 10px; border-radius: 6px; line-height: 1.35; }
+  .voice-badge.on { color: #2ed573; background: rgba(46,213,115,0.13); }
+  .voice-badge.wait { color: #7fb8ff; background: rgba(127,184,255,0.15); }
+  .voice-badge.off { color: #ffd23f; background: rgba(255,210,63,0.15); }
+  .voice-toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 150; display: none; align-items: center; gap: 14px; max-width: min(720px, calc(100vw - 32px)); padding: 14px 16px 14px 18px; border-radius: 14px; background: #0f2238; border: 2px solid #2ed573; box-shadow: 0 10px 30px rgba(0,0,0,0.5); color: #fff; }
+  .voice-toast.active { display: flex; }
+  .voice-toast.error { border-color: #ff4757; }
+  .voice-toast-text { flex: 1; font-size: 16px; font-weight: 700; line-height: 1.35; }
+  .voice-toast-text small { display: block; font-size: 12px; font-weight: 500; color: #b8d4ed; margin-top: 2px; }
+  .voice-toast button { padding: 12px 18px; border-radius: 10px; font-size: 15px; font-weight: 800; background: #ff4757; color: #fff; white-space: nowrap; }
+  .voice-toast button.close { background: rgba(255,255,255,0.12); }
   .event-item { background: rgba(255,255,255,0.05); border-left: 3px solid #7fb8ff; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; display: flex; gap: 10px; align-items: flex-start; animation: slideIn 0.3s ease; }
   @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
   .event-item.goal { border-left-color: #2ecc71; }
@@ -744,6 +756,7 @@
         <div class="events-title">Eventi partita</div>
         <div class="roster-count" id="events-count">0</div>
       </div>
+      <div class="voice-badge" id="voice-badge" style="display:none;"></div>
       <div class="events-list" id="events-list">
         <div class="events-empty">Nessun evento registrato</div>
       </div>
@@ -882,6 +895,12 @@
   </div>
 </div>
 
+<div class="voice-toast" id="voice-toast" role="status" aria-live="polite">
+  <div class="voice-toast-text" id="voice-toast-text"></div>
+  <button id="voice-toast-undo" onclick="undoVoiceToast()">↩️ Annulla</button>
+  <button class="close" onclick="hideVoiceToast()" title="Chiudi">✕</button>
+</div>
+
 <div class="modal-overlay" id="settings-modal">
   <div class="modal">
     <div class="modal-title">⚙️ Impostazioni</div>
@@ -895,6 +914,16 @@
       <div style="display:flex;gap:8px;">
         <button class="secondary-btn" onclick="testSheetsConnection()" style="flex:1;padding:10px;font-size:13px;">🔗 Testa connessione</button>
         <button class="secondary-btn" onclick="clearSheetsUrl()" style="flex:1;padding:10px;font-size:13px;background:rgba(220,53,69,0.15);color:#ff6b7a;">🗑️ Rimuovi</button>
+      </div>
+      <div class="modal-field" style="margin-top:16px;">
+        <label class="modal-label">🎙️ Comandi vocali da Apple Watch</label>
+        <input type="password" class="modal-input" id="settings-voice-token" placeholder="Token (lo stesso della scorciatoia sul Watch)" autocomplete="off" style="font-size:13px;font-family:monospace;">
+        <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:#b8d4ed;">
+          <input type="checkbox" id="settings-voice-on" style="width:20px;height:20px;"> Ricevi i comandi durante la partita
+        </label>
+        <div style="font-size:11px;color:#7a96b3;margin-top:6px;line-height:1.4;">Il token è salvato solo su questo dispositivo, mai nel codice pubblico. Deve coincidere con la proprietà VOICE_TOKEN del backend.</div>
+        <div id="settings-voice-result" style="font-size:12px;padding:8px;border-radius:6px;display:none;margin-top:8px;"></div>
+        <button class="secondary-btn" onclick="testVoiceSettings()" style="width:100%;padding:10px;font-size:13px;margin-top:8px;">🎙️ Prova token comandi vocali</button>
       </div>
       <div class="modal-field" style="margin-top:16px;">
         <label class="modal-label">Versioni</label>
@@ -913,9 +942,9 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.31';
+const APP_VERSION = '3.32';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
-const BACKEND_MIN_VERSION = '5.7';
+const BACKEND_MIN_VERSION = '5.8';
 const STORAGE_KEY = 'mystatistics_matches_v2';
 const PERIODS = ['1° tempo', '2° tempo', '1° supplementare', '2° supplementare', 'Partita conclusa'];
 const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
@@ -2205,6 +2234,12 @@ function parsePlayer(val) {
 
 function deleteEvent(id) {
   if (!confirm('Eliminare questo evento?')) return;
+  removeEvent(id);
+}
+
+/* Rimozione senza conferma: la usano il cestino (dopo il confirm) e l'Annulla
+   dei comandi vocali. Un goal tolto riporta indietro il punteggio. */
+function removeEvent(id) {
   const ev = state.currentMatch.events.find(e => e.id === id);
   if (ev && ev.type === 'goal') {
     if (ev.goalType === 'autogol') state.currentMatch[ev.team === 'home' ? 'away' : 'home'].score--;
@@ -2265,6 +2300,326 @@ function eventCardHtml(e) {
     </div>
   `;
 }
+
+/* ==================== COMANDI VOCALI (Apple Watch) ==================== */
+/*
+ * v3.32 + backend v5.8: Max detta la frase al Watch ("gol fiamma 9 azione"),
+ * la scorciatoia Comandi la manda al backend (action 'voice'), che la
+ * interpreta e la accoda nel foglio "Comandi". Qui, solo con la schermata
+ * partita aperta su una gara in corso, ogni VOICE_POLL_MS si leggono i comandi
+ * nuovi ('voicePoll'), si riconosce la squadra (voiceTarget) e si risolve
+ * cognome / numero di maglia sulla rosa della partita, poi si registra
+ * l'evento con la stessa logica dei pulsanti
+ * (addMatchEvent = ramo "nuovo evento" di confirmEvent). L'esito torna al
+ * foglio con 'voiceAck' (applicato / errore / annullato).
+ * - Riquadro di conferma con "Annulla" per VOICE_UNDO_MS; "annulla" dettato
+ *   toglie l'ultimo evento arrivato da comando vocale (mai quelli inseriti a mano).
+ * - Il token sta solo nel localStorage di questo iPad (Impostazioni), mai nel
+ *   codice pubblicato su GitHub Pages.
+ * - Comandi gia' applicati (VOICE_DONE_KEY): se la conferma al backend non
+ *   arriva e il comando torna nel giro successivo, NON viene applicato due volte.
+ * - Con una finestra aperta (es. modale evento) i comandi restano in coda: il
+ *   backend li fa scadere dopo 2 minuti, mai applicati in ritardo.
+ */
+const VOICE_POLL_MS = 4000;
+const VOICE_UNDO_MS = 8000;
+const VOICE_ERROR_MS = 12000;
+const VOICE_TOKEN_KEY = 'mystatistics_voice_token';
+const VOICE_ON_KEY = 'mystatistics_voice_on';
+const VOICE_DONE_KEY = 'mystatistics_voice_done';
+const VOICE_DONE_MAX = 200;
+const VOICE_OUR_TEAM = 'FIAMMA MONZA';      // "fiamma" = la squadra con questo nome; "avversario" = l'altra
+const VOICE_UNKNOWN_PLAYER = 'Non indicata'; // avversaria senza numero ("gol avversario azione")
+let voice = { busy: false, lastOkAt: null, lastError: '', last: null, pendingAck: [], toast: null, toastTimer: null };
+
+function voiceToken() { return localStorage.getItem(VOICE_TOKEN_KEY) || ''; }
+function voiceEnabled() { return localStorage.getItem(VOICE_ON_KEY) === '1' && !!voiceToken() && !!getSheetsUrl(); }
+function voiceListening() {
+  const m = state.currentMatch;
+  return voiceEnabled() && !!m && !m.completed && document.getElementById('match-screen').classList.contains('active');
+}
+
+async function voiceCall(body, url, token) {
+  const res = await fetch(url || getSheetsUrl(), {
+    method: 'POST',
+    redirect: 'follow',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({ token: token || voiceToken() }, body))
+  });
+  const data = await res.json();
+  if (!data || !data.ok) throw new Error((data && data.error) || 'risposta inattesa dal backend');
+  return data;
+}
+
+function voiceDoneList() {
+  try { return JSON.parse(localStorage.getItem(VOICE_DONE_KEY) || '[]'); } catch { return []; }
+}
+function voiceSaveDone(res) {
+  const list = voiceDoneList().filter(d => d.id !== res.id);
+  list.push({ id: res.id, stato: res.stato, messaggio: res.messaggio });
+  localStorage.setItem(VOICE_DONE_KEY, JSON.stringify(list.slice(-VOICE_DONE_MAX)));
+}
+
+async function voiceTick() {
+  if (!voiceListening()) { renderVoiceBadge(); return; }
+  if (voice.busy || document.visibilityState !== 'visible') return;
+  if (document.querySelector('.modal-overlay.active')) { renderVoiceBadge('wait'); return; }
+  voice.busy = true;
+  try {
+    await voiceFlushAck();
+    const data = await voiceCall({ action: 'voicePoll' });
+    voice.lastOkAt = Date.now();
+    voice.lastError = '';
+    for (const c of data.commands || []) {
+      // una finestra aperta nel frattempo: il resto aspetta il giro successivo
+      if (!voiceListening() || document.querySelector('.modal-overlay.active')) break;
+      voice.pendingAck.push(applyVoiceCommand(c));
+    }
+    await voiceFlushAck();
+  } catch (e) {
+    voice.lastError = e.message || String(e);
+  } finally {
+    voice.busy = false;
+    renderVoiceBadge();
+  }
+}
+
+async function voiceFlushAck() {
+  if (!voice.pendingAck.length) return;
+  const batch = voice.pendingAck.splice(0);
+  try {
+    await voiceCall({ action: 'voiceAck', results: batch.map(r => ({ id: r.id, stato: r.stato, messaggio: r.messaggio })) });
+  } catch (e) {
+    voice.pendingAck.unshift(...batch);   // riprova al giro successivo
+    throw e;
+  }
+}
+
+function applyVoiceCommand(c) {
+  const done = voiceDoneList().find(d => d.id === c.id);
+  if (done) return done;               // gia' applicato: si conferma soltanto
+  let res;
+  try {
+    res = runVoiceCommand(c);
+  } catch (e) {
+    res = { stato: 'errore', messaggio: e.message || String(e) };
+  }
+  res.id = c.id;
+  voiceSaveDone(res);
+  voice.last = { text: c.text, at: Date.now(), ok: res.stato === 'applicato' };
+  showVoiceToast(res, c);
+  return res;
+}
+
+function runVoiceCommand(c) {
+  const m = state.currentMatch;
+  const cmd = c.command || {};
+  if (cmd.type === 'undo') {
+    const ev = m.events.filter(e => e.voiceCmd).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))[0];
+    if (!ev) throw new Error('Niente da annullare: nessun evento registrato da comando vocale');
+    const label = eventPlainLabel(ev);
+    removeEvent(ev.id);
+    voiceMarkCancelled(ev.voiceCmd, 'Annullato con "annulla" dal Watch');
+    return { stato: 'applicato', messaggio: 'Annullato: ' + label };
+  }
+  const { side, ours, player } = voiceTarget(cmd);
+  const pick = (ref, role) => {
+    if (ref) return resolveVoicePlayer(side, ref, role);
+    if (side !== ours) return { num: null, name: VOICE_UNKNOWN_PLAYER };
+    throw new Error('Manca la giocatrice (' + role + ')');
+  };
+  const periodMinute = Math.floor(currentElapsedMs() / 60000);
+  const ev = { type: cmd.type, team: side, periodMinute, period: state.timer.periodIndex };
+  ev.minute = periodMinute + (PERIOD_OFFSETS[ev.period] || 0);
+  if (cmd.type === 'goal') {
+    ev.scorer = pick(player, cmd.goalType === 'autogol' ? 'autogol' : 'marcatrice');
+    ev.assist = cmd.assist ? resolveVoicePlayer(side, cmd.assist, 'assist') : null;
+    ev.goalType = cmd.goalType || 'azione';
+  } else if (cmd.type === 'yellow' || cmd.type === 'red' || cmd.type === 'penaltysave') {
+    ev.player = pick(player, cmd.type === 'penaltysave' ? 'chi ha parato' : 'calciatrice');
+  } else if (cmd.type === 'sub') {
+    ev.playerOut = resolveVoicePlayer(side, player, 'esce');
+    ev.playerIn = resolveVoicePlayer(side, cmd.playerIn, 'entra');
+    ev.subReason = cmd.subReason || 'tattica';
+  } else {
+    throw new Error('Evento non riconosciuto');
+  }
+  ev.voiceCmd = c.id;
+  addMatchEvent(ev);
+  return { stato: 'applicato', messaggio: eventPlainLabel(ev) + ' al ' + ev.minute + "'", eventId: ev.id };
+}
+
+/* Squadra del comando (matrice di Max, 03/10/2026):
+   - "fiamma" / "avversario" detti come parola chiave (cmd.team);
+   - altrimenti le prime parole non riconosciute dal backend (cmd.lead) si
+     confrontano con i nomi delle due squadre della partita ("Brugherio",
+     "citta di Brugherio"): le parole che avanzano sono il cognome
+     ("goal Brugherio Rossi");
+   - squadra non detta: si cerca la giocatrice in entrambe le rose; vale solo
+     se compare in UNA sola, altrimenti il comando e' rifiutato.
+   In statistica resta sempre il nome della squadra come da distinta. */
+function voiceTarget(cmd) {
+  const m = state.currentMatch;
+  const ours = ourSideOf(m, VOICE_OUR_TEAM);
+  const other = ours === 'home' ? 'away' : 'home';
+  let side = cmd.team === 'fiamma' ? ours : cmd.team === 'avversario' ? other : null;
+  let player = cmd.player || null;
+  if (cmd.lead) {
+    const words = athleteWords(cmd.lead);
+    let hit = null;
+    for (let k = words.length; k >= 1 && !hit; k--) {
+      const sides = ['home', 'away'].filter(sd => voiceNameIsTeam(words.slice(0, k), m[sd].name));
+      if (sides.length === 2) throw new Error('"' + cmd.lead + '" corrisponde a entrambe le squadre: di\' "fiamma" o "avversario"');
+      if (sides.length === 1) hit = { side: sides[0], k };
+    }
+    if (hit) {
+      side = hit.side;
+      const rest = words.slice(hit.k).join(' ');
+      if (rest) {
+        if (player || cmd.type === 'sub') throw new Error('Parole in piu\' dopo la squadra: "' + rest + '"');
+        player = { name: rest };
+      }
+    } else {
+      // nessuna squadra con quel nome: era il cognome ("ammonizione Gargaro")
+      if (player || cmd.type === 'sub') {
+        throw new Error('Squadra "' + cmd.lead + '" non riconosciuta (in partita: ' + m.home.name + ' – ' + m.away.name + ')');
+      }
+      player = { name: cmd.lead };
+    }
+  }
+  if (!side) {
+    const refs = [player, cmd.playerIn, cmd.assist].filter(Boolean);
+    if (!refs.length) throw new Error('Di\' la squadra: fiamma, avversario o il nome della squadra');
+    const fits = ['home', 'away'].filter(sd => refs.every(r => {
+      try { resolveVoicePlayer(sd, r, ''); return true; } catch (e) { return false; }
+    }));
+    const who = refs.map(r => (r.num != null ? 'maglia ' + r.num : '"' + r.name + '"')).join(', ');
+    if (!fits.length) throw new Error(who + ': non trovata in nessuna delle due rose');
+    if (fits.length > 1) throw new Error(who + ': presente in entrambe le squadre, di\' "fiamma" o il nome della squadra');
+    side = fits[0];
+  }
+  return { side, ours, player };
+}
+
+/* Le parole dette sono il nome della squadra se ognuna (tolte le sigle e le
+   parole corte, come in teamWords) si ritrova nel nome, con 1 lettera di tolleranza */
+function voiceNameIsTeam(spokenWords, teamName) {
+  const said = spokenWords.filter(w => w.length >= 3 && TEAM_STOPWORDS.indexOf(w) < 0);
+  const tw = teamWords(teamName);
+  return said.length > 0 && said.every(w => tw.some(x => wordsAlike(w, x)));
+}
+
+/* Come confirmEvent per un evento nuovo: punteggio, id, salvataggio, ridisegno */
+function addMatchEvent(ev) {
+  if (ev.type === 'goal') {
+    if (ev.goalType === 'autogol') state.currentMatch[ev.team === 'home' ? 'away' : 'home'].score++;
+    else state.currentMatch[ev.team].score++;
+  }
+  ev.id = 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  ev.timestamp = Date.now();
+  state.currentMatch.events.push(ev);
+  persistCurrent();
+  renderMatchInfo();   // NON renderMatchScreen: il cronometro deve continuare a correre
+}
+
+/* ref = { num } oppure { name } (cognome dettato: di norma per la Fiamma; il
+   numero per le avversarie con cognomi uguali). Il cognome si confronta parola per parola come in sameAthlete
+   (accenti ignorati, 1 lettera di differenza sulle parole di 4+ lettere).
+   Nessuna corrispondenza o piu' di una = errore, nessun evento. */
+function resolveVoicePlayer(side, ref, role) {
+  const team = state.currentMatch[side];
+  const label = team.name || (side === 'home' ? 'Casa' : 'Ospiti');
+  if (!ref) throw new Error('Manca la giocatrice (' + role + ')');
+  if (ref.num != null) {
+    const hits = team.roster.filter(p => p.num != null && Number(p.num) === Number(ref.num));
+    if (hits.length === 1) return { num: hits[0].num, name: hits[0].name };
+    if (!hits.length) throw new Error('Maglia ' + ref.num + ' non in rosa ' + label + ' (' + role + ')');
+    throw new Error('Maglia ' + ref.num + ' presente ' + hits.length + ' volte in rosa ' + label + ': correggi la rosa');
+  }
+  const spoken = athleteWords(ref.name);
+  if (!spoken.length) throw new Error('Giocatrice non indicata (' + role + ')');
+  const matchAll = (p, eq) => { const w = athleteWords(p.name); return spoken.every(sw => w.some(x => eq(sw, x))); };
+  let hits = team.roster.filter(p => matchAll(p, (a, b) => a === b));
+  if (!hits.length) hits = team.roster.filter(p => matchAll(p, wordsAlike));
+  if (hits.length === 1) return { num: hits[0].num, name: hits[0].name };
+  if (!hits.length) throw new Error('"' + ref.name + '" non trovata in rosa ' + label + ' (' + role + '): usa il numero di maglia');
+  throw new Error('"' + ref.name + '" ambigua in rosa ' + label + ' (' + hits.map(p => (p.num ?? '?') + ' ' + p.name).join(', ') + '): usa il numero di maglia');
+}
+
+function eventPlainLabel(e) {
+  const team = state.currentMatch[e.team].name;
+  const who = p => (p ? (p.num ?? '?') + ' ' + p.name : '');
+  if (e.type === 'goal') {
+    return (e.goalType === 'autogol' ? 'Autogol ' : 'Gol ') + team + ' · ' + who(e.scorer) +
+      (e.goalType && e.goalType !== 'azione' && e.goalType !== 'autogol' ? ' su ' + e.goalType : '') +
+      (e.assist ? ' · assist ' + who(e.assist) : '');
+  }
+  if (e.type === 'sub') return 'Sostituzione ' + team + ' · esce ' + who(e.playerOut) + ', entra ' + who(e.playerIn);
+  return ({ yellow: 'Ammonizione ', red: 'Espulsione ', penaltysave: 'Rigore parato ' }[e.type] || '') + team + ' · ' + who(e.player);
+}
+
+function voiceMarkCancelled(cmdId, why) {
+  const res = { id: cmdId, stato: 'annullato', messaggio: why };
+  voiceSaveDone(res);
+  voice.pendingAck.push(res);
+}
+
+function showVoiceToast(res, c) {
+  const box = document.getElementById('voice-toast');
+  const ok = res.stato === 'applicato';
+  const isUndo = c.command && c.command.type === 'undo';
+  document.getElementById('voice-toast-text').innerHTML =
+    (ok ? (isUndo ? '↩️ ' : '🎙️ ') : '❌ Comando non registrato: ') + escapeHtml(res.messaggio) +
+    '<small>Dal Watch: "' + escapeHtml(c.text) + '"</small>';
+  box.classList.toggle('error', !ok);
+  document.getElementById('voice-toast-undo').style.display = ok && res.eventId ? '' : 'none';
+  box.classList.add('active');
+  voice.toast = ok && res.eventId ? { eventId: res.eventId, cmdId: res.id } : null;
+  clearTimeout(voice.toastTimer);
+  voice.toastTimer = setTimeout(hideVoiceToast, ok ? VOICE_UNDO_MS : VOICE_ERROR_MS);
+}
+function hideVoiceToast() {
+  clearTimeout(voice.toastTimer);
+  voice.toast = null;
+  document.getElementById('voice-toast').classList.remove('active');
+}
+function undoVoiceToast() {
+  const t = voice.toast;
+  hideVoiceToast();
+  if (!t || !state.currentMatch || !state.currentMatch.events.some(e => e.id === t.eventId)) return;
+  removeEvent(t.eventId);
+  voiceMarkCancelled(t.cmdId, 'Annullato dal riquadro di conferma sull\'iPad');
+  voiceFlushAck().catch(() => {});   // se non passa, riprova al giro successivo
+}
+
+function renderVoiceBadge(mode) {
+  const el = document.getElementById('voice-badge');
+  if (!el) return;
+  const m = state.currentMatch;
+  if (!voiceEnabled() || !m) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  const time = ts => new Date(ts).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const last = voice.last
+    ? ' · ultimo ' + (voice.last.ok ? '✓' : '✗') + ' "' + escapeHtml(voice.last.text) + '" alle ' + time(voice.last.at)
+    : ' · nessun comando ricevuto';
+  if (m.completed) {
+    el.className = 'voice-badge wait';
+    el.innerHTML = '⏸ Watch in pausa: partita conclusa';
+  } else if (mode === 'wait') {
+    el.className = 'voice-badge wait';
+    el.innerHTML = '⏸ Watch: finestra aperta, comandi in attesa';
+  } else if (voice.lastError) {
+    el.className = 'voice-badge off';
+    el.innerHTML = '⚠️ Watch non collegato: ' + escapeHtml(voice.lastError) + ' — riprovo';
+  } else if (voice.lastOkAt) {
+    el.className = 'voice-badge on';
+    el.innerHTML = '🎙️ Watch in ascolto' + last;
+  } else {
+    el.className = 'voice-badge wait';
+    el.innerHTML = '🎙️ Watch: collegamento…';
+  }
+}
+setInterval(voiceTick, VOICE_POLL_MS);
 
 function openAddPlayerModal() {
   if (!state.currentMatch) return;
@@ -3856,6 +4211,9 @@ function getSheetsUrl() {
 
 function openSettingsModal() {
   document.getElementById('settings-sheets-url').value = getSheetsUrl();
+  document.getElementById('settings-voice-token').value = voiceToken();
+  document.getElementById('settings-voice-on').checked = localStorage.getItem(VOICE_ON_KEY) === '1';
+  document.getElementById('settings-voice-result').style.display = 'none';
   document.getElementById('settings-test-result').style.display = 'none';
   document.getElementById('settings-version-result').style.display = 'none';
   document.getElementById('settings-version-app').textContent = 'App in esecuzione: v' + APP_VERSION + ' • backend richiesto: almeno v' + BACKEND_MIN_VERSION;
@@ -3947,6 +4305,11 @@ function saveSheetsUrl() {
     return;
   }
   localStorage.setItem(SHEETS_URL_KEY, url);
+  const token = document.getElementById('settings-voice-token').value.trim();
+  if (token) localStorage.setItem(VOICE_TOKEN_KEY, token); else localStorage.removeItem(VOICE_TOKEN_KEY);
+  localStorage.setItem(VOICE_ON_KEY, document.getElementById('settings-voice-on').checked ? '1' : '0');
+  voice.lastError = '';
+  renderVoiceBadge();
   closeModal('settings-modal');
   alert('Impostazioni salvate.');
 }
@@ -3956,6 +4319,29 @@ function clearSheetsUrl() {
   localStorage.removeItem(SHEETS_URL_KEY);
   document.getElementById('settings-sheets-url').value = '';
   alert('URL rimosso.');
+}
+
+/* Prova del token comandi vocali: conta i comandi in coda senza modificarli */
+async function testVoiceSettings() {
+  const el = document.getElementById('settings-voice-result');
+  const url = document.getElementById('settings-sheets-url').value.trim() || getSheetsUrl();
+  const token = document.getElementById('settings-voice-token').value.trim();
+  el.style.display = 'block';
+  const show = (ok, text) => {
+    el.style.background = ok ? 'rgba(46,204,113,0.15)' : 'rgba(220,53,69,0.15)';
+    el.style.color = ok ? '#2ecc71' : '#ff6b7a';
+    el.textContent = text;
+  };
+  if (!url || !token) { show(false, '❌ Servono URL del backend e token'); return; }
+  el.style.background = 'rgba(127,184,255,0.15)';
+  el.style.color = '#7fb8ff';
+  el.textContent = '⏳ Prova in corso...';
+  try {
+    const data = await voiceCall({ action: 'voicePoll', peek: true }, url, token);
+    show(true, '✅ Token valido, foglio "Comandi" raggiungibile · comandi in attesa: ' + (data.pending || 0));
+  } catch (e) {
+    show(false, '❌ ' + e.message);
+  }
 }
 
 async function testSheetsConnection() {
