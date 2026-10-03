@@ -1,5 +1,10 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v5.9 (03/10/2026): doPost tollerante per la scorciatoia del Watch: "voice"
+//   con spazi/maiuscole accettato, chiavi ripulite da spazi invisibili, corpo
+//   anche come modulo. Una richiesta senza action riconosciuta e senza partita
+//   risponde "Richiesta non riconosciuta. Ricevuto: chiavi [...]" (mai il
+//   token) invece del fuorviante "Payload mancante". Nessun nuovo scope.
 // v5.8 (03/10/2026): COMANDI VOCALI da Apple Watch. Nuove action:
 //   'voice'     (dal Watch, scorciatoia Comandi) - frase dettata -> parser ->
 //               riga nel foglio "Comandi" (creato da solo se manca). Non tocca
@@ -67,7 +72,7 @@
 
 // Aggiornare ad OGNI modifica di questo file; il frontend la confronta con
 // BACKEND_MIN_VERSION di index.html.
-const BACKEND_VERSION = '5.8';
+const BACKEND_VERSION = '5.9';
 
 const SHEET_PARTITE = 'Partite';
 const SHEET_STATISTICHE = 'Statistiche';
@@ -88,7 +93,7 @@ const DISTINTE_MAX_FILES = 60;
 // ============================================
 function doPost(e) {
   try {
-    const payload = JSON.parse(e.postData.contents);
+    const payload = readPostPayload(e);
     if (payload.action === 'ocr') {
       return handleOcrRequest(payload);
     }
@@ -107,10 +112,46 @@ function doPost(e) {
     if (payload.action === 'voice' || payload.action === 'voicePoll' || payload.action === 'voiceAck') {
       return handleVoiceRequest(payload);
     }
+    // v5.9: la scorciatoia del Watch puo' scrivere "voice" con spazi o maiuscole
+    // (suggerimenti della tastiera iOS)
+    if (cleanKey(payload.action).toLowerCase() === 'voice') {
+      payload.action = 'voice';
+      return handleVoiceRequest(payload);
+    }
+    if (!payload.match) {
+      return jsonResponse({ ok: false, error: 'Richiesta non riconosciuta', message: '❌ Richiesta non riconosciuta. Ricevuto: ' + describePayload(e, payload) });
+    }
     return handleSyncRequest(payload);
   } catch (err) {
-    return jsonResponse({ ok: false, error: String(err) });
+    return jsonResponse({ ok: false, error: String(err), message: '❌ ' + String(err) });
   }
+}
+
+// v5.9: corpo JSON (app, scorciatoia) oppure modulo (e.parameter); chiavi
+// ripulite da spazi e caratteri invisibili ("action " -> "action")
+function readPostPayload(e) {
+  var raw = e && e.postData ? e.postData.contents : '';
+  var payload = null;
+  try { payload = JSON.parse(raw); } catch (err) { payload = null; }
+  if (typeof payload === 'string') {
+    try { payload = JSON.parse(payload); } catch (err) { /* resta stringa */ }
+  }
+  if (!payload || typeof payload !== 'object') payload = (e && e.parameter) || {};
+  var out = {};
+  Object.keys(payload).forEach(function (k) { out[cleanKey(k)] = payload[k]; });
+  return out;
+}
+
+function cleanKey(v) {
+  return String(v == null ? '' : v).replace(/[\s\u200B-\u200D\uFEFF]+/g, '');
+}
+
+// Diagnostica senza riportare il token: chiavi ricevute, valore di action, tipo di contenuto
+function describePayload(e, payload) {
+  return 'chiavi [' + Object.keys(payload).join(', ') + ']' +
+    ', action=' + JSON.stringify(payload.action === undefined ? null : payload.action) +
+    ', tipo=' + ((e && e.postData && e.postData.type) || 'nessun corpo') +
+    ', lunghezza=' + ((e && e.postData && e.postData.contents) ? e.postData.contents.length : 0);
 }
 
 // ============================================
@@ -775,7 +816,7 @@ var VOICE_SUB_REASONS = { tattica: 'tattica', tattico: 'tattica', infortunio: 'i
 
 function voiceNormalize(text) {
   return String(text == null ? '' : text).toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/(\d)([a-z])/g, '$1 $2').replace(/([a-z])(\d)/g, '$1 $2')
     .replace(/[^a-z0-9]+/g, ' ').trim();
 }

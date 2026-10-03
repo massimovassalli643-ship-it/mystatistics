@@ -20,7 +20,30 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Comandi vocali | Guida completa (scorciatoia Watch, frasi, checklist): `COMANDI_VOCALI.md`. Token in Script Property `VOICE_TOKEN` e nelle Impostazioni dell'iPad, **mai nel repository** |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.32 + backend v5.8 — Comandi vocali da Apple Watch (03/10/2026)
+## Stato attuale: v3.32 + backend v5.9 — Comandi vocali da Apple Watch (03/10/2026)
+
+### Correzione backend v5.9 (03/10/2026, sera)
+
+**Problema**: la scorciatoia "Statistiche" sull'iPhone riceveva
+`{"ok":false,"error":"Payload mancante"}` e nel foglio "Comandi" non compariva
+nessuna riga, con l'URL giusto (ping GET → v5.8) e i campi `action`=`voice`,
+`token`, `text`=Testo dettato in apparenza corretti. "Payload mancante" e'
+l'errore della sincronizzazione partita: il backend non aveva riconosciuto
+`action` come `voice` (causa probabile: spazio o carattere invisibile inserito
+dai suggerimenti della tastiera iOS, non verificabile dalle foto).
+
+- `doPost` legge il corpo con `readPostPayload` (JSON, JSON doppio, oppure
+  modulo `e.parameter`), ripulisce le chiavi da spazi/caratteri invisibili e
+  accetta `voice` con spazi o maiuscole.
+- Una richiesta senza action riconosciuta e senza `match` risponde
+  "❌ Richiesta non riconosciuta. Ricevuto: chiavi [...], action=..., tipo=...,
+  lunghezza=..." (mai il valore del token), invece di "Payload mancante".
+- Provato in node con il backend simulato: `"action ":"Voice "` → "✅ Giallo
+  Fiamma GARGARO"; corpo a modulo → OK; chiavi estranee → messaggio diagnostico;
+  parser 29/29. `BACKEND_MIN_VERSION` resta 5.8 (il frontend non cambia).
+- **Da pubblicare**: incollare `Code.gs`, salvare, nuova versione su TUTTI e 3
+  i deployment; poi rieseguire la scorciatoia (con "Mostra Contenuti URL").
+
 
 ### Novità v3.32 + backend v5.8 (03/10/2026)
 
@@ -1153,7 +1176,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `GS_RATE_MAX` | 5 | fondo scala delle barre "gol ogni 90'" |
 | `GS_GOALS_SHOWN` | 12 | righe di "Gol per gol" visibili prima di "Mostra gli altri" |
 | `BACKEND_MIN_VERSION` | 5.8 | versione minima di backend richiesta dal frontend (Verifica versioni) |
-| `BACKEND_VERSION` (`Code.gs`) | 5.8 | versione del backend, restituita dal ping GET |
+| `BACKEND_VERSION` (`Code.gs`) | 5.9 | versione del backend, restituita dal ping GET |
 | `WAKE_SCREENS` | setup, lineup, match | schermate su cui lo schermo resta acceso (Wake Lock) |
 | OCR `max_tokens` (`Code.gs`) | 4000 | limite di token della risposta OCR (era 3000) |
 | `TIMER_RECOVERY_MAX_MS` | 2 h | oltre questo intervallo un cronometro "in marcia" salvato non viene ripristinato |
@@ -1187,6 +1210,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 03/10/2026 | Backend v5.9: `doPost` tollerante per la scorciatoia del Watch (`voice` con spazi/maiuscole, chiavi ripulite, corpo a modulo) e messaggio diagnostico "Richiesta non riconosciuta. Ricevuto: …" al posto di "Payload mancante". **Da pubblicare sui 3 deployment** |
 | 03/10/2026 | Frontend v3.32 + backend v5.8 (branch `comandi-vocali`): comandi vocali da Apple Watch — action `voice`/`voicePoll`/`voiceAck` con token `VOICE_TOKEN`, foglio "Comandi" come coda, parser con test (29 frasi, matrice di Max: squadra per nome, Fiamma per cognome), iPad in ascolto ogni 4 s nella schermata partita, riquadro di conferma con Annulla, "annulla" dettato, badge di stato, impostazioni token; guida `COMANDI_VOCALI.md`; `BACKEND_MIN_VERSION` = 5.8. Backend v5.8 pubblicato da Max sui 3 deployment (test dall'editor 29/29) |
 | 27/09/2026 | Frontend v3.31 + backend v5.7: campo `row` (numero di riga prestampato); con la cella "N° del Ruolo" vuota, su conferma, il numero di maglia è il prestampato (lo scritto a mano vince); `BACKEND_MIN_VERSION` = 5.7. **Backend da pubblicare sui 3 deployment** |
 | 27/09/2026 | Frontend v3.30 + backend v5.6: OCR scarta le righe barrate (`excluded`), legge le righe aggiunte a penna (stampatello/corsivo), parsing della risposta tollerante (commenti, virgole finali, troncamento) così il caricamento non si blocca; `BACKEND_MIN_VERSION` = 5.6. **Backend da pubblicare sui 3 deployment** |
