@@ -33,6 +33,7 @@ Full functional/technical documentation: PDF "MyStatistics_Documentazione"
 - Keep the logical module structure of `index.html` (Storage, Navigazione,
   Home, Setup, OCR, Lineup, Match, Eventi, Statistiche, Summary, Export, Sync,
   Impostazioni, Utility) — add code inside the matching block
+- Look (v3.35): dark theme in the club colors (navy `#0F1F4D`/`#12286a`, red `#D8232A` only as the top-bar line), Barlow / Barlow Condensed from Google Fonts, club logo `logo.png`. Same identity as `registro-presenze-fiamma-monza` and `convocazioni`, but kept dark on purpose (charts, PDF and report are tuned on a dark background). Keep tap targets >= 44 px and text >= 11 px
 - Frontend → backend requests use `Content-Type: text/plain;charset=utf-8`
   (avoids CORS preflight, which Apps Script cannot answer)
 - Files in the repo are normalized to LF: edit with tools that read/modify/write

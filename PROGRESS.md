@@ -20,7 +20,18 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Comandi vocali | Guida completa (scorciatoia Watch, frasi, checklist): `COMANDI_VOCALI.md`. Token in Script Property `VOICE_TOKEN` e nelle Impostazioni dell'iPad, **mai nel repository** |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.34 + backend v5.9 — Schermata partita a silos (03/10/2026)
+## Stato attuale: v3.35 + backend v5.9 — Grafica Fiammamonza (09/10/2026)
+
+### Novità v3.35 (09/10/2026)
+
+Restyling su richiesta di Max, coerente con le app presenze e convocazioni. Scelto di **restare scuri** (l'app si usa in partita, con grafici e PDF tarati sul fondo scuro): cambiano solo colori di sfondo (blu del club), logo, font, pulsanti e dimensioni di tocco.
+
+- Barra in alto con il logo del club e un filo rosso; titoli e numeri grandi in Barlow Condensed (le cifre del cronometro restano a larghezza fissa).
+- Pulsante principale bianco su blu (Nuova partita, Esporta, Conferma).
+- Più comodi da toccare: X/M delle rose, spunta del recupero, modifica/elimina eventi, scelte nei moduli.
+- **Da riprovare sull'iPad prima della prossima partita**: Home, Setup, schermata partita, Dashboard.
+
+### Stato precedente: v3.34 + backend v5.9 — Schermata partita a silos (03/10/2026)
 
 ### Novità v3.34 (03/10/2026)
 
@@ -1252,6 +1263,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | 13/09/2026 | Frontend v3.5: messaggi d'errore OCR leggibili (credito esaurito, rate limit, chiave, rete) |
 | 13/09/2026 | Frontend v3.6: dashboard statistiche (stagione + singola partita) e report via email |
 | 13/09/2026 | Backend v5: action `sendReport`, scope `script.send_mail` (da autorizzare prima di pubblicare) |
+| 09/10/2026 | Frontend v3.35: nuova grafica con i colori e il logo Fiammamonza, stessa identità di presenze e convocazioni ma restando **scura** (blu del club, filo rosso sotto la barra, font Barlow / Barlow Condensed); pulsante principale bianco al posto dell'arancione; bersagli di tocco ≥ 44 px (X/M della rosa, spunta del recupero, modifica/elimina eventi, scelte dei moduli) e etichette sotto gli 11 px portate a 11 px; grigi secondari più chiari; nuovo file `logo.png` (anche icona per la schermata Home). Solo CSS e intestazione: nessun cambio di logica, backend o colori dei grafici. Verificato su iPad simulato (Home, Setup, Partita, Dashboard) |
 | 03/10/2026 | Frontend v3.34: silos "Giallo Fiamma" / "Giallo avversarie" (prima "Ammonizioni …"), come il pulsante GIALLO. Solo frontend |
 | 03/10/2026 | Frontend v3.33: schermata partita con 4 silos sotto i pulsanti (sostituzioni e ammonizioni, Fiamma / avversarie) e colonna destra solo per goal, espulsioni e rigori parati; costante `OUR_TEAM_NAME`. Solo frontend |
 | 03/10/2026 | Backend v5.9: `doPost` tollerante per la scorciatoia del Watch (`voice` con spazi/maiuscole, chiavi ripulite, corpo a modulo) e messaggio diagnostico "Richiesta non riconosciuta. Ricevuto: …" al posto di "Payload mancante". Pubblicato sui 3 deployment; scorciatoia dall'iPhone → evento sull'iPad OK |
