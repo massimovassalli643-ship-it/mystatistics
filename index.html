@@ -527,6 +527,9 @@
   .stats-table td { padding: 8px 4px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #e8f0f7; }
   .stats-table td.num-cell { text-align: center; font-weight: 800; color: #ffb84d; font-variant-numeric: tabular-nums; }
   .stats-table .player-cell { display: flex; align-items: center; gap: 6px; }
+  .editable-stat { cursor: pointer; min-width: 32px; }
+  .editable-stat:hover { background: rgba(74,143,224,0.18); border-radius: 4px; }
+  .editable-stat input { width: 44px; text-align: center; font-size: 13px; font-weight: 800; background: #1a2e4a; border: 1px solid #4a8fe0; border-radius: 4px; padding: 1px 2px; outline: none; font-variant-numeric: tabular-nums; }
 
   /* Identita' del club (stesso stile di presenze e convocazioni): titoli e
      numeri grandi in Barlow Condensed, focus visibile, feedback al tocco */
@@ -816,6 +819,7 @@
       </div>
       <button class="end-match-btn" id="end-match-btn" onclick="endMatch()">🏁 Termina partita</button>
       <button class="end-match-btn back-to-summary" id="back-to-summary-btn" style="display:none;" onclick="exitMatchEditMode()">↩️ Torna al riepilogo</button>
+      <button class="end-match-btn" id="add-event-edit-btn" style="display:none;background:rgba(74,143,224,0.25);border-color:#4a8fe0;" onclick="openEditModeEventPicker()">➕ Aggiungi evento</button>
     </div>
   </div>
 
@@ -996,7 +1000,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.35';
+const APP_VERSION = '3.37';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '5.8';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -1009,6 +1013,14 @@ const TIMER_RECOVERY_MAX_MS = 2 * 60 * 60 * 1000;
 // La nostra squadra: la riconosce ourSideOf anche con grafie diverse (silos della
 // schermata partita, comandi vocali "fiamma")
 const OUR_TEAM_NAME = 'FIAMMA MONZA';
+// Staff Fiamma Monza: possono ricevere solo cartellini (giallo/rosso)
+const FIAMMA_STAFF = [
+  { name: 'Luigi De Luca',      role: 'Assistente arbitro' },
+  { name: 'Laura Redaelli',     role: 'Dirigente' },
+  { name: 'Massimo Vassalli',   role: 'Dirigente' },
+  { name: 'Giacomo Gaggiani',   role: 'Allenatore' },
+  { name: 'Alessandro Monguzi', role: 'Vice allenatore' },
+];
 // Destinatario predefinito dei report (modificabile nella modale prima dell'invio)
 const REPORT_DEFAULT_TO = 'massimo.vassalli643@gmail.com';
 
@@ -1924,11 +1936,13 @@ function applyMatchScreenMode() {
   const timerControls = document.querySelector('#match-screen .timer-controls');
   const endBtn = document.getElementById('end-match-btn');
   const backBtn = document.getElementById('back-to-summary-btn');
+  const addEventBtn = document.getElementById('add-event-edit-btn');
   if (banner) banner.style.display = editing ? 'block' : 'none';
   if (stoppageBox) stoppageBox.style.display = editing ? 'none' : '';
   if (timerControls) timerControls.style.display = editing ? 'none' : '';
   if (endBtn) endBtn.style.display = editing ? 'none' : '';
   if (backBtn) backBtn.style.display = editing ? '' : 'none';
+  if (addEventBtn) addEventBtn.style.display = editing ? '' : 'none';
 }
 
 function enterMatchEditMode() {
@@ -1943,6 +1957,37 @@ function exitMatchEditMode() {
   state.currentMatch.editedAt = Date.now();
   persistCurrent();
   renderSummary();
+}
+
+/* Picker tipo evento (edit mode partita completata): mostra 3 pulsanti
+   nella modale evento, poi avvia il form completo. */
+function openEditModeEventPicker() {
+  const m = state.currentMatch;
+  if (!m || !m.completed) return;
+  currentEventDraft = null;
+  document.getElementById('event-modal-title').textContent = '➕ Aggiungi evento';
+  document.getElementById('event-modal-body').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0;">
+      <button class="action-btn yellow" style="min-height:44px;font-size:15px;border-radius:10px;cursor:pointer;" onclick="startEditModeEvent('yellow')">🟨 Ammonizione</button>
+      <button class="action-btn red"    style="min-height:44px;font-size:15px;border-radius:10px;cursor:pointer;" onclick="startEditModeEvent('red')">🟥 Espulsione</button>
+      <button class="action-btn sub"    style="min-height:44px;font-size:15px;border-radius:10px;cursor:pointer;" onclick="startEditModeEvent('sub')">🔄 Sostituzione</button>
+    </div>`;
+  const confirmBtn = document.getElementById('event-modal-confirm');
+  confirmBtn.style.display = 'none';
+  document.getElementById('event-modal').classList.add('active');
+}
+
+function startEditModeEvent(type) {
+  const m = state.currentMatch;
+  if (!m) return;
+  // Default: nostra squadra, 2° tempo, minuto 45
+  currentEventDraft = { type, team: ourSideOf(m, OUR_TEAM_NAME), periodMinute: 45, period: 1 };
+  const titles = { yellow: '🟨 Ammonizione', red: '🟥 Espulsione', sub: '🔄 Sostituzione' };
+  document.getElementById('event-modal-title').textContent = titles[type] || type;
+  const confirmBtn = document.getElementById('event-modal-confirm');
+  confirmBtn.style.display = '';
+  confirmBtn.onclick = confirmEvent;
+  renderEventModalBody();
 }
 
 /* Aggiornamento dopo un evento: punteggio, nomi, cronologia. Mai il cronometro. */
@@ -2106,7 +2151,9 @@ function showEventModal(type) {
   const isEdit = !!currentEventDraft.editingId;
   document.getElementById('event-modal-title').textContent = (isEdit ? 'Modifica · ' : '') + titles[type];
   renderEventModalBody();
-  document.getElementById('event-modal-confirm').onclick = confirmEvent;
+  const confirmBtn = document.getElementById('event-modal-confirm');
+  confirmBtn.onclick = confirmEvent;
+  confirmBtn.style.display = '';
   document.getElementById('event-modal').classList.add('active');
 }
 
@@ -2164,11 +2211,35 @@ function renderEventModalBody() {
       </div>`;
   } else if (type === 'yellow' || type === 'red' || type === 'penaltysave') {
     const playerSel = currentEventDraft.player ? `${currentEventDraft.player.num}|${currentEventDraft.player.name}` : null;
-    body += `
-      <div class="modal-field">
-        <label class="modal-label">${type === 'penaltysave' ? 'Atleta che ha parato' : 'Calciatrice'}</label>
-        ${playerSelect('event-player', currentEventDraft.team, false, playerSel)}
-      </div>`;
+    const isOurSide = state.currentMatch && currentEventDraft.team === ourSideOf(state.currentMatch, OUR_TEAM_NAME);
+    const isStaff = !!currentEventDraft.isStaff;
+    if (type !== 'penaltysave' && isOurSide) {
+      body += `
+        <div class="modal-field">
+          <label class="modal-label">Soggetto</label>
+          <div class="modal-radio-group">
+            <div class="radio-option ${!isStaff ? 'selected' : ''}" onclick="setEventStaffMode(false)">Calciatrice</div>
+            <div class="radio-option ${isStaff ? 'selected' : ''}" onclick="setEventStaffMode(true)">Staff</div>
+          </div>
+        </div>`;
+    }
+    if (isStaff) {
+      const staffSel = currentEventDraft.player ? currentEventDraft.player.name : '';
+      body += `
+        <div class="modal-field">
+          <label class="modal-label">Membro staff</label>
+          <select class="modal-select" id="event-player">
+            <option value="">— Seleziona —</option>
+            ${FIAMMA_STAFF.map(s => `<option value="${escapeHtml(s.name)}" ${staffSel === s.name ? 'selected' : ''}>${escapeHtml(s.name)} (${escapeHtml(s.role)})</option>`).join('')}
+          </select>
+        </div>`;
+    } else {
+      body += `
+        <div class="modal-field">
+          <label class="modal-label">${type === 'penaltysave' ? 'Atleta che ha parato' : 'Calciatrice'}</label>
+          ${playerSelect('event-player', currentEventDraft.team, false, playerSel)}
+        </div>`;
+    }
   } else if (type === 'sub') {
     const outSel = currentEventDraft.playerOut ? `${currentEventDraft.playerOut.num}|${currentEventDraft.playerOut.name}` : null;
     const inSel = currentEventDraft.playerIn ? `${currentEventDraft.playerIn.num}|${currentEventDraft.playerIn.name}` : null;
@@ -2218,6 +2289,19 @@ function setEventField(field, value) {
     if (!isNaN(v)) currentEventDraft.periodMinute = v;
   }
   currentEventDraft[field] = value;
+  // Cambiare squadra resetta la scelta di staff/calciatrice
+  if (field === 'team') { delete currentEventDraft.isStaff; delete currentEventDraft.player; }
+  renderEventModalBody();
+}
+
+function setEventStaffMode(isStaff) {
+  const minuteInput = document.getElementById('event-minute');
+  if (minuteInput) {
+    const v = parseInt(minuteInput.value);
+    if (!isNaN(v)) currentEventDraft.periodMinute = v;
+  }
+  currentEventDraft.isStaff = isStaff;
+  delete currentEventDraft.player; // reset selezione
   renderEventModalBody();
 }
 
@@ -2258,8 +2342,15 @@ function confirmEvent() {
     }
   } else if (type === 'yellow' || type === 'red' || type === 'penaltysave') {
     const pv = document.getElementById('event-player').value;
-    if (!pv) { alert(type === 'penaltysave' ? 'Seleziona l\'atleta che ha parato' : 'Seleziona la calciatrice'); return; }
-    currentEventDraft.player = parsePlayer(pv);
+    if (!pv) { alert(type === 'penaltysave' ? 'Seleziona l\'atleta che ha parato' : 'Seleziona la calciatrice o il membro dello staff'); return; }
+    if (currentEventDraft.isStaff) {
+      const staffMember = FIAMMA_STAFF.find(s => s.name === pv) || { name: pv, role: '' };
+      currentEventDraft.player = { num: null, name: staffMember.name, role: staffMember.role };
+      currentEventDraft.isStaff = true;
+    } else {
+      currentEventDraft.player = parsePlayer(pv);
+      delete currentEventDraft.isStaff;
+    }
   } else if (type === 'sub') {
     const outV = document.getElementById('event-out').value;
     const inV = document.getElementById('event-in').value;
@@ -2267,6 +2358,12 @@ function confirmEvent() {
     currentEventDraft.playerOut = parsePlayer(outV);
     currentEventDraft.playerIn = parsePlayer(inV);
     if (!currentEventDraft.subReason) currentEventDraft.subReason = 'tattica';
+  }
+
+  // In una partita già completata, se c'è un override manuale sul campo
+  // interessato da questo nuovo evento, avvisa e cancella l'override.
+  if (state.currentMatch.completed && !isEdit) {
+    if (!checkAndClearStatOverride(type, team, currentEventDraft)) return;
   }
 
   if (isEdit) {
@@ -2282,6 +2379,36 @@ function confirmEvent() {
   renderMatchInfo();   // NON renderMatchScreen: il cronometro deve continuare a correre
   closeModal('event-modal');
   currentEventDraft = null;
+}
+
+/* Quando si aggiunge un nuovo evento a una partita completata, controlla
+   se esiste un override manuale sul campo interessato. Se sì, mostra un
+   avviso e, su conferma, elimina l'override. Restituisce false se l'utente
+   ha annullato (l'evento non va aggiunto). */
+function checkAndClearStatOverride(type, team, draft) {
+  const m = state.currentMatch;
+  const fieldMap = { goal: 'goals', yellow: 'yellows', red: 'reds', penaltysave: 'saves' };
+  const field = fieldMap[type];
+  if (!field) return true; // tipo senza campo singolo (sub): nessun controllo
+
+  if (draft.isStaff) {
+    const name = draft.player && draft.player.name;
+    const ov = name && m.staffOverrides && m.staffOverrides[name];
+    if (!ov || !(field in ov)) return true;
+    if (!confirm(`"${name}" ha il campo "${field}" modificato manualmente (valore: ${ov[field]}).\n` +
+        `Aggiungendo questo evento, il valore manuale verrà rimosso e sostituito dal calcolo automatico dagli eventi.\n\nContinuare?`)) return false;
+    delete ov[field];
+  } else {
+    const player = draft.player || draft.scorer;
+    if (!player) return true;
+    const pkey = `${player.num}_${player.name}`;
+    const sideOv = m.statsOverrides && m.statsOverrides[team] && m.statsOverrides[team][pkey];
+    if (!sideOv || !(field in sideOv)) return true;
+    if (!confirm(`"${player.name}" ha il campo "${field}" modificato manualmente (valore: ${sideOv[field]}).\n` +
+        `Aggiungendo questo evento, il valore manuale verrà rimosso e sostituito dal calcolo automatico dagli eventi.\n\nContinuare?`)) return false;
+    delete sideOv[field];
+  }
+  return true;
 }
 
 function parsePlayer(val) {
@@ -2344,10 +2471,12 @@ function eventCardHtml(e, compact) {
     subDetail = extras.join(' • ');
   } else if (e.type === 'yellow') {
     typeLabel = `🟨 Ammonizione · ${escapeHtml(teamName)}`;
-    detail = `${e.player.num ?? '?'} ${escapeHtml(e.player.name)}`;
+    if (e.isStaff) { detail = escapeHtml(e.player.name); subDetail = escapeHtml(e.player.role || 'Staff'); }
+    else detail = `${e.player.num ?? '?'} ${escapeHtml(e.player.name)}`;
   } else if (e.type === 'red') {
     typeLabel = `🟥 Espulsione · ${escapeHtml(teamName)}`;
-    detail = `${e.player.num ?? '?'} ${escapeHtml(e.player.name)}`;
+    if (e.isStaff) { detail = escapeHtml(e.player.name); subDetail = escapeHtml(e.player.role || 'Staff'); }
+    else detail = `${e.player.num ?? '?'} ${escapeHtml(e.player.name)}`;
   } else if (e.type === 'sub') {
     typeLabel = `🔄 Sostituzione · ${escapeHtml(teamName)}`;
     detail = `Esce ${e.playerOut.num ?? '?'} ${escapeHtml(e.playerOut.name)}`;
@@ -2789,7 +2918,7 @@ function computePlayerStats(side, match) {
         if (stats[ak]) stats[ak].assists++;
       }
     }
-    if ((e.type === 'yellow' || e.type === 'red') && e.team === side) {
+    if ((e.type === 'yellow' || e.type === 'red') && e.team === side && !e.isStaff) {
       const k = `${e.player.num}_${e.player.name}`;
       if (stats[k]) {
         if (e.type === 'yellow') stats[k].yellows++;
@@ -2806,7 +2935,7 @@ function computePlayerStats(side, match) {
       if (stats[outK] && stats[outK].minutesOut == null) stats[outK].minutesOut = e.minute;
       if (stats[inK] && stats[inK].minutesIn == null) stats[inK].minutesIn = e.minute;
     }
-    if (e.type === 'red' && e.team === side) {
+    if (e.type === 'red' && e.team === side && !e.isStaff) {
       const k = `${e.player.num}_${e.player.name}`;
       if (stats[k] && stats[k].minutesOut == null) stats[k].minutesOut = e.minute;
     }
@@ -2819,11 +2948,47 @@ function computePlayerStats(side, match) {
     }
   });
 
+  // Apply manual overrides from summary editing
+  const ovMap = (m.statsOverrides || {})[side] || {};
+  Object.values(stats).forEach(s => {
+    const ov = ovMap[`${s.num}_${s.name}`];
+    if (!ov) return;
+    if ('goals'         in ov) s.goals         = ov.goals;
+    if ('assists'       in ov) s.assists        = ov.assists;
+    if ('yellows'       in ov) s.yellows        = ov.yellows;
+    if ('reds'          in ov) s.reds           = ov.reds;
+    if ('saves'         in ov) s.saves          = ov.saves;
+    if ('minutesPlayed' in ov) s.minutesPlayed  = ov.minutesPlayed;
+  });
+
   return Object.values(stats).sort((a, b) => {
     if (b.goals !== a.goals) return b.goals - a.goals;
     if (b.assists !== a.assists) return b.assists - a.assists;
     return (a.num || 99) - (b.num || 99);
   });
+}
+
+/* Cartellini staff Fiamma (yellows/reds) da eventi + override manuali */
+function computeStaffStats(m) {
+  const mat = m || state.currentMatch;
+  const result = {};
+  FIAMMA_STAFF.forEach(s => { result[s.name] = { name: s.name, role: s.role, yellows: 0, reds: 0 }; });
+  (mat.events || []).forEach(e => {
+    if (!e.isStaff || (e.type !== 'yellow' && e.type !== 'red')) return;
+    const name = e.player && e.player.name;
+    if (!name) return;
+    if (!result[name]) result[name] = { name, role: (e.player.role || ''), yellows: 0, reds: 0 };
+    if (e.type === 'yellow') result[name].yellows++;
+    else result[name].reds++;
+  });
+  // Override manuali
+  const ov = mat.staffOverrides || {};
+  Object.keys(ov).forEach(name => {
+    if (!result[name]) result[name] = { name, role: '', yellows: 0, reds: 0 };
+    if ('yellows' in ov[name]) result[name].yellows = ov[name].yellows;
+    if ('reds'    in ov[name]) result[name].reds    = ov[name].reds;
+  });
+  return Object.values(result);
 }
 
 function endMatch() {
@@ -2858,9 +3023,12 @@ function renderSummary() {
   const statsAway = computePlayerStats('away');
   // La colonna dei rigori parati compare solo se in partita ce n'e' stato almeno uno
   const showSaves = [...statsHome, ...statsAway].some(s => s.saves > 0);
+  // Staff: solo per la nostra squadra
+  const fiammaSide = ourSideOf(m, OUR_TEAM_NAME);
+  const staffStats = computeStaffStats(m);
   document.getElementById('summary-stats').innerHTML = `
-    ${statsPanelHtml(m.home.name, statsHome, showSaves)}
-    ${statsPanelHtml(m.away.name, statsAway, showSaves)}
+    ${statsPanelHtml(m.home.name, statsHome, showSaves, 'home', fiammaSide === 'home' ? staffStats : null)}
+    ${statsPanelHtml(m.away.name, statsAway, showSaves, 'away', fiammaSide === 'away' ? staffStats : null)}
   `;
 
   const allScorers = [...statsHome, ...statsAway].filter(s => s.goals > 0).sort((a, b) => b.goals - a.goals);
@@ -2891,21 +3059,27 @@ function renderSummary() {
   showScreen('summary-screen');
 }
 
-function statsPanelHtml(teamName, stats, showSaves) {
-  const rows = stats.map(s => `
+function statsPanelHtml(teamName, stats, showSaves, side, staffStats) {
+  const rows = stats.map(s => {
+    const pkey = escapeHtml(`${s.num}_${s.name}`);
+    const ed = side ? ` class="num-cell editable-stat" data-side="${side}" data-pkey="${pkey}"` : ' class="num-cell"';
+    const minDisplay = s.minutesPlayed
+      ? s.minutesPlayed + "'"
+      : (s.minutesIn != null ? "0'" : '—');
+    return `
     <tr>
       <td class="player-cell">
         <span style="background:rgba(0,0,0,0.4);color:#ffb84d;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;">${s.num ?? '?'}</span>
         <span>${escapeHtml(s.name)}</span>
       </td>
-      <td class="num-cell">${s.goals || ''}</td>
-      <td class="num-cell">${s.assists || ''}</td>
-      <td class="num-cell" style="color:#f1c40f">${s.yellows || ''}</td>
-      <td class="num-cell" style="color:#e74c3c">${s.reds || ''}</td>
-      ${showSaves ? `<td class="num-cell" style="color:#1abc9c">${s.saves || ''}</td>` : ''}
-      <td class="num-cell">${s.minutesPlayed || (s.minutesIn != null ? 0 : '—')}'</td>
-    </tr>
-  `).join('');
+      <td${ed} data-field="goals">${s.goals || ''}</td>
+      <td${ed} data-field="assists">${s.assists || ''}</td>
+      <td${ed} style="color:#f1c40f" data-field="yellows">${s.yellows || ''}</td>
+      <td${ed} style="color:#e74c3c" data-field="reds">${s.reds || ''}</td>
+      ${showSaves ? `<td${ed} style="color:#1abc9c" data-field="saves">${s.saves || ''}</td>` : ''}
+      <td${ed} data-field="minutesPlayed">${minDisplay}</td>
+    </tr>`;
+  }).join('');
   return `
     <div class="stats-panel">
       <div class="stats-panel-title">${escapeHtml(teamName)}</div>
@@ -2924,7 +3098,116 @@ function statsPanelHtml(teamName, stats, showSaves) {
         <tbody>${rows}</tbody>
       </table>
     </div>
+    ${staffStats ? staffPanelHtml(staffStats) : ''}
   `;
+}
+
+function staffPanelHtml(staffStats) {
+  const rows = staffStats.map(s => {
+    const pkey = escapeHtml(s.name);
+    return `
+    <tr>
+      <td class="player-cell">
+        <span style="font-size:11px;color:#93adc9;white-space:nowrap;">${escapeHtml(s.role)}</span>
+        <span>${escapeHtml(s.name)}</span>
+      </td>
+      <td class="num-cell editable-stat" data-side="staff" data-pkey="${pkey}" data-field="yellows" style="color:#f1c40f">${s.yellows || ''}</td>
+      <td class="num-cell editable-stat" data-side="staff" data-pkey="${pkey}" data-field="reds" style="color:#e74c3c">${s.reds || ''}</td>
+    </tr>`;
+  }).join('');
+  return `
+    <div class="stats-panel" style="margin-top:8px;opacity:0.9">
+      <div class="stats-panel-title" style="font-size:12px;">Staff Fiamma Monza</div>
+      <table class="stats-table">
+        <thead>
+          <tr>
+            <th>Membro</th>
+            <th style="text-align:center" title="Ammonizioni">🟨</th>
+            <th style="text-align:center" title="Espulsioni">🟥</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+/* ==================== Summary — celle statistiche modificabili ==================== */
+function initSummaryStatEditing() {
+  const container = document.getElementById('summary-stats');
+  if (!container) return;
+  container.addEventListener('click', function(e) {
+    const td = e.target.closest('.editable-stat');
+    if (!td || td.querySelector('input')) return;
+
+    const side  = td.dataset.side;
+    const pkey  = td.dataset.pkey;
+    const field = td.dataset.field;
+    const m = state.currentMatch;
+    if (!m || !side || !pkey || !field) return;
+
+    // Valore corrente (già con eventuali override)
+    let currentVal = 0;
+    if (side === 'staff') {
+      const staffStats = computeStaffStats(m);
+      const member = staffStats.find(s => s.name === pkey);
+      currentVal = member ? (member[field] || 0) : 0;
+    } else {
+      const allStats = computePlayerStats(side);
+      const playerStat = allStats.find(s => `${s.num}_${s.name}` === pkey);
+      currentVal = playerStat ? (playerStat[field] != null ? playerStat[field] : 0) : 0;
+    }
+
+    // Sostituisce il contenuto con un input numerico
+    td.innerHTML = '';
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.inputMode = 'numeric';
+    input.min = '0';
+    input.value = currentVal;
+    input.style.color = td.style.color || '';
+    td.appendChild(input);
+    input.focus();
+    input.select();
+
+    let committed = false;
+    function commit() {
+      if (committed) return;
+      committed = true;
+      const raw = parseInt(input.value, 10);
+      if (isNaN(raw) || raw < 0) { renderSummary(); return; }
+
+      if (side === 'staff') {
+        if (!m.staffOverrides) m.staffOverrides = {};
+        if (!m.staffOverrides[pkey]) m.staffOverrides[pkey] = {};
+        m.staffOverrides[pkey][field] = raw;
+      } else {
+        if (!m.statsOverrides) m.statsOverrides = {};
+        if (!m.statsOverrides[side]) m.statsOverrides[side] = {};
+        if (!m.statsOverrides[side][pkey]) m.statsOverrides[side][pkey] = {};
+        m.statsOverrides[side][pkey][field] = raw;
+
+        // Ricalcola il punteggio quando cambiano i gol
+        if (field === 'goals') {
+          const oppSide = side === 'home' ? 'away' : 'home';
+          const autogols = m.events.filter(
+            ev => ev.type === 'goal' && ev.team === oppSide && ev.goalType === 'autogol'
+          ).length;
+          const updated = computePlayerStats(side);
+          m[side].score = updated.reduce((sum, s) => sum + (s.goals || 0), 0) + autogols;
+        }
+      }
+
+      m.editedAt = Date.now();
+      persistCurrent();
+      renderSummary();
+    }
+
+    input.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter') { input.blur(); }
+      if (ev.key === 'Escape') { committed = true; renderSummary(); }
+    });
+    input.addEventListener('blur', commit);
+  });
 }
 
 function exportAllData() {
@@ -4514,6 +4797,7 @@ async function syncToSheets() {
 document.getElementById('app-version').textContent = 'v' + APP_VERSION;
 renderHistory();
 initCardZoom();
+initSummaryStatEditing();
 window.addEventListener('beforeunload', () => { if (state.timer.running) stopTimer(); });
 </script>
 </body>

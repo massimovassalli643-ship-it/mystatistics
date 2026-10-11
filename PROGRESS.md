@@ -20,7 +20,77 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Comandi vocali | Guida completa (scorciatoia Watch, frasi, checklist): `COMANDI_VOCALI.md`. Token in Script Property `VOICE_TOKEN` e nelle Impostazioni dell'iPad, **mai nel repository** |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.35 + backend v5.9 — Grafica Fiammamonza (09/10/2026)
+## Stato attuale: v3.37 + backend v5.9 — Staff cartellini + eventi in edit mode (11/10/2026)
+
+### Novità v3.37 (11/10/2026)
+
+Quattro funzionalità implementate in un unico passaggio. Solo frontend; backend invariato (v5.9).
+
+**1 — Celle riepilogo modificabili (completamento v3.36)**
+Tocco su qualsiasi cella numerica del Riepilogo → input numerico; Invio o blur salva, Esc annulla. Valori negativi o non numerici rifiutati.
+
+**2 — Punteggio automatico da gol modificati**
+Quando cambiano i gol di una giocatrice, `m[side].score` viene ricalcolato come somma dei
+gol di tutte le giocatrici + autogol dell'avversaria (dagli eventi). Già implementato in v3.36.
+
+**3 — Staff con cartellini (Fiamma Monza)**
+- **Costante `FIAMMA_STAFF`**: Luigi De Luca (Assistente arbitro), Laura Redaelli (Dirigente),
+  Massimo Vassalli (Dirigente), Giacomo Gaggiani (Allenatore), Alessandro Monguzi (Vice allenatore).
+- **Form evento**: per ammonizione/espulsione sulla nostra squadra compare il toggle
+  **Calciatrice | Staff**; se Staff si seleziona il membro dal menu (nome + ruolo).
+- **Modello evento**: `isStaff: true`, `player: { num: null, name, role }`.
+  `computePlayerStats` ignora gli eventi con `isStaff: true`.
+- **`computeStaffStats(m)`**: legge eventi staff + override `m.staffOverrides`.
+  Restituisce tutti e 5 i membri FIAMMA_STAFF (anche a 0 cartellini).
+- **Riepilogo**: `staffPanelHtml()` aggiunta in coda al pannello della nostra squadra;
+  colonne 🟨/🟥 modificabili con lo stesso meccanismo delle giocatrici (`data-side="staff"`).
+  I cartellini staff **non modificano il punteggio**.
+- **Cronologia**: `eventCardHtml` mostra nome + ruolo per gli eventi staff.
+- **Override staff**: salvati in `m.staffOverrides[name][field]`.
+
+**4 — Aggiungi evento in modalità modifica**
+- Pulsante **➕ Aggiungi evento** (`#add-event-edit-btn`) visibile solo in edit mode
+  (`applyMatchScreenMode`), nascosto durante la partita live.
+- `openEditModeEventPicker()`: mostra i 3 tipi (Ammonizione / Espulsione / Sostituzione)
+  nella modale evento; il pulsante Conferma è nascosto fino alla scelta del tipo.
+- `startEditModeEvent(type)`: draft con nostra squadra, 2° tempo, minuto 45; poi form completo.
+- **Override clearing** (`checkAndClearStatOverride`): se la giocatrice/staff coinvolta
+  in un nuovo evento ha un override manuale sul campo interessato (yellows, reds, saves,
+  goals), viene mostrato un avviso; su conferma l'override viene eliminato e il valore
+  torna calcolato automaticamente dagli eventi.
+
+### Stato precedente: v3.36 + backend v5.9 — Statistiche riepilogo modificabili (11/10/2026)
+
+### Novità v3.36 (11/10/2026)
+
+**Richiesta**: nella modalità Riepilogo (statistiche calciatrici), rendere
+modificabili i valori numerici di ogni giocatrice — gol, assist, ammonizioni,
+espulsioni e minuti giocati — direttamente toccando la cella.
+
+- **Celle modificabili**: ogni cella numerica nella tabella "Statistiche
+  calciatrici" porta la classe `.editable-stat` con attributi `data-side`,
+  `data-pkey` (chiave `num_nome`) e `data-field`. Toccarla sostituisce il
+  contenuto con un `<input type="number" inputmode="numeric" min="0">` da 44 px,
+  adatto all'iPad. Il valore si conferma con Invio o perdita del focus; Escape
+  annulla. Valori negativi o non numerici vengono rifiutati e la tabella si
+  ripristina.
+- **Override**: le modifiche si salvano in `m.statsOverrides[side][pkey][field]`
+  nella partita corrente. `computePlayerStats` applica gli override sopra i
+  valori calcolati dagli eventi, quindi Excel, PDF e "Sincronizza su Sheets"
+  ricevono sempre i dati corretti senza modifiche aggiuntive.
+- **Punteggio**: quando cambiano i gol di una giocatrice, `m[side].score` viene
+  ricalcolato come somma dei gol di tutte le giocatrici di quella squadra più
+  gli autogol dell'avversaria (dagli eventi). Il punteggio in testata e la scheda
+  Partite su Sheets si aggiornano al salvataggio successivo.
+- **Persistenza**: ogni modifica aggiorna `m.editedAt` e chiama `persistCurrent()`
+  (localStorage); la sincronizzazione su Sheets con il pulsante "Sincronizza"
+  porta i dati aggiornati su Statistiche e Partite.
+- **Invarianza**: la vista live di partita (`#match-screen`) non è toccata.
+  `initSummaryStatEditing()` usa event delegation su `#summary-stats`, quindi
+  sopravvive ai re-render di `renderSummary()`.
+- Solo frontend; backend invariato (v5.9).
+
+### Stato precedente: v3.35 + backend v5.9 — Grafica Fiammamonza (09/10/2026)
 
 ### Novità v3.35 (09/10/2026)
 
