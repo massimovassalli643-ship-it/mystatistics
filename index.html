@@ -1000,7 +1000,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.37';
+const APP_VERSION = '3.38';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '5.8';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -2741,6 +2741,14 @@ function resolveVoicePlayer(side, ref, role) {
   const matchAll = (p, eq) => { const w = athleteWords(p.name); return spoken.every(sw => w.some(x => eq(sw, x))); };
   let hits = team.roster.filter(p => matchAll(p, (a, b) => a === b));
   if (!hits.length) hits = team.roster.filter(p => matchAll(p, wordsAlike));
+  // v3.38: il Watch separa o unisce le parole come vuole ("solo hub" / SOLOHUB, "de luca" / DELUCA):
+  // si confronta anche il dettato unito con ogni gruppo di parole contigue del nome in rosa
+  if (!hits.length) {
+    const joined = spoken.join('');
+    const matchJoined = (p, eq) => { const w = athleteWords(p.name); for (let i = 0; i < w.length; i++) for (let j = i; j < w.length; j++) if (eq(joined, w.slice(i, j + 1).join(''))) return true; return false; };
+    hits = team.roster.filter(p => matchJoined(p, (a, b) => a === b));
+    if (!hits.length) hits = team.roster.filter(p => matchJoined(p, wordsAlike));
+  }
   if (hits.length === 1) return { num: hits[0].num, name: hits[0].name };
   if (!hits.length) throw new Error('"' + ref.name + '" non trovata in rosa ' + label + ' (' + role + '): usa il numero di maglia');
   throw new Error('"' + ref.name + '" ambigua in rosa ' + label + ' (' + hits.map(p => (p.num ?? '?') + ' ' + p.name).join(', ') + '): usa il numero di maglia');

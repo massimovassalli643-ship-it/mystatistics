@@ -20,7 +20,13 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Comandi vocali | Guida completa (scorciatoia Watch, frasi, checklist): `COMANDI_VOCALI.md`. Token in Script Property `VOICE_TOKEN` e nelle Impostazioni dell'iPad, **mai nel repository** |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.37 + backend v5.9 — Staff cartellini + eventi in edit mode (11/10/2026)
+## Stato attuale: v3.38 + backend v6.0 (live) — Comandi vocali: cognomi uniti/separati (18/10/2026)
+
+**Problema** (prova sul Watch, 18/10/2026): "Sostituzione esce Bocchi, entra solo hub" -> "non trovata in nessuna delle due rose", ma SOLOHUB VALENTINA e' in distinta. Il Watch trascrive "solo hub" in due parole, la rosa ha "SOLOHUB" in una.
+**Fix (solo frontend)**: `resolveVoicePlayer` confronta anche il dettato unito con ogni gruppo di parole contigue del nome in rosa (esatto, poi con 1 lettera di tolleranza). Copre anche "de luca" / DELUCA. Backend invariato.
+**Nota**: le Impostazioni dell'iPad avevano perso token e spunta "Ricevi i comandi" (badge sparito): reinseriti e salvati. Il backend live risponde v6.0 mentre `backend/Code.gs` dice 5.9: da riallineare.
+
+### Stato precedente: v3.37 + backend v5.9 — Staff cartellini + eventi in edit mode (11/10/2026)
 
 ### Novità v3.37 (11/10/2026)
 
@@ -1316,6 +1322,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 ## Changelog
 | Data | Modifica |
 |------|----------|
+| 18/10/2026 | v3.38: comandi vocali riconoscono cognomi detti separati/uniti rispetto alla rosa ("solo hub" = SOLOHUB). Solo frontend |
 | 23–26/05/2026 | Versioni 1–9 del backend: OCR Claude, permessi external request, deploy "v3 con OCR ok" (vedi documentazione PDF) |
 | 25/05/2026 | Documentazione completa (manuale utente + tecnica) |
 | 12/09/2026 | Diagnosi OCR da foto cartacea (nomi inventati) → causa: riduzione immagine lato API |
