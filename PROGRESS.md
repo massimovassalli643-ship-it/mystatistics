@@ -20,7 +20,16 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Comandi vocali | Guida completa (scorciatoia Watch, frasi, checklist): `COMANDI_VOCALI.md`. Token in Script Property `VOICE_TOKEN` e nelle Impostazioni dell'iPad, **mai nel repository** |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.39 + backend v6.0 (live) - Comandi vocali: staff e badge (18/10/2026)
+## Stato attuale: v3.40 + backend v6.1 - Copia distinte avversarie su Drive (18/10/2026)
+
+- **Richiesta di Max**: la distinta di una squadra avversaria caricata da foto o da file va copiata su Drive in `G:\My Drive\From Dropbox\CI Fiamma monza prima squadra\Distinte squadre avversarie`.
+- **Frontend** (`saveOpponentDistinta`): dopo la lettura OCR di "Scatta foto", "Libreria foto" e "Carica file"/"Sfoglia dal dispositivo", se il nome squadra letto NON e' la Fiamma (`teamOverlap` con `OUR_TEAM_NAME`), manda l'originale al backend (action `saveDistinta`). Non vale per le distinte gia' lette dalla cartella Drive. Un errore non tocca la rosa gia' caricata: compare solo l'avviso "Copia NON salvata". `BACKEND_MIN_VERSION` = 6.1.
+- **Backend v6.1** (`handleSaveDistinta`): cartella "Distinte squadre avversarie" creata accanto a "Distinte" (ID in Script Property `DISTINTE_AVV_FOLDER_ID`), nome `AAAA-MM-GG_HHMM_<squadra>.<ext>`, max 15 MB, niente doppioni (stessa squadra, giorno e dimensione).
+- **A carico di Max PRIMA di pubblicare**: scrivere su Drive richiede lo scope completo `drive` (finora lettura). Incollare `Code.gs` nell'editor, eseguire una volta `testSalvaDistinta()` e accettare il consenso Drive, poi nuova versione su TUTTI e 3 i deployment. Se il progetto ha un `appsscript.json` con `oauthScopes` espliciti, aggiungere `https://www.googleapis.com/auth/drive`.
+- **Hotfix**: la v3.39 pubblicata aveva un apice non escapato in `runVoiceStaffCard` ("di' nome e cognome") che rompeva TUTTO lo script dell'app. Corretto qui. Lezione: dopo ogni modifica a `index.html` controllare la sintassi del blocco script con node prima del commit.
+- Non provato sull'iPad ne' su Drive reale.
+
+### Stato precedente: v3.39 + backend v6.0 (live) - Comandi vocali: staff e badge (18/10/2026)
 
 - **Cartellini allo staff da voce** (solo frontend, backend invariato): `giallo staff Redaelli`, `rosso fiamma staff Gaggiani`, oppure senza "staff" se il nome non e' in rosa (`giallo Gaggiani`). Nomi da `FIAMMA_STAFF`, tolleranza 1 lettera, nome ambiguo = errore. Sempre della Fiamma (mai per `avversario`). Evento `isStaff` come quelli dei pulsanti (v3.37). Funzioni: `voiceStaffMatch`, `runVoiceStaffCard`.
 - **Badge**: con comandi non attivi (token / URL / spunta mancanti) mostra "Comandi vocali non attivi ..." invece di sparire.
@@ -1328,6 +1337,8 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 ## Changelog
 | Data | Modifica |
 |------|----------|
+| 18/10/2026 | `backend/Code.gs` riallineato alla copia live nell'editor (v6.0): aggiunta action `partite` / `handlePartiteList`. Nessuna modifica al comportamento live |
+| 18/10/2026 | v3.40 + backend v6.1: copia su Drive delle distinte avversarie caricate da foto/file (`saveDistinta`). HOTFIX di un errore di sintassi introdotto nella v3.39 |
 | 18/10/2026 | v3.39: cartellini allo staff da comando vocale (`giallo staff Redaelli`); badge "Comandi vocali non attivi" quando token/URL/spunta mancano. Solo frontend |
 | 18/10/2026 | v3.38: comandi vocali riconoscono cognomi detti separati/uniti rispetto alla rosa ("solo hub" = SOLOHUB). Solo frontend |
 | 23–26/05/2026 | Versioni 1–9 del backend: OCR Claude, permessi external request, deploy "v3 con OCR ok" (vedi documentazione PDF) |

@@ -1,5 +1,13 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v6.1 (18/10/2026): action 'saveDistinta' - copia della distinta di una squadra
+//   AVVERSARIA caricata da foto/file: salvata su Drive in "Distinte squadre avversarie"
+//   (accanto alla cartella Distinte, creata da sola). ATTENZIONE: scrivere su Drive
+//   richiede lo scope completo `drive` (prima bastava la lettura): PRIMA di pubblicare
+//   i 3 deployment eseguire una volta testSalvaDistinta() dall'editor e accettare il
+//   consenso, altrimenti OCR e sync possono chiedere la ri-autorizzazione.
+// v6.0 (data non registrata, aggiunto nell'editor da Max): action 'partite' = elenco partite dal
+//   foglio Partite (sola lettura, handlePartiteList). Allineata al repo il 18/10/2026.
 // v5.9 (03/10/2026): doPost tollerante per la scorciatoia del Watch: "voice"
 //   con spazi/maiuscole accettato, chiavi ripulite da spazi invisibili, corpo
 //   anche come modulo. Una richiesta senza action riconosciuta e senza partita
@@ -72,7 +80,7 @@
 
 // Aggiornare ad OGNI modifica di questo file; il frontend la confronta con
 // BACKEND_MIN_VERSION di index.html.
-const BACKEND_VERSION = '5.9';
+const BACKEND_VERSION = '6.1';
 
 const SHEET_PARTITE = 'Partite';
 const SHEET_STATISTICHE = 'Statistiche';
@@ -109,6 +117,8 @@ function doPost(e) {
     if (payload.action === 'atlete') {
       return handleAtlete();
     }
+    if (payload.action === 'partite') return handlePartiteList();
+    if (payload.action === 'saveDistinta') return handleSaveDistinta(payload);
     if (payload.action === 'voice' || payload.action === 'voicePoll' || payload.action === 'voiceAck') {
       return handleVoiceRequest(payload);
     }
@@ -482,6 +492,76 @@ function handleDriveOcr(payload) {
 }
 
 // ============================================
+// COPIA DISTINTE AVVERSARIE SU DRIVE (v6.1)
+// ============================================
+// L'iPad manda la foto/PDF originale dopo la lettura OCR; qui finisce in
+//   My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte squadre avversarie
+// (stessa cartella madre di "Distinte"). Nome: AAAA-MM-GG_HHMM_<squadra>.<ext>.
+// Stesso file (stessa squadra, stesso giorno, stessa dimensione) = non duplicato.
+//   action 'saveDistinta' + { teamName, filename, mimeType, dataBase64 }
+const DISTINTE_AVV_NAME = 'Distinte squadre avversarie';
+const DISTINTE_AVV_MAX_BYTES = 15 * 1024 * 1024;
+
+function resolveDistinteAvversarieFolder() {
+  var props = PropertiesService.getScriptProperties();
+  var cached = props.getProperty('DISTINTE_AVV_FOLDER_ID');
+  if (cached) {
+    try { return DriveApp.getFolderById(cached); } catch (e) { props.deleteProperty('DISTINTE_AVV_FOLDER_ID'); }
+  }
+  var parents = resolveDistinteFolder().getParents();
+  if (!parents.hasNext()) throw new Error('Cartella madre di "Distinte" non trovata su Drive');
+  var parent = parents.next();
+  var it = parent.getFoldersByName(DISTINTE_AVV_NAME);
+  var folder = it.hasNext() ? it.next() : parent.createFolder(DISTINTE_AVV_NAME);
+  props.setProperty('DISTINTE_AVV_FOLDER_ID', folder.getId());
+  return folder;
+}
+
+function handleSaveDistinta(payload) {
+  try {
+    if (!payload.dataBase64) return jsonResponse({ ok: false, error: 'File mancante' });
+    var bytes = Utilities.base64Decode(payload.dataBase64);
+    if (bytes.length > DISTINTE_AVV_MAX_BYTES) return jsonResponse({ ok: false, error: 'File troppo grande (max 15 MB)' });
+    var mime = String(payload.mimeType || 'image/jpeg');
+    var ext = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic' }[mime.toLowerCase()];
+    if (!ext) {
+      var m = /\.([A-Za-z0-9]{2,5})$/.exec(String(payload.filename || ''));
+      ext = m ? m[1].toLowerCase() : 'jpg';
+    }
+    var team = String(payload.teamName || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 60) || 'squadra sconosciuta';
+    var now = new Date();
+    var tz = Session.getScriptTimeZone();
+    var day = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+    var folder = resolveDistinteAvversarieFolder();
+    // stesso giorno + stessa squadra + stessa dimensione = gia' salvata
+    var dup = folder.searchFiles("title contains '" + day + "_'");
+    while (dup.hasNext()) {
+      var f = dup.next();
+      if (f.getSize() === bytes.length && f.getName().indexOf(team) >= 0) {
+        return jsonResponse({ ok: true, duplicate: true, name: f.getName(), folder: DISTINTE_AVV_NAME });
+      }
+    }
+    var name = day + '_' + Utilities.formatDate(now, tz, 'HHmm') + '_' + team + '.' + ext;
+    var file = folder.createFile(Utilities.newBlob(bytes, mime, name));
+    return jsonResponse({ ok: true, duplicate: false, name: file.getName(), folder: DISTINTE_AVV_NAME, id: file.getId() });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: String(err.message || err) });
+  }
+}
+
+// TEST v6.1 - ESEGUIRE UNA VOLTA DALL'EDITOR prima di pubblicare i deployment:
+// chiede lo scope Drive in scrittura, salva un PNG 1x1 di prova e lo cestina.
+function testSalvaDistinta() {
+  var png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+  var out = JSON.parse(handleSaveDistinta({ teamName: 'TEST', filename: 'test.png', mimeType: 'image/png', dataBase64: png }).getContent());
+  Logger.log(JSON.stringify(out));
+  if (out.ok && out.id) {
+    DriveApp.getFileById(out.id).setTrashed(true);
+    Logger.log('File di prova cestinato. Cartella: ' + resolveDistinteAvversarieFolder().getName());
+  }
+}
+
+// ============================================
 // INVIO REPORT VIA EMAIL (v5)
 // ============================================
 // Un'app web non puo' allegare un file a un'email: mailto: non supporta allegati.
@@ -570,6 +650,21 @@ function handleAtlete() {
 
 function testAtlete() {
   Logger.log(handleAtlete().getContent());
+}
+// v6.0: elenco partite dal foglio Partite (sola lettura)
+function handlePartiteList() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PARTITE);
+  if (!sheet) return jsonResponse({ ok: false, error: 'Foglio "Partite" non trovato' });
+  const rows = sheet.getDataRange().getValues().slice(1); // salta l'intestazione
+  const partite = rows
+    .filter(function (r) { return String(r[0]).trim() !== ''; })
+    .map(function (r) {
+      return {
+        id: String(r[0]), data: String(r[1]), casa: String(r[2]), ospite: String(r[3]),
+        golCasa: r[4], golOspite: r[5], stato: String(r[6]), periodo: String(r[7])
+      };
+    });
+  return jsonResponse({ ok: true, partite: partite });
 }
 
 // ============================================

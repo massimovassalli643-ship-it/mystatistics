@@ -1000,9 +1000,9 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.39';
+const APP_VERSION = '3.40';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
-const BACKEND_MIN_VERSION = '5.8';
+const BACKEND_MIN_VERSION = '6.1';
 const STORAGE_KEY = 'mystatistics_matches_v2';
 const PERIODS = ['1° tempo', '2° tempo', '1° supplementare', '2° supplementare', 'Partita conclusa'];
 const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
@@ -1417,6 +1417,40 @@ function normalizeOcrName(name) {
   return (name || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
 }
 
+/* v3.40 + backend v6.1: la distinta di una squadra AVVERSARIA caricata da foto o da
+   file (non quelle gia' lette da Drive) viene copiata su Drive, in "Distinte squadre
+   avversarie". Si manda l'originale (non le strisce). Va dopo la lettura OCR, senza
+   bloccarla: un errore qui non tocca la rosa gia' caricata. */
+async function saveOpponentDistinta(file, result, progressEl) {
+  if (!result || !result.ok || !file) return;
+  const team = typeof result.teamName === 'string' ? result.teamName.trim() : '';
+  if (team && teamOverlap(team, OUR_TEAM_NAME) > 0) return;   // e' la nostra distinta
+  const note = (html, ms) => {
+    progressEl.classList.add('active');
+    progressEl.innerHTML += '<br>' + html;
+    setTimeout(() => progressEl.classList.remove('active'), ms);
+  };
+  try {
+    const b64 = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(',')[1]);
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(file);
+    });
+    const res = await fetch(getSheetsUrl(), {
+      method: 'POST', mode: 'cors', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'saveDistinta', teamName: team, filename: file.name || '',
+        mimeType: file.type || 'image/jpeg', dataBase64: b64 })
+    });
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'risposta inattesa dal backend');
+    note('💾 ' + (data.duplicate ? 'Copia già presente' : 'Copia salvata') + ' su Drive · ' + escapeHtml(data.folder || '') + ' / ' + escapeHtml(data.name || ''), 8000);
+  } catch (e) {
+    note('⚠️ Copia della distinta NON salvata su Drive: ' + escapeHtml(e.message || String(e)), 20000);
+  }
+}
+
 async function handleOcr(input, side) {
   const file = input.files[0];
   if (!file) return;
@@ -1446,6 +1480,7 @@ async function handleOcr(input, side) {
 
     const result = await response.json();
     applyOcrResult(result, side, progressEl);
+    saveOpponentDistinta(file, result, progressEl);
 
     setTimeout(() => progressEl.classList.remove('active'), 8000);
   } catch (e) {
@@ -1782,7 +1817,9 @@ async function handleFilePick(input, side) {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: body
     });
-    applyOcrResult(await res.json(), side, progressEl);
+    const result = await res.json();
+    applyOcrResult(result, side, progressEl);
+    saveOpponentDistinta(file, result, progressEl);
     setTimeout(() => progressEl.classList.remove('active'), 8000);
   } catch (e) {
     progressEl.innerHTML = '❌ ' + humanOcrError(e.message || e);
@@ -2676,7 +2713,7 @@ function runVoiceStaffCard(c, cmd) {
     try { resolveVoicePlayer(ours, { name: raw }, ''); return null; } catch (e) { /* non e' in rosa: forse e' staff */ }
   }
   const st = voiceStaffMatch(words);
-  if (st === 'ambiguous') throw new Error('Staff "' + words.join(' ') + '" ambiguo: di' nome e cognome');
+  if (st === 'ambiguous') throw new Error('Staff "' + words.join(' ') + '" ambiguo: di\' nome e cognome');
   if (!st) {
     if (explicit) throw new Error('Staff "' + words.join(' ') + '" non trovato');
     return null;     // ne' in rosa ne' staff: l'errore lo da' voiceTarget
