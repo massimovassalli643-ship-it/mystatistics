@@ -1,6 +1,6 @@
 # Comandi vocali da Apple Watch — guida di configurazione e prova
 
-App v3.32 + backend v5.8 (03/10/2026). Stato e storico in `PROGRESS.md`.
+App v3.39 + backend v5.8 o successivo (aggiornato 18/10/2026). Stato e storico in `PROGRESS.md`.
 
 ## Come funziona
 1. Sul Watch la scorciatoia **Comandi** detta la frase e la manda (POST) al
@@ -26,6 +26,7 @@ Ordine: **evento · squadra · giocatrice · campi facoltativi**.
 | Rosso | `rosso fiamma Gargaro` | `rosso Brugherio 5` |
 | Sostituzione | `sostituzione fiamma esce Gargaro entra Bignotti` + facoltativo `tattica` / `infortunio` | `sostituzione Brugherio esce 7 entra 13` |
 | Rigore parato | `rigore parato fiamma Porta` | — |
+| Cartellino allo staff (v3.39) | `giallo staff Redaelli` · `rosso fiamma staff Gaggiani` · `giallo Gaggiani` (senza "staff" vale solo se il nome non e' in rosa) | non previsto |
 | Annulla | `annulla`: toglie l'ultimo evento arrivato **da comando vocale** (quelli inseriti a mano non si toccano) | |
 
 - **Squadra**: `fiamma` (o `noi`); per le avversarie il **nome della squadra**
@@ -136,4 +137,4 @@ sulla partita sbagliata modificano davvero i dati.
 | iPad: "Squadra … non riconosciuta" | il nome detto non somiglia a nessuna delle due squadre: di' `avversario` |
 | iPad: "corrisponde a entrambe le squadre" | le due squadre hanno lo stesso nome (es. distinta di prova usata per entrambe): di' `fiamma` o `avversario` |
 | Comando "Scaduto" | iPad bloccato, offline, o schermata partita non aperta per più di 2 minuti |
-| Badge non visibile | Comandi vocali non attivi nelle Impostazioni dell'iPad, oppure token o URL mancanti |
+| Badge "Comandi vocali non attivi" | token, URL o spunta "Ricevi i comandi" mancanti nelle Impostazioni dell'iPad: reinseriscili e premi **Salva** (la sola prova non salva) |

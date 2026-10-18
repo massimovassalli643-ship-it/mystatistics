@@ -1000,7 +1000,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.38';
+const APP_VERSION = '3.39';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '5.8';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -2622,6 +2622,10 @@ function runVoiceCommand(c) {
     voiceMarkCancelled(ev.voiceCmd, 'Annullato con "annulla" dal Watch');
     return { stato: 'applicato', messaggio: 'Annullato: ' + label };
   }
+  if (cmd.type === 'yellow' || cmd.type === 'red') {
+    const sev = runVoiceStaffCard(c, cmd);
+    if (sev) return sev;
+  }
   const { side, ours, player } = voiceTarget(cmd);
   const pick = (ref, role) => {
     if (ref) return resolveVoicePlayer(side, ref, role);
@@ -2645,6 +2649,42 @@ function runVoiceCommand(c) {
     throw new Error('Evento non riconosciuto');
   }
   ev.voiceCmd = c.id;
+  addMatchEvent(ev);
+  return { stato: 'applicato', messaggio: eventPlainLabel(ev) + ' al ' + ev.minute + "'", eventId: ev.id };
+}
+
+/* v3.38: cartellini allo staff (v3.37) da voce: "giallo staff Redaelli", "rosso fiamma staff
+   Gaggiani". Senza la parola "staff" vale solo se il nome non e' in rosa ("giallo Gaggiani").
+   Lo staff e' sempre della Fiamma: un'avversaria con quel nome ("giallo Brugherio ...") non lo tocca. */
+function voiceStaffMatch(words) {
+  if (!words.length) return null;
+  const hits = FIAMMA_STAFF.filter(st => {
+    const sw = athleteWords(st.name);
+    return words.every(w => sw.some(x => x === w) || sw.some(x => wordsAlike(w, x)));
+  });
+  return hits.length === 1 ? hits[0] : (hits.length > 1 ? 'ambiguous' : null);
+}
+function runVoiceStaffCard(c, cmd) {
+  const m = state.currentMatch;
+  const ours = ourSideOf(m, VOICE_OUR_TEAM);
+  const raw = cmd.player && cmd.player.name ? cmd.player.name : (!cmd.team && cmd.lead ? cmd.lead : '');
+  if (!raw || cmd.team === 'avversario') return null;
+  const all = athleteWords(raw);
+  const explicit = all[0] === 'STAFF';
+  const words = explicit ? all.slice(1) : all;
+  if (!explicit) {
+    try { resolveVoicePlayer(ours, { name: raw }, ''); return null; } catch (e) { /* non e' in rosa: forse e' staff */ }
+  }
+  const st = voiceStaffMatch(words);
+  if (st === 'ambiguous') throw new Error('Staff "' + words.join(' ') + '" ambiguo: di' nome e cognome');
+  if (!st) {
+    if (explicit) throw new Error('Staff "' + words.join(' ') + '" non trovato');
+    return null;     // ne' in rosa ne' staff: l'errore lo da' voiceTarget
+  }
+  const periodMinute = Math.floor(currentElapsedMs() / 60000);
+  const ev = { type: cmd.type, team: ours, periodMinute, period: state.timer.periodIndex,
+    player: { num: null, name: st.name, role: st.role }, isStaff: true, voiceCmd: c.id };
+  ev.minute = periodMinute + (PERIOD_OFFSETS[ev.period] || 0);
   addMatchEvent(ev);
   return { stato: 'applicato', messaggio: eventPlainLabel(ev) + ' al ' + ev.minute + "'", eventId: ev.id };
 }
@@ -2756,7 +2796,7 @@ function resolveVoicePlayer(side, ref, role) {
 
 function eventPlainLabel(e) {
   const team = state.currentMatch[e.team].name;
-  const who = p => (p ? (p.num ?? '?') + ' ' + p.name : '');
+  const who = p => (p ? (e.isStaff && p.num == null ? p.name + ' (' + (p.role || 'staff') + ')' : (p.num ?? '?') + ' ' + p.name) : '');
   if (e.type === 'goal') {
     return (e.goalType === 'autogol' ? 'Autogol ' : 'Gol ') + team + ' · ' + who(e.scorer) +
       (e.goalType && e.goalType !== 'azione' && e.goalType !== 'autogol' ? ' su ' + e.goalType : '') +
@@ -2804,8 +2844,13 @@ function renderVoiceBadge(mode) {
   const el = document.getElementById('voice-badge');
   if (!el) return;
   const m = state.currentMatch;
-  if (!voiceEnabled() || !m) { el.style.display = 'none'; return; }
+  if (!m) { el.style.display = 'none'; return; }
   el.style.display = '';
+  if (!voiceEnabled()) {
+    el.className = 'voice-badge off';
+    el.innerHTML = '🎙️ Comandi vocali non attivi: apri ⚙️ Impostazioni, inserisci token, spunta "Ricevi i comandi" e premi Salva';
+    return;
+  }
   const time = ts => new Date(ts).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const last = voice.last
     ? ' · ultimo ' + (voice.last.ok ? '✓' : '✗') + ' "' + escapeHtml(voice.last.text) + '" alle ' + time(voice.last.at)
