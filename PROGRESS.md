@@ -20,7 +20,33 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Comandi vocali | Guida completa (scorciatoia Watch, frasi, checklist): `COMANDI_VOCALI.md`. Token in Script Property `VOICE_TOKEN` e nelle Impostazioni dell'iPad, **mai nel repository** |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.40 + backend v6.1 - Copia distinte avversarie su Drive (18/10/2026)
+## Stato attuale: v3.41 - Numeri di maglia doppi bloccati e segnalati (25/10/2026)
+
+### Novità v3.41 (25/10/2026)
+
+Due atlete della stessa squadra non possono avere lo stesso numero di maglia.
+
+- **Correzione a mano** (riga della rosa `confirmRosterRow` e modale "➕ Atleta"
+  in correzione o aggiunta): se il numero è già di un'altra atleta compare
+  "⛔ Il numero X è già assegnato a …" e la modifica non viene salvata (la riga
+  resta in modifica).
+- **Caricamento distinta** (`applyOcrResult`):
+  - i numeri prestampati non vengono assegnati se il numero è già di
+    un'atleta in rosa non presente in questa lettura (altro scatto o
+    inserimento a mano);
+  - un numero letto dall'OCR già di un'altra atleta non sovrascrive quello
+    esistente (atleta già in rosa) oppure resta vuoto (atleta nuova); conta nei
+    "numeri già usati: da inserire a mano";
+  - se alla fine la rosa contiene doppioni: "⚠️ N numeri di maglia doppi" nel
+    messaggio e avviso con l'elenco (`warnDuplicateNumbers`).
+- Helper nuovi: `findDuplicateNumbers`, `numberTakenIn`,
+  `duplicateNumberMessage`, `warnDuplicateNumbers`.
+- **Provato** (node, logica frontend simulata): prestampato già occupato →
+  vuoto; numero OCR doppione → vuoto; rosa già con un doppione → avviso con
+  l'elenco. Sintassi dello script verificata.
+- Solo frontend.
+
+## Versione precedente: v3.40 + backend v6.1 - Copia distinte avversarie su Drive (18/10/2026)
 
 - **Richiesta di Max**: la distinta di una squadra avversaria caricata da foto o da file va copiata su Drive in `G:\My Drive\From Dropbox\CI Fiamma monza prima squadra\Distinte squadre avversarie`.
 - **Frontend** (`saveOpponentDistinta`): dopo la lettura OCR di "Scatta foto", "Libreria foto" e "Carica file"/"Sfoglia dal dispositivo", se il nome squadra letto NON e' la Fiamma (`teamOverlap` con `OUR_TEAM_NAME`), manda l'originale al backend (action `saveDistinta`). Non vale per le distinte gia' lette dalla cartella Drive. Un errore non tocca la rosa gia' caricata: compare solo l'avviso "Copia NON salvata". `BACKEND_MIN_VERSION` = 6.1.
@@ -1313,7 +1339,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `OCR_STRIP_OVERLAP` | 0.08 | sovrapposizione tra strisce (frazione dell'altezza) |
 | `OCR_LEFT_CROP` | 0.62 | frazione di larghezza tenuta per le strisce (foto verticali) |
 | `OCR_JPEG_QUALITY` | 0.9 | qualità JPEG delle immagini inviate |
-| `APP_VERSION` | 3.34 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
+| `APP_VERSION` | 3.41 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
 | `GS_WINDOWS` | 3, 5, 10 | soglie (minuti) dei "gol ravvicinati" nella dashboard; predefinita 5 (`gsWindow`) |
 | `GS_MIN_FORM` / `GS_SMALL_FORM` | 30 / 60 | minuti minimi per confrontare una formazione / sotto i quali compare "campione piccolo" |
 | `GS_MIN_PLAYER` / `GS_SMALL_PLAYER` | 60 / 180 | come sopra, per le singole calciatrici |
@@ -1337,6 +1363,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 ## Changelog
 | Data | Modifica |
 |------|----------|
+| 25/10/2026 | Frontend v3.41: numeri di maglia doppi nella stessa squadra bloccati nelle correzioni a mano e nel caricamento distinta (prestampati e numeri OCR già occupati restano vuoti), avviso con l'elenco dei doppioni. Solo frontend |
 | 18/10/2026 | `backend/Code.gs` riallineato alla copia live nell'editor (v6.0): aggiunta action `partite` / `handlePartiteList`. Nessuna modifica al comportamento live |
 | 18/10/2026 | v3.40 + backend v6.1: copia su Drive delle distinte avversarie caricate da foto/file (`saveDistinta`). HOTFIX di un errore di sintassi introdotto nella v3.39 |
 | 18/10/2026 | v3.39: cartellini allo staff da comando vocale (`giallo staff Redaelli`); badge "Comandi vocali non attivi" quando token/URL/spunta mancano. Solo frontend |

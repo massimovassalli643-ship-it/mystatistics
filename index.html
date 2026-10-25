@@ -1000,7 +1000,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.40';
+const APP_VERSION = '3.41';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '6.1';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -1274,13 +1274,51 @@ function confirmRosterRow(side, idx) {
   if (!d || !p) return;
   const oldP = { num: p.num, name: p.name };
   const rawNum = String(d.num == null ? '' : d.num).replace(/\D/g, '');
-  p.num = rawNum === '' ? null : parseInt(rawNum, 10);
+  const newNum = rawNum === '' ? null : parseInt(rawNum, 10);
+  const clash = numberTakenIn(state.currentMatch[side].roster, newNum, p);
+  if (clash) { alert(duplicateNumberMessage(newNum, clash)); return; }   // la riga resta in modifica
+  p.num = newNum;
   p.name = (d.name || '').trim();
   p.birthDate = (d.birthDate || '').trim();
   relinkPlayerRefs(side, oldP, p);
   delete state.rosterEdit[side][String(idx)];
   persistCurrent();
   renderRoster(side);
+}
+/* Numeri di maglia doppi nella rosa di una squadra: [{ num, names: [...] }].
+ * Non blocca nulla (in gara un doppione può essere legittimo, es. cambio
+ * maglia): serve solo a far emergere subito l'errore. */
+function findDuplicateNumbers(side) {
+  const byNum = new Map();
+  (state.currentMatch[side].roster || []).forEach(p => {
+    const name = (p.name || '').trim();
+    if (p.num == null || !name) return;
+    if (!byNum.has(p.num)) byNum.set(p.num, []);
+    byNum.get(p.num).push(name);
+  });
+  return [...byNum.entries()]
+    .filter(([, names]) => names.length > 1)
+    .map(([num, names]) => ({ num, names }));
+}
+/* Restituisce l'atleta di `list` che ha già il numero `num` (esclusa `except`),
+ * oppure null. Due atlete della stessa squadra NON possono avere lo stesso numero. */
+function numberTakenIn(list, num, except) {
+  if (num == null || isNaN(Number(num))) return null;
+  return (list || []).find(p => p !== except && p.num != null
+    && Number(p.num) === Number(num) && (p.name || '').trim()) || null;
+}
+function duplicateNumberMessage(num, clash) {
+  return '⛔ Il numero ' + num + ' è già assegnato a ' + clash.name + '.\n\n'
+    + 'Due atlete della stessa squadra non possono avere lo stesso numero: correggi il numero.';
+}
+function warnDuplicateNumbers(side) {
+  const dups = findDuplicateNumbers(side);
+  if (!dups.length) return 0;
+  const teamName = state.currentMatch[side].name || (side === 'home' ? 'Casa' : 'Ospiti');
+  alert('⚠️ Numeri di maglia doppi in rosa ' + teamName + ':\n\n'
+    + dups.map(d => '#' + d.num + ' → ' + d.names.join(' / ')).join('\n')
+    + '\n\nControlla la distinta e correggi il numero sbagliato nella rosa.');
+  return dups.length;
 }
 function clearRoster(side) {
   const roster = state.currentMatch[side].roster;
@@ -1617,6 +1655,12 @@ function applyOcrResult(result, side, progressEl) {
         + 'Usare come numero di maglia il numero PRESTAMPATO a sinistra di ogni riga (1, 2, 3, ...)?\n\n'
         + 'I numeri scritti a mano nella colonna restano quelli scritti.')) {
         const used = new Set(formatted.filter(p => p.num != null).map(p => p.num));
+        // Anche i numeri delle atlete GIA' in rosa (altro scatto, inserimento a
+        // mano) sono occupati: un prestampato non deve duplicarli.
+        const nomiLetti = new Set(formatted.map(p => normalizeOcrName(p.name)));
+        state.currentMatch[side].roster.forEach(r => {
+          if (r.num != null && !nomiLetti.has(normalizeOcrName(r.name))) used.add(r.num);
+        });
         blanks.forEach(p => {
           if (used.has(p.row)) { conflitti++; return; }
           p.num = p.row;
@@ -1640,7 +1684,10 @@ function applyOcrResult(result, side, progressEl) {
         if (prev) {
           // Una lettura senza numero (cella illeggibile o vuota) non deve
           // cancellare quello gia' presente, ad esempio inserito a mano.
-          if (np.num != null) {
+          if (np.num != null && numberTakenIn(existing, np.num, prev)) {
+            // Numero gia' di un'altra atleta: non si sovrascrive, da verificare a mano
+            conflitti++;
+          } else if (np.num != null) {
             const oldP = { num: prev.num, name: prev.name };
             prev.num = np.num;
             relinkPlayerRefs(side, oldP, prev);
@@ -1649,6 +1696,9 @@ function applyOcrResult(result, side, progressEl) {
           if (np.role) prev.role = np.role;
           corrette++;
         } else {
+          // Stesso numero di un'altra atleta (letto male dall'OCR o in conflitto):
+          // resta vuoto, da inserire a mano dopo il controllo sulla distinta
+          if (np.num != null && numberTakenIn(existing, np.num, null)) { np.num = null; conflitti++; }
           existing.push(np);
           if (key) byName.set(key, np);
           nuove++;
@@ -1667,7 +1717,9 @@ function applyOcrResult(result, side, progressEl) {
         costInfo = ' • ' + (inTok + outTok) + ' token (~$' + cost + ')';
       }
       const dubbi = formatted.filter(p => /\?|ILLEGGIBILE/.test(p.name)).length;
+      const doppi = findDuplicateNumbers(side).length;
       progressEl.innerHTML = '✅ ' + nuove + ' nuove'
+        + (doppi ? ' • ⚠️ ' + doppi + ' numeri di maglia doppi' : '')
         + (corrette ? ' • ' + corrette + ' corrette' : '')
         + (teamName ? ' • ' + teamName : '')
         + (dubbi ? ' • ⚠️ ' + dubbi + ' da verificare' : '')
@@ -1675,6 +1727,7 @@ function applyOcrResult(result, side, progressEl) {
         + (conflitti ? ' • ⚠️ ' + conflitti + ' numeri già usati: da inserire a mano' : '')
         + scartate + troncata
         + costInfo;
+      if (doppi) setTimeout(() => warnDuplicateNumbers(side), 50);
     }
 }
 
@@ -2960,6 +3013,8 @@ function confirmAddPlayer() {
     // Correzione di un'atleta gia' in rosa: formazione ed eventi la seguono
     const p = state.currentMatch[team].roster[parseInt(existingIdx, 10)];
     if (!p) return;
+    const clashEdit = numberTakenIn(state.currentMatch[team].roster, newNum, p);
+    if (clashEdit) { alert(duplicateNumberMessage(newNum, clashEdit)); return; }
     const oldP = { num: p.num, name: p.name };
     p.num = newNum;
     p.name = name;
@@ -2969,6 +3024,8 @@ function confirmAddPlayer() {
     closeModal('add-player-modal');
     return;
   }
+  const clashNew = numberTakenIn(state.currentMatch[team].roster, newNum, null);
+  if (clashNew) { alert(duplicateNumberMessage(newNum, clashNew)); return; }
   state.currentMatch[team].roster.push({ num: newNum, name, role: '', birthDate: '' });
   persistCurrent();
   closeModal('add-player-modal');
