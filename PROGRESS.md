@@ -20,7 +20,53 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Comandi vocali | Guida completa (scorciatoia Watch, frasi, checklist): `COMANDI_VOCALI.md`. Token in Script Property `VOICE_TOKEN` e nelle Impostazioni dell'iPad, **mai nel repository** |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.41 - Numeri di maglia doppi bloccati e segnalati (25/10/2026)
+## Stato attuale: v3.42 - Correzione del numero di maglia in una partita conclusa (26/10/2026)
+
+### Novità v3.42 (26/10/2026)
+
+**Richiesta di Max**: il 25/10 (partita col Pavia) l'OCR ha letto male due
+numeri scritti a mano (Gargaro Emma 4 invece di 7, Guidi Sofia 17 invece di
+12). In modalità modifica mancava un modo guidato per correggere il numero di
+un'atleta già presente.
+
+- **Modale "➕ Atleta" in modalità modifica** (partita conclusa): titolo
+  "✏️ Correggi numero di maglia", il menu parte da "— Scegli la calciatrice —"
+  (entrambe le squadre, con il selettore squadra), "➕ Nuova calciatrice" è in
+  fondo, "Salva correzione" resta spento finché non se ne sceglie una. A
+  partita in corso la modale è quella di prima. La correzione usava già
+  `confirmAddPlayer` / `relinkPlayerRefs`, ma il menu partiva da "Nuova
+  calciatrice" e sembrava servire solo ad aggiungere.
+- **Doppioni**: blocco della v3.41 nella stessa squadra della stessa partita
+  ("⛔ Il numero X è già assegnato a …", nessun salvataggio). Squadre diverse
+  possono avere lo stesso numero.
+- **Propagazione** (`relinkPlayerRefs`): rosa della partita, formazione,
+  eventi (marcatrice, assist, cartellini, rigori parati, entrate/uscite) e ora
+  anche le **statistiche corrette a mano** nel riepilogo (`statsOverrides`,
+  chiave "numero_nome": prima andavano perse in silenzio). Punteggio, minuti e
+  altri dati non cambiano. Gli eventi salvano una copia `{ num, name }`
+  dell'atleta (nessun id); il testo "Entra 17 GUIDI SOFIA" si compone solo a
+  video e nella sincronizzazione.
+- **Solo per la partita**: non esiste una rosa generale con i numeri (foglio
+  ATLETE = solo nomi; ogni partita ha la rosa della sua distinta), quindi la
+  correzione non tocca le altre partite. La Dashboard raggruppa per nome.
+- **"Ultima modifica"** aggiornata subito a ogni correzione (`markPlayerFix`);
+  con "↩️ Torna al riepilogo" la partita si **risincronizza da sola** su Sheets
+  (`state.pendingResync`; solo se c'è stata una correzione atleta). Il backend
+  cancella e riscrive le righe con lo stesso id partita: nessun duplicato,
+  `Code.gs` invariato. Senza rete resta il tasto "Sincronizza" lampeggiante.
+  `syncToSheets(btnEl)` accetta il pulsante come parametro.
+- **Provato** (26/10/2026, browser 1180×820 con backend v6.1 simulato
+  in memoria, partita conclusa costruita sul caso Pavia): Guidi → 4 bloccato
+  ("già assegnato a GARGARO EMMA"), nessuna modifica; Gargaro 4 → 7 e Guidi
+  17 → 12: rosa, formazione, 5 eventi, statistiche (g1 a1 y1 / g1, minuti 80 e
+  60) e correzione manuale dei minuti spostata su `12_GUIDI SOFIA`; punteggio
+  2-1 invariato; Pavia: Neri → 17 bloccato (Bruni), Neri → 7 consentito (altra
+  squadra); nessun doppione nelle due rose. "Torna al riepilogo" → 1
+  sincronizzazione automatica, "Ultima modifica" aggiornata; seconda
+  sincronizzazione manuale → sempre 1 riga Partite, 9 Statistiche, 5 Eventi,
+  con i numeri nuovi. Uscita dalla modalità modifica senza correzioni → nessuna
+  sincronizzazione automatica. Modale a partita in corso invariata.
+
 
 ### Novità v3.41 (25/10/2026)
 
@@ -1339,7 +1385,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `OCR_STRIP_OVERLAP` | 0.08 | sovrapposizione tra strisce (frazione dell'altezza) |
 | `OCR_LEFT_CROP` | 0.62 | frazione di larghezza tenuta per le strisce (foto verticali) |
 | `OCR_JPEG_QUALITY` | 0.9 | qualità JPEG delle immagini inviate |
-| `APP_VERSION` | 3.41 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
+| `APP_VERSION` | 3.42 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
 | `GS_WINDOWS` | 3, 5, 10 | soglie (minuti) dei "gol ravvicinati" nella dashboard; predefinita 5 (`gsWindow`) |
 | `GS_MIN_FORM` / `GS_SMALL_FORM` | 30 / 60 | minuti minimi per confrontare una formazione / sotto i quali compare "campione piccolo" |
 | `GS_MIN_PLAYER` / `GS_SMALL_PLAYER` | 60 / 180 | come sopra, per le singole calciatrici |
@@ -1363,6 +1409,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 ## Changelog
 | Data | Modifica |
 |------|----------|
+| 26/10/2026 | Frontend v3.42: in una partita conclusa la modale "➕ Atleta" si apre per correggere il numero di maglia (scelta atleta di entrambe le squadre, blocco doppioni v3.41); il numero nuovo segue formazione, eventi e statistiche corrette a mano; "Ultima modifica" subito e risincronizzazione automatica tornando al riepilogo. Solo frontend, `Code.gs` invariato |
 | 25/10/2026 | Frontend v3.41: numeri di maglia doppi nella stessa squadra bloccati nelle correzioni a mano e nel caricamento distinta (prestampati e numeri OCR già occupati restano vuoti), avviso con l'elenco dei doppioni. Solo frontend |
 | 18/10/2026 | `backend/Code.gs` riallineato alla copia live nell'editor (v6.0): aggiunta action `partite` / `handlePartiteList`. Nessuna modifica al comportamento live |
 | 18/10/2026 | v3.40 + backend v6.1: copia su Drive delle distinte avversarie caricate da foto/file (`saveDistinta`). HOTFIX di un errore di sintassi introdotto nella v3.39 |
@@ -1447,6 +1494,7 @@ Nessuna modifica al codice finché Max non scegle la direzione.
 - [ ] Valutare: selezione automatica del ritaglio colonne anche per foto orizzontali; anteprima delle strisce prima dell'invio
 
 ## Da verificare
+- [ ] **Sull'iPad (v3.42)**: aprire una partita conclusa → ✏️ modifica → ➕ Atleta: titolo "Correggi numero di maglia", scegliere un'atleta, cambiare il numero, "Torna al riepilogo" → sincronizzazione automatica e controllo su Sheets (foglio Statistiche ed Eventi con il numero nuovo, nessuna riga doppia)
 - [x] Backend v5.8 (03/10/2026, mattina, da Max): Script Property `VOICE_TOKEN` creata; `Code.gs` v5.8 incollato e salvato; `testParserComandi()` → 29/29 OK; `testComandoVocale()` → "✅ Giallo Fiamma GARGARO", foglio "Comandi" creato (pending 1, la riga di prova scade da sola); nuova versione pubblicata su TUTTI e 3 i deployment (dichiarato da Max)
 - [x] Frontend v3.32 su `main` e online su GitHub Pages (03/10/2026, verificato leggendo `APP_VERSION` dal sito live)
 - [x] Comandi vocali, prova senza Watch sull'iPad (03/10/2026, Max, partita di prova): frase scritta a mano nel foglio "Comandi" (`goal fiamma bignotti`) → goal "3 BIGNOTTI CHIARA" registrato, riga `applicato`, badge "Watch in ascolto"; Annulla dal riquadro → evento tolto, riga `annullato`; cognome inesistente → riquadro rosso, nessun evento, riga `errore`. Manca: scorciatoia sul Watch e prova in allenamento

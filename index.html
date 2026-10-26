@@ -873,7 +873,7 @@
 
 <div class="modal-overlay" id="add-player-modal">
   <div class="modal">
-    <div class="modal-title">Aggiungi o correggi calciatrice</div>
+    <div class="modal-title" id="add-player-title">Aggiungi o correggi calciatrice</div>
     <div>
       <div class="modal-field">
         <label class="modal-label">Squadra</label>
@@ -1000,7 +1000,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.41';
+const APP_VERSION = '3.42';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '6.1';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -1267,6 +1267,14 @@ function relinkPlayerRefs(side, oldP, newP) {
     if (e.team !== side) return;
     ['scorer', 'assist', 'player', 'playerOut', 'playerIn'].forEach(k => { if (same(e[k])) follow(e[k]); });
   });
+  // v3.42: le statistiche corrette a mano nel riepilogo (statsOverrides) hanno
+  // chiave "numero_nome": senza spostarle andrebbero perse in silenzio
+  const ov = m.statsOverrides && m.statsOverrides[side];
+  const oldKey = `${oldP.num}_${oldP.name}`, newKey = `${newP.num}_${newP.name}`;
+  if (ov && ov[oldKey]) {
+    ov[newKey] = Object.assign({}, ov[newKey] || {}, ov[oldKey]);
+    delete ov[oldKey];
+  }
 }
 function confirmRosterRow(side, idx) {
   const d = state.rosterEdit[side][String(idx)];
@@ -2047,6 +2055,13 @@ function exitMatchEditMode() {
   state.currentMatch.editedAt = Date.now();
   persistCurrent();
   renderSummary();
+  // v3.42: dopo una correzione di numero/nome di un'atleta la partita torna da
+  // sola su Sheets (il backend riscrive le righe con lo stesso id: nessun
+  // duplicato). Senza rete resta il tasto "Sincronizza" lampeggiante.
+  if (state.pendingResync === state.currentMatch.id) {
+    state.pendingResync = null;
+    if (getSheetsUrl()) syncToSheets(document.getElementById('sync-btn'));
+  }
 }
 
 /* Picker tipo evento (edit mode partita completata): mostra 3 pulsanti
@@ -2964,8 +2979,15 @@ function renderVoiceBadge(mode) {
 }
 setInterval(voiceTick, VOICE_POLL_MS);
 
+/* v3.42: in una partita conclusa (modalita' modifica) la modale si apre per
+   CORREGGERE il numero di un'atleta gia' in rosa: il menu parte da "Scegli la
+   calciatrice", "Nuova calciatrice" e' in fondo e "Salva correzione" resta
+   spento finche' non se ne sceglie una. A partita in corso resta come prima. */
+function addPlayerEditing() { return !!(state.currentMatch && state.currentMatch.completed); }
 function openAddPlayerModal() {
   if (!state.currentMatch) return;
+  document.getElementById('add-player-title').textContent =
+    addPlayerEditing() ? '✏️ Correggi numero di maglia' : 'Aggiungi o correggi calciatrice';
   const choice = document.getElementById('add-player-team-choice');
   choice.innerHTML = `
     <div class="radio-option selected" onclick="selectAddPlayerTeam(this, 'home')">${escapeHtml(state.currentMatch.home.name)}</div>
@@ -2990,17 +3012,23 @@ function refreshAddPlayerExisting() {
     .map((p, i) => ({ p, i }))
     .sort((a, b) => (a.p.num || 99) - (b.p.num || 99))
     .map(({ p, i }) => `<option value="${i}">${p.num ?? '?'} - ${escapeHtml(p.name || 'Senza nome')}</option>`);
-  sel.innerHTML = '<option value="">— Nuova calciatrice —</option>' + opts.join('');
+  sel.innerHTML = addPlayerEditing()
+    ? '<option value="">— Scegli la calciatrice —</option>' + opts.join('') + '<option value="new">➕ Nuova calciatrice</option>'
+    : '<option value="">— Nuova calciatrice —</option>' + opts.join('');
   sel.value = '';
   onAddPlayerExistingChange();
 }
 function onAddPlayerExistingChange() {
   const team = document.getElementById('add-player-team-choice').dataset.selected;
   const v = document.getElementById('add-player-existing').value;
-  const p = v === '' ? null : state.currentMatch[team].roster[parseInt(v, 10)];
+  const p = v === '' || v === 'new' ? null : state.currentMatch[team].roster[parseInt(v, 10)];
   document.getElementById('new-player-num').value = p && p.num != null ? p.num : '';
   document.getElementById('new-player-name').value = p ? (p.name || '') : '';
-  document.getElementById('add-player-confirm-btn').textContent = p ? 'Salva correzione' : 'Aggiungi';
+  const btn = document.getElementById('add-player-confirm-btn');
+  btn.textContent = p ? 'Salva correzione' : 'Aggiungi';
+  // in modalita' modifica, senza una scelta non c'e' nulla da salvare
+  btn.disabled = addPlayerEditing() && v === '';
+  btn.style.opacity = btn.disabled ? '0.5' : '';
 }
 function confirmAddPlayer() {
   const team = document.getElementById('add-player-team-choice').dataset.selected;
@@ -3009,7 +3037,8 @@ function confirmAddPlayer() {
   if (!name) { alert('Inserisci cognome e nome'); return; }
   const newNum = isNaN(num) ? null : num;
   const existingIdx = document.getElementById('add-player-existing').value;
-  if (existingIdx !== '') {
+  if (addPlayerEditing() && existingIdx === '') return;
+  if (existingIdx !== '' && existingIdx !== 'new') {
     // Correzione di un'atleta gia' in rosa: formazione ed eventi la seguono
     const p = state.currentMatch[team].roster[parseInt(existingIdx, 10)];
     if (!p) return;
@@ -3019,6 +3048,7 @@ function confirmAddPlayer() {
     p.num = newNum;
     p.name = name;
     relinkPlayerRefs(team, oldP, p);
+    markPlayerFix();
     persistCurrent();
     renderMatchInfo();
     closeModal('add-player-modal');
@@ -3027,8 +3057,17 @@ function confirmAddPlayer() {
   const clashNew = numberTakenIn(state.currentMatch[team].roster, newNum, null);
   if (clashNew) { alert(duplicateNumberMessage(newNum, clashNew)); return; }
   state.currentMatch[team].roster.push({ num: newNum, name, role: '', birthDate: '' });
+  markPlayerFix();
   persistCurrent();
   closeModal('add-player-modal');
+}
+/* Partita conclusa: "Ultima modifica" aggiornata subito e risincronizzazione
+   automatica all'uscita dalla modalita' modifica (exitMatchEditMode) */
+function markPlayerFix() {
+  const m = state.currentMatch;
+  if (!m || !m.completed) return;
+  m.editedAt = Date.now();
+  state.pendingResync = m.id;
 }
 
 /* side = 'home'|'away'; match opzionale: se assente usa la partita in corso.
@@ -4877,7 +4916,7 @@ async function testSheetsConnection() {
   }
 }
 
-async function syncToSheets() {
+async function syncToSheets(btnEl) {
   if (!state.currentMatch) return;
   const url = getSheetsUrl();
   if (!url) {
@@ -4887,7 +4926,7 @@ async function syncToSheets() {
     return;
   }
   const m = state.currentMatch;
-  const btn = event.target.closest('button');
+  const btn = btnEl || (window.event && window.event.target && window.event.target.closest ? window.event.target.closest('button') : null);
   const originalText = btn ? btn.innerHTML : '';
   if (btn) {
     btn.disabled = true;
