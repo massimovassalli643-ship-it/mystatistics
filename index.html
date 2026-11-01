@@ -1000,7 +1000,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.42';
+const APP_VERSION = '3.43';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '6.1';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -1511,9 +1511,16 @@ async function handleOcr(input, side) {
     return;
   }
 
+  // Dettaglio tecnico mostrato solo se la rete fallisce (v3.43): serve a capire
+  // se "Scatta foto" cade per peso dell'invio, tempo o ricaricamento pagina.
+  const t0 = Date.now();
+  let diag = 'file ' + (file.size / 1048576).toFixed(1) + ' MB ' + (file.type || '?');
   try {
     progressEl.textContent = '⏳ Preparazione immagine (ritaglio e contrasto)...';
     const images = await prepareOcrImages(file);
+    const body = JSON.stringify({ action: 'ocr', images: images });
+    diag += ' · ' + images.length + ' immagini · invio ' + (body.length / 1048576).toFixed(1)
+      + ' MB · preparazione ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s';
 
     progressEl.textContent = '🤖 Analisi distinta con Claude AI...';
     const response = await fetch(sheetsUrl, {
@@ -1521,7 +1528,7 @@ async function handleOcr(input, side) {
       mode: 'cors',
       redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'ocr', images: images })
+      body: body
     });
 
     const result = await response.json();
@@ -1530,7 +1537,10 @@ async function handleOcr(input, side) {
 
     setTimeout(() => progressEl.classList.remove('active'), 8000);
   } catch (e) {
-    progressEl.innerHTML = '❌ ' + humanOcrError(e.message || e);
+    progressEl.innerHTML = '❌ ' + humanOcrError(e.message || e)
+      + (/Failed to fetch|NetworkError|Load failed|network/i.test(String(e && e.message || e))
+        ? '<br><span style="opacity:0.6;font-size:11px">Dettaglio: ' + escapeHtml(diag)
+          + ' · dopo ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s</span>' : '');
     setTimeout(() => progressEl.classList.remove('active'), 30000);
   }
   input.value = '';

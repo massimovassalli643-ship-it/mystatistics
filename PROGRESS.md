@@ -20,7 +20,15 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Comandi vocali | Guida completa (scorciatoia Watch, frasi, checklist): `COMANDI_VOCALI.md`. Token in Script Property `VOICE_TOKEN` e nelle Impostazioni dell'iPad, **mai nel repository** |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.42 - Correzione del numero di maglia in una partita conclusa (26/10/2026)
+## Stato attuale: v3.43 - Diagnostica errore di rete su "Scatta foto" (01/11/2026)
+
+**Contesto**: Max riferisce che con "Scatta foto" (iPad) compariva "Nessuna risposta dal backend" (fetch fallita), mentre da "Libreria foto" la stessa distinta si caricava. Il percorso di invio è identico: cambia l'immagine in ingresso (foto piena della fotocamera vs file di libreria) o il comportamento di iOS (pagina scaricata dopo la fotocamera). Causa **non confermata**.
+
+- `handleOcr`: se l'errore è di rete, sotto il messaggio compare "Dettaglio: file X MB tipo · N immagini · invio Y MB · preparazione Z s · dopo T s". Se la pagina si ricarica non si vede nulla e lo stato (partita, rosa) risulta perso.
+- Intanto la strada sicura sull'iPad è "Libreria foto".
+- Da fare: prova sull'iPad con "Scatta foto" e annotare il dettaglio.
+
+## Versione precedente: v3.42 - Correzione del numero di maglia in una partita conclusa (26/10/2026)
 
 ### Novità v3.42 (26/10/2026)
 
@@ -1385,7 +1393,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | `OCR_STRIP_OVERLAP` | 0.08 | sovrapposizione tra strisce (frazione dell'altezza) |
 | `OCR_LEFT_CROP` | 0.62 | frazione di larghezza tenuta per le strisce (foto verticali) |
 | `OCR_JPEG_QUALITY` | 0.9 | qualità JPEG delle immagini inviate |
-| `APP_VERSION` | 3.42 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
+| `APP_VERSION` | 3.43 | versione del frontend, da aggiornare ad ogni modifica di `index.html` |
 | `GS_WINDOWS` | 3, 5, 10 | soglie (minuti) dei "gol ravvicinati" nella dashboard; predefinita 5 (`gsWindow`) |
 | `GS_MIN_FORM` / `GS_SMALL_FORM` | 30 / 60 | minuti minimi per confrontare una formazione / sotto i quali compare "campione piccolo" |
 | `GS_MIN_PLAYER` / `GS_SMALL_PLAYER` | 60 / 180 | come sopra, per le singole calciatrici |
@@ -1409,6 +1417,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 ## Changelog
 | Data | Modifica |
 |------|----------|
+| 01/11/2026 | Frontend v3.43: se "Scatta foto" fallisce con "Nessuna risposta dal backend", il messaggio mostra il dettaglio tecnico (peso file, n. immagini, MB inviati, secondi) per capire la causa. Solo frontend, `Code.gs` invariato |
 | 26/10/2026 | Frontend v3.42: in una partita conclusa la modale "➕ Atleta" si apre per correggere il numero di maglia (scelta atleta di entrambe le squadre, blocco doppioni v3.41); il numero nuovo segue formazione, eventi e statistiche corrette a mano; "Ultima modifica" subito e risincronizzazione automatica tornando al riepilogo. Solo frontend, `Code.gs` invariato |
 | 25/10/2026 | Frontend v3.41: numeri di maglia doppi nella stessa squadra bloccati nelle correzioni a mano e nel caricamento distinta (prestampati e numeri OCR già occupati restano vuoti), avviso con l'elenco dei doppioni. Solo frontend |
 | 18/10/2026 | `backend/Code.gs` riallineato alla copia live nell'editor (v6.0): aggiunta action `partite` / `handlePartiteList`. Nessuna modifica al comportamento live |
