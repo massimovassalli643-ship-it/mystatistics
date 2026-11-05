@@ -20,7 +20,18 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Comandi vocali | Guida completa (scorciatoia Watch, frasi, checklist): `COMANDI_VOCALI.md`. Token in Script Property `VOICE_TOKEN` e nelle Impostazioni dell'iPad, **mai nel repository** |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.43 - Diagnostica errore di rete su "Scatta foto" (01/11/2026)
+## Stato attuale: v3.44 - Zoom dei riquadri: sfondo opaco, più largo, nomi squadra per intero (05/11/2026)
+
+**Segnalazione di Max** (Chrome su desktop, monitor da 21"): nel riquadro "Quando subiamo, partita per partita" aperto a tutto schermo (1) i nomi delle squadre a sinistra erano tagliati ("C.s.d. Uesse Sa...") e non si capiva chi fosse l'avversaria; (2) il riquadro risultava trasparente e sotto restavano visibili, in filigrana, le altre schede della dashboard.
+
+- **Non dipendeva dallo schermo dell'iPad**: il taglio avveniva nel codice (`gsMatchLabel` accorciava il nome a 16 caratteri) e la colonna dei nomi del grafico era larga fissa (`X0 = 176`), quindi succedeva su qualunque dispositivo; lo zoom ingrandiva solo il taglio.
+- **Nuova `gsShortTeam(name)`**: toglie le sigle societarie (`C.S.D.`, `A.S.D.`, `S.S.D.`, `A.R.L.`, `ASD`, `SSDARL`, `POL.D.`…) e i codici numerici (`58287`), tenendo gli anni di fondazione. Esempi: "C.S.D. UESSE SARNICO 1908" → "Uesse Sarnico 1908"; "C.S. TREVIGLIESE S.S.D. A.R.L." → "Trevigliese"; "58287 A.C.D. CAVENAGO" → "Cavenago"; "POL.D. CITTA DI SEGRATE" → "Citta Di Segrate". Tetto a 26 caratteri (poi "…"), se il nome resta vuoto si usa l'originale. Vale per tutte le viste che usano l'etichetta partita (grafico, "Episodi ravvicinati", "Gol per gol").
+- **Grafico stagione** (`gsSeasonSvg`): colonna dei nomi più larga (`X0 = 262`, larghezza `W = X0 + 604`) e font dei nomi 13 px, così "13/09 Womens Soccer Team Brescia (C) 0–1" sta per intero.
+- **Zoom** (CSS `.card-zoom-*`): overlay **opaco** (`#060c22`, prima `rgba(…,0.94)`, che lasciava intravedere la pagina sotto) e pannello fino a **1600 px** (prima 1100).
+- **Provato** (browser, 8 partite di prova con gli stessi nomi di squadra e gli stessi minuti dei gol, senza nomi di giocatrici): zoom a 1700 px con nomi completi e sfondo pulito; riquadro normale a 1180 px (iPad) leggibile; nessun errore in console.
+- Solo frontend.
+
+## Versione precedente: v3.43 - Diagnostica errore di rete su "Scatta foto" (01/11/2026)
 
 **Contesto**: Max riferisce che con "Scatta foto" (iPad) compariva "Nessuna risposta dal backend" (fetch fallita), mentre da "Libreria foto" la stessa distinta si caricava. Il percorso di invio è identico: cambia l'immagine in ingresso (foto piena della fotocamera vs file di libreria) o il comportamento di iOS (pagina scaricata dopo la fotocamera). Causa **non confermata**.
 
@@ -1417,6 +1428,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 ## Changelog
 | Data | Modifica |
 |------|----------|
+| 05/11/2026 | Frontend v3.44: zoom dei riquadri con sfondo opaco e pannello fino a 1600 px; nomi delle squadre avversarie per intero nel grafico "Quando subiamo" (`gsShortTeam` toglie sigle e codici, colonna nomi più larga). Solo frontend |
 | 01/11/2026 | Frontend v3.43: se "Scatta foto" fallisce con "Nessuna risposta dal backend", il messaggio mostra il dettaglio tecnico (peso file, n. immagini, MB inviati, secondi) per capire la causa. Solo frontend, `Code.gs` invariato |
 | 26/10/2026 | Frontend v3.42: in una partita conclusa la modale "➕ Atleta" si apre per correggere il numero di maglia (scelta atleta di entrambe le squadre, blocco doppioni v3.41); il numero nuovo segue formazione, eventi e statistiche corrette a mano; "Ultima modifica" subito e risincronizzazione automatica tornando al riepilogo. Solo frontend, `Code.gs` invariato |
 | 25/10/2026 | Frontend v3.41: numeri di maglia doppi nella stessa squadra bloccati nelle correzioni a mano e nel caricamento distinta (prestampati e numeri OCR già occupati restano vuoti), avviso con l'elenco dei doppioni. Solo frontend |

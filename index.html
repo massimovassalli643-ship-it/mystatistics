@@ -330,9 +330,9 @@
   .dash-card-title { font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #7fb8ff; margin-bottom: 14px; padding-right: 22px; }
 
   /* ---- Zoom a tutto schermo di un riquadro dashboard, al tocco ---- */
-  .card-zoom-overlay { display: none; position: fixed; inset: 0; z-index: 500; background: rgba(6,12,34,0.94); padding: 20px; overflow-y: auto; cursor: zoom-out; }
+  .card-zoom-overlay { display: none; position: fixed; inset: 0; z-index: 500; background: #060c22; padding: 20px; overflow-y: auto; cursor: zoom-out; } /* opaco: con la trasparenza la dashboard sotto si vedeva "in filigrana" */
   .card-zoom-overlay.active { display: block; }
-  .card-zoom-panel { max-width: 1100px; margin: 0 auto; cursor: default; }
+  .card-zoom-panel { max-width: min(1600px, 100%); margin: 0 auto; cursor: default; }
   .card-zoom-close { position: sticky; top: 0; display: block; margin: 0 0 14px auto; background: #e8f0f7; color: #0F1F4D; border: none; border-radius: 10px; padding: 10px 18px; min-height: 44px; font-size: 15px; font-weight: 800; cursor: pointer; }
   .card-zoom-body .dash-card { cursor: default; font-size: 17px; padding: 22px 26px; }
   .card-zoom-body .dash-card::after { display: none; }
@@ -393,7 +393,7 @@
   .gs-sec svg { width: 100%; height: auto; display: block; overflow: visible; }
   .gs-sec svg text { font-family: inherit; fill: #e8f0f7; }
   .gs-ax { font-size: 10px; fill: #93adc9 !important; font-weight: 700; letter-spacing: 0.6px; }
-  .gs-rl { font-size: 12.5px; font-weight: 700; }
+  .gs-rl { font-size: 13px; font-weight: 700; }
   .gs-rr { font-size: 11.5px; fill: #93adc9 !important; font-weight: 600; }
   .gs-cnt { font-size: 12px; font-weight: 800; fill: #b8d4ed !important; }
   .gs-clean { font-size: 11px; fill: #93adc9 !important; font-style: italic; }
@@ -1000,7 +1000,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.43';
+const APP_VERSION = '3.44';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '6.1';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -3748,11 +3748,25 @@ function gsName(name) {
   return String(name || '').toLowerCase().replace(/(^|[\s'’-])(\S)/g, (m, a, b) => a + b.toUpperCase());
 }
 function gsFmt(n) { return (Math.round(n * 10) / 10).toFixed(1); }
+/* Nome dell'avversaria senza sigle societarie ("C.S.D.", "SSDARL", "POL.D.", "A.R.L.") e senza codici
+ * numerici ("58287"), cosi' resta leggibile per intero: "C.S. TREVIGLIESE S.S.D. A.R.L." -> "Trevigliese".
+ * Gli anni di fondazione (1908, 1911) restano. */
+function gsShortTeam(name) {
+  const full = String(name || '').trim();
+  const words = full.toUpperCase().split(/\s+/).filter(w => {
+    if (/^(?:[A-Z]\.)+$/.test(w)) return false;                                    // C.S.D. · A.R.L. · S.S.D.
+    if (/^(?:ASD|SSD|USD|ASDC|SSDARL|SRL|ARL|ONLUS|CSD|ACD|POL\.?D?\.?)$/.test(w)) return false;
+    if (/^\d+$/.test(w) && !/^(?:18|19|20)\d\d$/.test(w)) return false;           // codici societari, non gli anni
+    return true;
+  });
+  const s = words.join(' ');
+  return s.length > 26 ? s.slice(0, 25) + '…' : (s || full);
+}
 function gsMatchLabel(m, side) {
   const opp = (m[side === 'home' ? 'away' : 'home'].name) || 'Avversari';
   const d = new Date(m.endedAt || m.createdAt);
   const dd = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2);
-  return dd + ' ' + gsName(opp.length > 16 ? opp.slice(0, 15) + '…' : opp) + ' (' + (side === 'home' ? 'C' : 'T') + ')';
+  return dd + ' ' + gsName(gsShortTeam(opp)) + ' (' + (side === 'home' ? 'C' : 'T') + ')';
 }
 
 function gsApply(on, e) {
@@ -3875,7 +3889,8 @@ function gsTrack(rate, color, avg) {
 /* ---------- grafico stagione: una riga per partita + istogramma per fascia ---------- */
 function gsSeasonSvg(st, w) {
   const per = st.per, n = per.length;
-  const W = 780, X0 = 176, PX = 6, rowH = n <= 10 ? 38 : (n <= 20 ? 30 : 24), top = 44;
+  // colonna dei nomi larga abbastanza per "13/09 Womens Soccer Team Brescia (C) 0–1" senza tagli
+  const X0 = 262, W = X0 + 604, PX = 6, rowH = n <= 10 ? 38 : (n <= 20 ? 30 : 24), top = 44;
   const dotR = rowH >= 30 ? 7 : 5.5;
   const xOf = t => X0 + t * PX;
   const yEnd = top + n * rowH;
