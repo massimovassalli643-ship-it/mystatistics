@@ -1,5 +1,13 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v6.2 (08/11/2026): IMPORTA DA SHEETS. Ogni sync salva anche la partita completa
+//   (JSON: rose, formazione, timer, eventi) nel foglio "PartiteJSON" (creato da solo,
+//   A id | B data | C salvata il | D... JSON a blocchi da 40000 caratteri). Nuova
+//   action 'partiteFull' (sola lettura): restituisce { matches:[...] } cosi' un altro
+//   dispositivo (es. desktop) puo' scaricare lo storico. Eventi "Tiro in porta"
+//   (type shot) nel foglio Eventi. Nessun nuovo scope: pubblicare su TUTTI e 3 i
+//   deployment, poi RISINCRONIZZARE dall'iPad le partite da rendere importabili
+//   (quelle sincronizzate con versioni precedenti non hanno il JSON).
 // v6.1 (18/10/2026): action 'saveDistinta' - copia della distinta di una squadra
 //   AVVERSARIA caricata da foto/file: salvata su Drive in "Distinte squadre avversarie"
 //   (accanto alla cartella Distinte, creata da sola). ATTENZIONE: scrivere su Drive
@@ -80,9 +88,12 @@
 
 // Aggiornare ad OGNI modifica di questo file; il frontend la confronta con
 // BACKEND_MIN_VERSION di index.html.
-const BACKEND_VERSION = '6.1';
+const BACKEND_VERSION = '6.2';
 
 const SHEET_PARTITE = 'Partite';
+const SHEET_BACKUP = 'PartiteJSON';
+const BACKUP_CHUNK = 40000;   // limite Sheets: 50000 caratteri per cella
+const BACKUP_MAX_CHUNKS = 8;
 const SHEET_STATISTICHE = 'Statistiche';
 const SHEET_EVENTI = 'Eventi';
 const SHEET_ATLETE = 'ATLETE';
@@ -118,6 +129,7 @@ function doPost(e) {
       return handleAtlete();
     }
     if (payload.action === 'partite') return handlePartiteList();
+    if (payload.action === 'partiteFull') return handlePartiteFull();
     if (payload.action === 'saveDistinta') return handleSaveDistinta(payload);
     if (payload.action === 'voice' || payload.action === 'voicePoll' || payload.action === 'voiceAck') {
       return handleVoiceRequest(payload);
@@ -667,6 +679,37 @@ function handlePartiteList() {
   return jsonResponse({ ok: true, partite: partite });
 }
 
+// v6.2: partite complete dal foglio PartiteJSON (sola lettura)
+function handlePartiteFull() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_BACKUP);
+  if (!sheet || sheet.getLastRow() < 2) return jsonResponse({ ok: true, matches: [], skipped: 0 });
+  const rows = sheet.getDataRange().getValues().slice(1);
+  const matches = [];
+  let skipped = 0;
+  rows.forEach(function (r) {
+    if (String(r[0]).trim() === '') return;
+    try {
+      matches.push(JSON.parse(r.slice(3).map(function (c) { return String(c); }).join('')));
+    } catch (err) { skipped++; }
+  });
+  return jsonResponse({ ok: true, matches: matches, skipped: skipped });
+}
+
+// v6.2: scrive/aggiorna la partita completa (una riga per id)
+function saveMatchBackup(ss, match, dataPartita, dataSalvataggio) {
+  var sheet = ss.getSheetByName(SHEET_BACKUP);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_BACKUP);
+    sheet.getRange(1, 1, 1, 4).setValues([['ID', 'Data partita', 'Salvata il', 'JSON (a blocchi)']]).setFontWeight('bold');
+  }
+  const json = JSON.stringify(match);
+  const chunks = [];
+  for (var i = 0; i < json.length; i += BACKUP_CHUNK) chunks.push(json.substring(i, i + BACKUP_CHUNK));
+  if (chunks.length > BACKUP_MAX_CHUNKS) throw new Error('Partita troppo grande per il backup JSON');
+  deleteRowsById(sheet, 'A', match.id);
+  sheet.appendRow([match.id, dataPartita, dataSalvataggio].concat(chunks));
+}
+
 // ============================================
 // COMANDI VOCALI da Apple Watch (v5.8)
 // ============================================
@@ -1168,6 +1211,9 @@ function handleSyncRequest(payload) {
     } else if (ev.type === 'red') {
       tipo = 'Espulsione';
       calc = (ev.player.num || '?') + ' ' + ev.player.name;
+    } else if (ev.type === 'shot') {
+      tipo = 'Tiro in porta';
+      note = ev.shotResult === 'fuori' ? 'fuori dallo specchio' : 'nello specchio';
     } else if (ev.type === 'penaltysave') {
       tipo = 'Rigore parato';
       calc = (ev.player.num || '?') + ' ' + ev.player.name;
@@ -1186,6 +1232,8 @@ function handleSyncRequest(payload) {
   if (eventiRows.length > 0) {
     sheetEventi.getRange(sheetEventi.getLastRow() + 1, 1, eventiRows.length, 9).setValues(eventiRows);
   }
+
+  saveMatchBackup(ss, match, dataPartita, dataSalvataggio);
 
   return jsonResponse({
     ok: true,

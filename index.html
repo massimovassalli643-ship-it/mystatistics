@@ -221,11 +221,12 @@
   .timer-btn.pause { background: #f39c12; color: white; }
   .timer-btn.next { background: rgba(127,184,255,0.2); color: #7fb8ff; }
   .timer-btn:active { transform: scale(0.95); }
-  .actions-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; flex: none; align-content: start; }
+  .actions-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; flex: none; align-content: start; }
   /* Silos (v3.33): sostituzioni e ammonizioni divise per squadra sotto i pulsanti,
      stesso aspetto della colonna "Eventi partita"; il colore del bordo alto e'
      quello del pulsante (blu sostituzioni, giallo ammonizioni) */
-  .silos { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+  .silos { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+  .silo.shot { border-top-color: #e67e22; }
   .silo { min-height: 0; display: flex; flex-direction: column; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-top: 3px solid #7fb8ff; border-radius: 12px; overflow: hidden; }
   .silo.sub { border-top-color: #3498db; }
   .silo.yellow { border-top-color: #f1c40f; }
@@ -241,6 +242,7 @@
   .action-btn:active { transform: scale(0.95); }
   .action-btn .ico { font-size: 30px; line-height: 1.1; }
   .action-btn.goal { background: linear-gradient(135deg, #27ae60, #2ecc71); }
+  .action-btn.shot { background: linear-gradient(135deg, #d35400, #e67e22); }
   .action-btn.yellow { background: linear-gradient(135deg, #f1c40f, #f39c12); color: #2c1810; }
   .action-btn.red { background: linear-gradient(135deg, #c0392b, #e74c3c); }
   .action-btn.sub { background: linear-gradient(135deg, #2980b9, #3498db); }
@@ -265,6 +267,7 @@
   .event-item { background: rgba(255,255,255,0.05); border-left: 3px solid #7fb8ff; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; display: flex; gap: 10px; align-items: flex-start; animation: slideIn 0.3s ease; }
   @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
   .event-item.goal { border-left-color: #2ecc71; }
+  .event-item.shot { border-left-color: #e67e22; }
   .event-item.yellow { border-left-color: #f1c40f; }
   .event-item.red { border-left-color: #e74c3c; }
   .event-item.sub { border-left-color: #3498db; }
@@ -317,6 +320,8 @@
   .dash-filter-label { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #93adc9; }
   .dash-select { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 8px; padding: 10px 12px; font-size: 14px; font-weight: 600; min-width: 320px; max-width: 100%; }
   .dash-select:focus { border-color: #7fb8ff; }
+  /* il popup nativo ha sfondo chiaro: senza questo le voci (testo bianco) risultavano invisibili */
+  .dash-select option { background: #12286a; color: #fff; }
   .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
   .kpi-stack { display: flex; flex-direction: column; gap: 12px; }
   .kpi { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 16px; }
@@ -578,10 +583,12 @@
       <button class="primary-btn" onclick="startNewMatch()">⚽ Nuova partita</button>
       <button class="secondary-btn" onclick="exportAllData()">📤 Backup completo</button>
       <button class="secondary-btn" onclick="importData()">📥 Importa</button>
+      <button class="secondary-btn" id="import-sheets-btn" onclick="importFromSheets()">☁️ Importa da Sheets</button>
       <button class="secondary-btn" onclick="openSettingsModal()">⚙️ Impostazioni</button>
       <button class="secondary-btn" onclick="openDashboard()">📊 Dashboard</button>
       <button class="secondary-btn" onclick="openReportModal()">📄 Report</button>
     </div>
+    <div id="import-status" style="display:none;font-size:13px;margin:-4px 0 10px;"></div>
     <h2 class="history-title">Storico</h2>
     <div class="history-list" id="history-list"></div>
   </div>
@@ -771,6 +778,9 @@
         <button class="action-btn goal" onclick="openEventModal('goal')">
           <span class="ico">⚽</span><span>Goal</span>
         </button>
+        <button class="action-btn shot" onclick="openEventModal('shot')">
+          <span class="ico">🎯</span><span>Tiro in porta</span>
+        </button>
         <button class="action-btn yellow" onclick="openEventModal('yellow')">
           <span class="ico">🟨</span><span>Giallo</span>
         </button>
@@ -796,6 +806,10 @@
         <div class="silo sub">
           <div class="silo-head"><div class="silo-title">🔄 Sostituzioni avversarie</div><div class="roster-count" id="silo-count-sub-opp">0</div></div>
           <div class="silo-list" id="silo-sub-opp"></div>
+        </div>
+        <div class="silo shot">
+          <div class="silo-head"><div class="silo-title">🎯 Tiri in porta Fiamma</div><div class="roster-count" id="silo-count-shot-ours">0</div></div>
+          <div class="silo-list" id="silo-shot-ours"></div>
         </div>
         <div class="silo yellow">
           <div class="silo-head"><div class="silo-title">🟨 Giallo Fiamma</div><div class="roster-count" id="silo-count-yellow-ours">0</div></div>
@@ -1000,9 +1014,9 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.44';
+const APP_VERSION = '3.45';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
-const BACKEND_MIN_VERSION = '6.1';
+const BACKEND_MIN_VERSION = '6.2';
 const STORAGE_KEY = 'mystatistics_matches_v2';
 const PERIODS = ['1° tempo', '2° tempo', '1° supplementare', '2° supplementare', 'Partita conclusa'];
 const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
@@ -1151,6 +1165,12 @@ function renderHistory() {
 function deleteMatch(id) {
   if (!confirm('Eliminare questa partita? L\'azione non è reversibile.')) return;
   saveMatches(loadMatches().filter(m => m.id !== id));
+  // v3.45: ricordata, altrimenti l'import automatico da Sheets la riporterebbe a ogni apertura
+  try {
+    const gone = JSON.parse(localStorage.getItem('mystatistics_deleted') || '[]');
+    gone.push(id);
+    localStorage.setItem('mystatistics_deleted', JSON.stringify(gone.slice(-500)));
+  } catch (e) {}
   renderHistory();
 }
 function openMatch(id) {
@@ -2243,7 +2263,9 @@ let currentEventDraft = null;
 function openEventModal(type) {
   if (!state.currentMatch) return;
   const periodMinute = Math.floor(currentElapsedMs() / 60000);
-  currentEventDraft = { type, team: 'home', periodMinute, period: state.timer.periodIndex };
+  // Il tiro in porta e' solo della Fiamma (dato di squadra): niente scelta squadra
+  const team = type === 'shot' ? ourSideOf(state.currentMatch, OUR_TEAM_NAME) : 'home';
+  currentEventDraft = { type, team, periodMinute, period: state.timer.periodIndex };
   showEventModal(type);
 }
 
@@ -2262,7 +2284,7 @@ function editEvent(id) {
 }
 
 function showEventModal(type) {
-  const titles = { goal: '⚽ Goal', yellow: '🟨 Ammonizione', red: '🟥 Espulsione', sub: '🔄 Sostituzione', penaltysave: '🧤 Rigore parato' };
+  const titles = { goal: '⚽ Goal', shot: '🎯 Tiro in porta', yellow: '🟨 Ammonizione', red: '🟥 Espulsione', sub: '🔄 Sostituzione', penaltysave: '🧤 Rigore parato' };
   const isEdit = !!currentEventDraft.editingId;
   document.getElementById('event-modal-title').textContent = (isEdit ? 'Modifica · ' : '') + titles[type];
   renderEventModalBody();
@@ -2321,6 +2343,18 @@ function renderEventModalBody() {
         <div class="modal-radio-group">
           ${['azione','rigore','punizione','autogol'].map(t => `
             <div class="radio-option ${currentEventDraft.goalType===t?'selected':''}" onclick="setEventField('goalType','${t}')">${t}</div>
+          `).join('')}
+        </div>
+      </div>`;
+  } else if (type === 'shot') {
+    const res = currentEventDraft.shotResult || 'specchio';
+    // Solo Fiamma, senza tiratrice: si toglie il campo Squadra e restano minuto + esito
+    body = minuteField + `
+      <div class="modal-field">
+        <label class="modal-label">Esito</label>
+        <div class="modal-radio-group">
+          ${[['specchio', 'Nello specchio'], ['fuori', 'Fuori dallo specchio']].map(([v, l]) => `
+            <div class="radio-option ${res===v?'selected':''}" onclick="setEventField('shotResult','${v}')">${l}</div>
           `).join('')}
         </div>
       </div>`;
@@ -2455,6 +2489,8 @@ function confirmEvent() {
     } else {
       state.currentMatch[team].score++;
     }
+  } else if (type === 'shot') {
+    if (!currentEventDraft.shotResult) currentEventDraft.shotResult = 'specchio';
   } else if (type === 'yellow' || type === 'red' || type === 'penaltysave') {
     const pv = document.getElementById('event-player').value;
     if (!pv) { alert(type === 'penaltysave' ? 'Seleziona l\'atleta che ha parato' : 'Seleziona la calciatrice o il membro dello staff'); return; }
@@ -2552,11 +2588,11 @@ function removeEvent(id) {
 /* v3.33: colonna destra = goal, espulsioni, rigori parati; sostituzioni e
    ammonizioni nei 4 silos sotto i pulsanti, divise tra Fiamma (ourSideOf) e
    avversarie. Stesse schede evento (✏️ / ×) ovunque, piu' recenti in alto. */
-const SILOS = [['sub', 'ours'], ['sub', 'opp'], ['yellow', 'ours'], ['yellow', 'opp']];
+const SILOS = [['sub', 'ours'], ['sub', 'opp'], ['shot', 'ours'], ['yellow', 'ours'], ['yellow', 'opp']];
 function renderEvents() {
   const m = state.currentMatch;
   const events = [...m.events].sort((a, b) => b.minute - a.minute);
-  const inSilo = e => e.type === 'sub' || e.type === 'yellow';
+  const inSilo = e => e.type === 'sub' || e.type === 'yellow' || e.type === 'shot';
   const main = events.filter(e => !inSilo(e));
   const list = document.getElementById('events-list');
   document.getElementById('events-count').textContent = main.length;
@@ -2584,6 +2620,9 @@ function eventCardHtml(e, compact) {
     if (e.assist) extras.push(`Assist: ${e.assist.num ?? '?'} ${escapeHtml(e.assist.name)}`);
     if (e.goalType && e.goalType !== 'azione' && e.goalType !== 'autogol') extras.push('su ' + e.goalType);
     subDetail = extras.join(' • ');
+  } else if (e.type === 'shot') {
+    typeLabel = `🎯 Tiro in porta · ${escapeHtml(teamName)}`;
+    detail = e.shotResult === 'fuori' ? 'Fuori dallo specchio' : 'Nello specchio';
   } else if (e.type === 'yellow') {
     typeLabel = `🟨 Ammonizione · ${escapeHtml(teamName)}`;
     if (e.isStaff) { detail = escapeHtml(e.player.name); subDetail = escapeHtml(e.player.role || 'Staff'); }
@@ -3225,6 +3264,7 @@ function renderSummary() {
   document.getElementById('summary-stats').innerHTML = `
     ${statsPanelHtml(m.home.name, statsHome, showSaves, 'home', fiammaSide === 'home' ? staffStats : null)}
     ${statsPanelHtml(m.away.name, statsAway, showSaves, 'away', fiammaSide === 'away' ? staffStats : null)}
+    ${shotsPanelHtml(m)}
   `;
 
   const allScorers = [...statsHome, ...statsAway].filter(s => s.goals > 0).sort((a, b) => b.goals - a.goals);
@@ -3296,6 +3336,26 @@ function statsPanelHtml(teamName, stats, showSaves, side, staffStats) {
     </div>
     ${staffStats ? staffPanelHtml(staffStats) : ''}
   `;
+}
+
+/* Riquadro "Tiri in porta" del riepilogo di ogni partita (solo se ne sono stati registrati) */
+function shotsPanelHtml(m) {
+  const sc = shotCounts(m);
+  if (!sc.tot) return '';
+  const pct = Math.round(sc.on / sc.tot * 100);
+  return `
+    <div class="stats-panel" style="margin-top:8px;">
+      <div class="stats-panel-title">🎯 Tiri in porta · ${escapeHtml(OUR_TEAM_NAME)}</div>
+      <table class="stats-table">
+        <thead><tr><th>Totale</th><th style="text-align:center">Nello specchio</th><th style="text-align:center">Fuori dallo specchio</th><th style="text-align:center">Precisione</th></tr></thead>
+        <tbody><tr>
+          <td class="num-cell">${sc.tot}</td>
+          <td class="num-cell">${sc.on}</td>
+          <td class="num-cell">${sc.off}</td>
+          <td class="num-cell">${pct}%</td>
+        </tr></tbody>
+      </table>
+    </div>`;
 }
 
 function staffPanelHtml(staffStats) {
@@ -3447,6 +3507,78 @@ function importData() {
   input.click();
 }
 
+/* v3.45 + backend v6.2: scarica da Google Sheets (foglio PartiteJSON) le partite
+   sincronizzate da un altro dispositivo. Aggiunge quelle mancanti; una gia' presente
+   viene sostituita solo se quella di Sheets e' piu' recente (modifica/fine partita) e
+   quella locale e' conclusa: una partita in corso su questo dispositivo non si tocca. */
+let importingFromSheets = false;
+/* auto = true: lanciata da sola all'apertura dell'app. Nessun alert: l'esito sta in una
+   riga di stato sotto i pulsanti della Home e un errore (offline, backend vecchio) e'
+   silenzioso, cosi' non intralcia chi apre l'app a bordo campo senza rete. */
+async function importFromSheets(auto) {
+  if (importingFromSheets) return;
+  const url = getSheetsUrl();
+  const statusEl = document.getElementById('import-status');
+  const setStatus = (txt, err) => {
+    if (!statusEl) return;
+    statusEl.textContent = txt;
+    statusEl.style.color = err ? '#ff9aa5' : '#7fd8a0';
+    statusEl.style.display = txt ? '' : 'none';
+  };
+  if (!url) {
+    if (!auto && confirm('Non hai ancora configurato l\'URL del backend Google Sheets.\nVuoi farlo ora?')) openSettingsModal();
+    return;
+  }
+  importingFromSheets = true;
+  const btn = document.getElementById('import-sheets-btn');
+  const label = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Importazione...'; }
+  if (auto) setStatus('☁️ Aggiornamento partite da Sheets…', false);
+  try {
+    const res = await fetch(url, {
+      method: 'POST', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'partiteFull' })
+    });
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && (data.error || data.message)) || 'risposta inattesa dal backend (backend non aggiornato alla v6.2?)');
+    if (!Array.isArray(data.matches)) throw new Error('backend non aggiornato: pubblica Code.gs v6.2 su tutti i deployment');
+    const stamp = m => m.editedAt || m.endedAt || m.createdAt || 0;
+    const local = loadMatches();
+    let gone = [];
+    try { gone = JSON.parse(localStorage.getItem('mystatistics_deleted') || '[]'); } catch (e) {}
+    let added = 0, updated = 0;
+    data.matches.forEach(r => {
+      if (!r || !r.id || !r.home || !r.away || !Array.isArray(r.events)) return;
+      if (gone.includes(r.id)) return;   // eliminata a mano su questo dispositivo
+      const i = local.findIndex(x => x.id === r.id);
+      if (i < 0) { local.push(r); added++; }
+      else if (local[i].completed && stamp(r) > stamp(local[i])
+               && !(state.currentMatch && state.currentMatch.id === r.id)) { local[i] = r; updated++; }
+    });
+    if (added || updated) {
+      local.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      saveMatches(local);
+      renderHistory();
+    }
+    if (auto) {
+      setStatus(added || updated ? '☁️ Da Sheets: ' + added + ' nuove, ' + updated + ' aggiornate' : '', false);
+      if (added || updated) setTimeout(() => setStatus(''), 10000);
+    } else {
+      alert('☁️ Importazione da Sheets completata.\n\nNuove: ' + added + '\nAggiornate: ' + updated
+        + '\nGià presenti e invariate: ' + (data.matches.length - added - updated)
+        + (data.skipped ? '\nIlleggibili (saltate): ' + data.skipped : '')
+        + (data.matches.length === 0 ? '\n\nSu Sheets non ci sono ancora partite complete: sincronizzale dal dispositivo dove le hai giocate (dopo aver aggiornato app e backend).' : ''));
+    }
+  } catch (e) {
+    if (auto) { console.warn('Importa da Sheets (automatico):', e); setStatus(''); }
+    else alert('❌ Importazione non riuscita:\n' + (e.message || e));
+  } finally {
+    importingFromSheets = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = label; }
+  }
+}
+
 /* match: partita da esportare (default: quella in corso).
    asBase64: se true non scarica il file ma restituisce { filename, mimeType, dataBase64 },
    che e' cio' che serve per allegarlo a un'email. */
@@ -3475,6 +3607,8 @@ function exportMatchXlsx(match, asBase64) {
     ['Espulsioni', m.events.filter(e => e.type === 'red').length],
     ['Sostituzioni', m.events.filter(e => e.type === 'sub').length],
     ['Rigori parati', m.events.filter(e => e.type === 'penaltysave').length],
+    ['Tiri in porta (nello specchio)', m.events.filter(e => e.type === 'shot' && e.shotResult !== 'fuori').length],
+    ['Tiri in porta (fuori dallo specchio)', m.events.filter(e => e.type === 'shot' && e.shotResult === 'fuori').length],
   ];
   const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
   ws1['!cols'] = [{ wch: 25 }, { wch: 35 }];
@@ -3502,6 +3636,9 @@ function exportMatchXlsx(match, asBase64) {
       calciatrice = `${e.scorer.num ?? '?'} ${e.scorer.name}`;
       if (e.assist) dettaglioAgg = `Assist: ${e.assist.num ?? '?'} ${e.assist.name}`;
       note = e.goalType || 'azione';
+    } else if (e.type === 'shot') {
+      tipoEvento = 'Tiro in porta';
+      note = e.shotResult === 'fuori' ? 'fuori dallo specchio' : 'nello specchio';
     } else if (e.type === 'yellow') { tipoEvento = 'Ammonizione'; calciatrice = `${e.player.num ?? '?'} ${e.player.name}`; }
     else if (e.type === 'red') { tipoEvento = 'Espulsione'; calciatrice = `${e.player.num ?? '?'} ${e.player.name}`; }
     else if (e.type === 'penaltysave') { tipoEvento = 'Rigore parato'; calciatrice = `${e.player.num ?? '?'} ${e.player.name}`; }
@@ -3613,9 +3750,19 @@ function matchLabel(m) {
   return d.toLocaleDateString('it-IT') + ' · ' + (m.home.name || 'Casa') + ' – ' + (m.away.name || 'Ospiti');
 }
 
+/* Tiri in porta della Fiamma (dato di squadra, v3.45): nello specchio / fuori */
+function shotCounts(m) {
+  let on = 0, off = 0;
+  (m.events || []).forEach(e => {
+    if (e.type !== 'shot') return;
+    if (e.shotResult === 'fuori') off++; else on++;
+  });
+  return { on, off, tot: on + off };
+}
+
 /* Aggrega squadra e calciatrici su un insieme di partite */
 function buildDashboardStats(matches, ourKey) {
-  const team = { played: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, gfPen: 0, gaPen: 0, yellows: 0, reds: 0, saves: 0 };
+  const team = { played: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, gfPen: 0, gaPen: 0, yellows: 0, reds: 0, saves: 0, shotsOn: 0, shotsOff: 0, shotMatches: [] };
   const players = {};
   matches.forEach(m => {
     const side = ourSideOf(m, ourKey);
@@ -3623,6 +3770,12 @@ function buildDashboardStats(matches, ourKey) {
     const gf = m[side].score || 0;
     const ga = m[opp].score || 0;
     team.played++;
+    const sc = shotCounts(m);
+    if (sc.tot > 0) {   // le partite senza tiri registrati (prima della v3.45) non entrano
+      team.shotsOn += sc.on;
+      team.shotsOff += sc.off;
+      team.shotMatches.push({ label: matchLabel(m), on: sc.on, off: sc.off });
+    }
     team.gf += gf;
     team.ga += ga;
     (m.events || []).forEach(e => {
@@ -3695,6 +3848,29 @@ function playersTableHtml(players) {
     + '<thead><tr><th>N°</th><th>Cognome e nome</th><th>Presenze</th><th>Minuti</th>'
     + '<th>⚽ Gol</th><th>🅰️ Assist</th><th>🟨 Gialli</th><th>🟥 Rossi</th><th>🧤 Parati</th></tr></thead>'
     + '<tbody>' + body + '</tbody></table></div>';
+}
+
+/* KPI e riquadro "Tiri in porta" della dashboard: solo se almeno una partita ha tiri registrati */
+function shotsKpiHtml(t) {
+  const tot = t.shotsOn + t.shotsOff;
+  if (!tot) return '';
+  return kpiHtml('Tiri in porta', tot, '🎯 ' + t.shotsOn + ' nello specchio · ' + t.shotsOff + ' fuori');
+}
+function shotsCardHtml(t, single) {
+  const tot = t.shotsOn + t.shotsOff;
+  if (!tot) return '';
+  const pct = Math.round(t.shotsOn / tot * 100);
+  let h = '<div class="dash-card"><div class="dash-card-title">🎯 Tiri in porta</div>'
+    + barChartHtml([{ label: 'Nello specchio', value: t.shotsOn }, { label: 'Fuori dallo specchio', value: t.shotsOff }], '', 2, true)
+    + '<div class="kpi-sub" style="margin-top:8px;">' + pct + '% nello specchio · ' + gsPlural(tot, 'tiro', 'tiri')
+    + (single ? '' : ' in ' + gsPlural(t.shotMatches.length, 'partita', 'partite')
+      + ' (' + (t.shotMatches.length ? (tot / t.shotMatches.length).toFixed(1) : '0') + ' a partita)') + '</div>';
+  if (!single && t.shotMatches.length > 1) {
+    h += '<div class="dash-scroll"><table class="dash-table"><thead><tr><th>Partita</th><th>Nello specchio</th><th>Fuori</th><th>Totale</th></tr></thead><tbody>'
+      + t.shotMatches.map(r => '<tr><td>' + escapeHtml(r.label) + '</td><td class="n">' + r.on + '</td><td class="n">' + r.off + '</td><td class="n">' + (r.on + r.off) + '</td></tr>').join('')
+      + '</tbody></table></div>';
+  }
+  return h + '</div>';
 }
 
 function kpiHtml(label, value, sub) {
@@ -4340,7 +4516,8 @@ function renderDashboard() {
       + kpiStackHtml(kpiHtml('Gol fatti', t.gf, ''), kpiHtml('Gol fatti su rigore', t.gfPen, ''))
       + kpiStackHtml(kpiHtml('Gol subiti', t.ga, ''), kpiHtml('Gol subiti su rigore', t.gaPen, ''))
       + kpiHtml('Cartellini', t.yellows + t.reds, '🟨 ' + t.yellows + ' gialli · 🟥 ' + t.reds + ' rossi')
-      + kpiHtml('Rigori parati', t.saves, '');
+      + kpiHtml('Rigori parati', t.saves, '')
+      + shotsKpiHtml(t);
   } else {
     scopeEl.textContent = (ourKey ? ourKey + ' · ' : '') + t.played + ' partite concluse';
     const ptsPerMatch = t.played ? ((t.win * 3 + t.draw) / t.played).toFixed(2) : '0';
@@ -4357,7 +4534,8 @@ function renderDashboard() {
           kpiHtml('Gol subiti su rigore', t.gaPen, '')
         )
       + kpiHtml('Differenza reti', (diff > 0 ? '+' : '') + diff, '')
-      + kpiHtml('Rigori parati', t.saves, '');
+      + kpiHtml('Rigori parati', t.saves, '')
+      + shotsKpiHtml(t);
   }
 
   const goals = st.players.map(p => ({ label: p.name, value: p.goals }));
@@ -4372,6 +4550,7 @@ function renderDashboard() {
     '<div class="dash-card"><div class="dash-card-title">⚽ Marcatrici</div>' + barChartHtml(goals, '') + '</div>'
     + '<div class="dash-card"><div class="dash-card-title">🅰️ Assist</div>' + barChartHtml(assists, '') + '</div>'
     + (t.saves > 0 ? '<div class="dash-card"><div class="dash-card-title">🧤 Rigori parati</div>' + barChartHtml(saves, '') + '</div>' : '')
+    + shotsCardHtml(t, !!single)
     + '<div class="dash-card"><div class="dash-card-title">⏱️ Minuti giocati</div>' + barChartHtml(minutes, "'", minutes.length, true) + '</div>'
     + '<div class="dash-card wide"><div class="dash-card-title">Tutte le calciatrici</div>' + playersTableHtml(st.players) + '</div>';
 }
@@ -4438,6 +4617,7 @@ const REPORT_SECTIONS = [
   { id: 'when',    label: 'Quando subiamo', hint: '' },
   { id: 'ep',      label: 'Episodi ravvicinati', hint: '', seasonOnly: true },
   { id: 'field',   label: 'Chi era in campo quando subiamo', hint: 'tutte le schede' },
+  { id: 'shots',   label: 'Tiri in porta', hint: 'nello specchio / fuori (se registrati)' },
   { id: 'minutes', label: 'Minuti giocati', hint: '' },
   { id: 'players', label: 'Tutte le calciatrici', hint: '' }
 ];
@@ -4592,7 +4772,8 @@ async function buildGraphicReport(scope, sections) {
       }
     }
     const grid = document.getElementById('dash-grid');
-    if (full) blocks.push({ els: [findDashCard(grid, 'Marcatrici'), findDashCard(grid, 'Assist'), findDashCard(grid, 'Rigori parati')] });
+    if (full) blocks.push({ els: [findDashCard(grid, 'Marcatrici'), findDashCard(grid, 'Assist'), findDashCard(grid, 'Rigori parati'), findDashCard(grid, 'Tiri in porta')] });
+    else if (want('shots')) blocks.push({ els: [findDashCard(grid, 'Tiri in porta')] });
     if (want('minutes')) blocks.push({ els: [findDashCard(grid, 'Minuti giocati')] });
     if (want('players')) blocks.push({ els: [findDashCard(grid, 'Tutte le calciatrici')] });
 
@@ -5010,6 +5191,9 @@ renderHistory();
 initCardZoom();
 initSummaryStatEditing();
 window.addEventListener('beforeunload', () => { if (state.timer.running) stopTimer(); });
+// v3.45: la prima azione all'apertura dell'app e' scaricare le partite nuove da Sheets
+// (in background: la Home e' subito utilizzabile, senza rete non succede nulla)
+importFromSheets(true);
 </script>
 </body>
 </html>

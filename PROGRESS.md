@@ -20,7 +20,21 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Comandi vocali | Guida completa (scorciatoia Watch, frasi, checklist): `COMANDI_VOCALI.md`. Token in Script Property `VOICE_TOKEN` e nelle Impostazioni dell'iPad, **mai nel repository** |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.44 - Zoom dei riquadri: sfondo opaco, più largo, nomi squadra per intero (05/11/2026)
+## Stato attuale: v3.45 - Pulsante "Tiro in porta" e menù Dashboard leggibile (08/11/2026)
+
+- **Nuovo pulsante 🎯 "Tiro in porta"** nella schermata partita, tra Goal e Giallo. Dato **di squadra, solo Fiamma Monza** (niente avversarie, niente tiratrice). La modale ha solo minuto/tempo (precompilati dal timer di partita come gli altri eventi) ed **Esito**: "Nello specchio" (default) o "Fuori dallo specchio". Evento `type: 'shot'` con `team` = lato Fiamma (`ourSideOf`) e `shotResult` (`'specchio'` | `'fuori'`), senza `player`; modificabile (✏️) ed eliminabile come gli altri.
+- **Nuovo silo** "Tiri in porta Fiamma" sotto i pulsanti (griglia silos da 4 a 5 colonne, pulsanti da 6 a 7). I tiri non finiscono nella colonna destra.
+- **Export Excel**: nel Riepilogo due righe (tiri nello specchio / fuori) e nel foglio Eventi la riga "Tiro in porta" con l'esito nelle note.
+- **Riepilogo di ogni partita**: riquadro "🎯 Tiri in porta · FIAMMA MONZA" (totale, nello specchio, fuori, precisione %), visibile solo se in quella partita ne sono stati registrati (quindi dalla prossima settimana in poi).
+- **Dashboard**: KPI "Tiri in porta" e riquadro "🎯 Tiri in porta" (barre specchio/fuori, % di precisione; in vista stagione anche la tabella per partita e la media). Contano solo le partite con tiri registrati (`shotCounts`): quelle precedenti non falsano la media. Nel **Report PDF** il riquadro è nella "Vista totale" e c'è la sezione dedicata "Tiri in porta".
+- **Importa da Sheets** (nuovo pulsante in Home, backend **v6.2**, `BACKEND_MIN_VERSION = 6.2`): ogni sync scrive la partita completa in JSON nel foglio **`PartiteJSON`** (A id, B data, C salvata il, D… JSON a blocchi da 40000 caratteri, max 8) e la nuova action `partiteFull` (sola lettura) le restituisce. L'app aggiunge le partite mancanti; una già presente è sostituita solo se quella di Sheets è più recente (`editedAt`/`endedAt`) e quella locale è conclusa; una partita in corso locale non si tocca. Il sync scrive anche gli eventi "Tiro in porta" nel foglio Eventi.
+- **Import automatico all'apertura**: `importFromSheets(true)` parte da sola come prima azione all'avvio dell'app, in background (nessun alert; riga di stato sotto i pulsanti della Home, errori e assenza di rete silenziosi). Non sostituisce mai la partita aperta. Le partite eliminate a mano (`deleteMatch`) sono ricordate in `localStorage` (`mystatistics_deleted`, ultime 500) e non vengono reimportate. Il pulsante "☁️ Importa da Sheets" resta per l'import manuale con riepilogo.
+- **Da fare dopo il deploy**: pubblicare `Code.gs` v6.2 su **tutti e 3** i deployment, aggiornare l'app sull'iPad e **risincronizzare dall'iPad** le partite che devono arrivare sul desktop (quelle sincronizzate con versioni precedenti non hanno ancora il JSON). Poi sul desktop: Home → "☁️ Importa da Sheets". Nessun nuovo scope.
+- **Non incluso**: tiri nei comandi vocali, nell'aggiunta evento in partita conclusa e nel foglio Statistiche di Sheets.
+- **Fix Dashboard**: il menù a tendina "Vista" mostrava solo la prima voce perché le altre avevano testo bianco su sfondo chiaro del popup nativo; ora `.dash-select option` ha sfondo navy e testo bianco.
+- Solo frontend.
+
+## Stato precedente: v3.44 - Zoom dei riquadri: sfondo opaco, più largo, nomi squadra per intero (05/11/2026)
 
 **Segnalazione di Max** (Chrome su desktop, monitor da 21"): nel riquadro "Quando subiamo, partita per partita" aperto a tutto schermo (1) i nomi delle squadre a sinistra erano tagliati ("C.s.d. Uesse Sa...") e non si capiva chi fosse l'avversaria; (2) il riquadro risultava trasparente e sotto restavano visibili, in filigrana, le altre schede della dashboard.
 
@@ -1428,6 +1442,8 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 ## Changelog
 | Data | Modifica |
 |------|----------|
+| 08/11/2026 | Backend v6.2 + frontend v3.45: "Importa da Sheets" (foglio `PartiteJSON`, action `partiteFull`, `BACKEND_MIN_VERSION` 6.2); tiri in porta nel riepilogo partita, nella Dashboard e nel Report PDF; evento Tiro in porta nel foglio Eventi. Da pubblicare su tutti e 3 i deployment |
+| 08/11/2026 | Frontend v3.45: pulsante "Tiro in porta" (nello specchio / fuori dallo specchio, solo Fiamma, dato di squadra, minuto dal timer) tra Goal e Giallo, con silo dedicato ed export Excel; fix menù "Vista" della Dashboard (voci invisibili). Solo frontend |
 | 05/11/2026 | Frontend v3.44: zoom dei riquadri con sfondo opaco e pannello fino a 1600 px; nomi delle squadre avversarie per intero nel grafico "Quando subiamo" (`gsShortTeam` toglie sigle e codici, colonna nomi più larga). Solo frontend |
 | 01/11/2026 | Frontend v3.43: se "Scatta foto" fallisce con "Nessuna risposta dal backend", il messaggio mostra il dettaglio tecnico (peso file, n. immagini, MB inviati, secondi) per capire la causa. Solo frontend, `Code.gs` invariato |
 | 26/10/2026 | Frontend v3.42: in una partita conclusa la modale "➕ Atleta" si apre per correggere il numero di maglia (scelta atleta di entrambe le squadre, blocco doppioni v3.41); il numero nuovo segue formazione, eventi e statistiche corrette a mano; "Ultima modifica" subito e risincronizzazione automatica tornando al riepilogo. Solo frontend, `Code.gs` invariato |
