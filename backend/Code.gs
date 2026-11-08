@@ -1,5 +1,10 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v6.3 (08/11/2026): COMANDI VOCALI - tiro in porta (solo Fiamma, dato di squadra):
+//   "tiro in porta nello specchio" / "tiro in porta fuori dallo specchio" ->
+//   data { type:'shot', team:'fiamma', shotResult:'specchio'|'fuori' }. "tiro in porta"
+//   senza esito e con "avversario" sono rifiutati. Nessun nuovo scope: pubblicare su
+//   TUTTI e 4 i deployment.
 // v6.2 (08/11/2026): IMPORTA DA SHEETS. Ogni sync salva anche la partita completa
 //   (JSON: rose, formazione, timer, eventi) nel foglio "PartiteJSON" (creato da solo,
 //   A id | B data | C salvata il | D... JSON a blocchi da 40000 caratteri). Nuova
@@ -88,7 +93,7 @@
 
 // Aggiornare ad OGNI modifica di questo file; il frontend la confronta con
 // BACKEND_MIN_VERSION di index.html.
-const BACKEND_VERSION = '6.2';
+const BACKEND_VERSION = '6.3';
 
 const SHEET_PARTITE = 'Partite';
 const SHEET_BACKUP = 'PartiteJSON';
@@ -967,6 +972,24 @@ function parseVoiceCommand(text) {
 
   if (found.undo) return voiceResult({ type: 'undo' }, 'Annulla', '', '', '');
 
+  // v6.3: tiro in porta, dato di SQUADRA e solo della Fiamma (niente giocatrice):
+  //   "tiro in porta nello specchio" / "tiro in porta fuori dallo specchio"
+  // "fuori" da solo e' anche il marcatore delle sostituzioni, quindi conta come tiro
+  // solo con "tiro" o "specchio" e senza altri eventi nella frase.
+  var hasTiro = tokens.indexOf('tiro') >= 0 || tokens.indexOf('tiri') >= 0;
+  var hasSpecchio = tokens.indexOf('specchio') >= 0;
+  var hasFuori = tokens.indexOf('fuori') >= 0;
+  if ((hasTiro || hasSpecchio) &&
+      !(found.goal || found.owngoal || found.yellow || found.red || found.sub || found.save || found.inMark)) {
+    if (found.them) return { ok: false, message: 'Il tiro in porta si registra solo per la Fiamma' };
+    if (!hasSpecchio && !hasFuori) {
+      return { ok: false, message: 'Tiro in porta: di\' "nello specchio" oppure "fuori dallo specchio"' };
+    }
+    var shotResult = hasFuori ? 'fuori' : 'specchio';
+    return voiceResult({ type: 'shot', team: 'fiamma', shotResult: shotResult }, 'Tiro in porta', 'Fiamma', '',
+      shotResult === 'fuori' ? 'fuori dallo specchio' : 'nello specchio');
+  }
+
   var type = null, goalType = null, subReason = null;
   if (found.save && (tokens.indexOf('rigore') >= 0 || !(found.goal || found.yellow || found.red || found.sub))) {
     type = 'penaltysave';
@@ -974,7 +997,7 @@ function parseVoiceCommand(text) {
     var kinds = ['owngoal', 'goal', 'yellow', 'red', 'sub'].filter(function (k) { return found[k]; });
     if (kinds.length === 2 && found.owngoal && found.goal) kinds = ['owngoal'];   // "goal ... su autogol"
     if (kinds.length === 0 && found.inMark && found.outMark) kinds = ['sub'];     // "esce 7 entra 13"
-    if (kinds.length === 0) return { ok: false, message: 'Evento non riconosciuto (di\' goal, giallo, rosso, sostituzione, rigore parato o annulla)' };
+    if (kinds.length === 0) return { ok: false, message: 'Evento non riconosciuto (di\' goal, giallo, rosso, sostituzione, rigore parato, tiro in porta o annulla)' };
     if (kinds.length > 1) return { ok: false, message: 'Piu\' eventi nella stessa frase: dettane uno alla volta' };
     type = kinds[0] === 'owngoal' ? 'goal' : kinds[0];
     if (kinds[0] === 'owngoal') goalType = 'autogol';
@@ -1089,6 +1112,7 @@ function voiceRefCell(ref) {
 }
 function describeVoiceCommand(d) {
   if (!d || d.type === 'undo') return 'Annulla l\'ultimo comando vocale';
+  if (d.type === 'shot') return 'Tiro in porta Fiamma, ' + (d.shotResult === 'fuori' ? 'fuori dallo specchio' : 'nello specchio');
   var head = [voiceTeamLabel(d.team), d.lead].filter(function (x) { return x; }).join(' ');
   var who = (head ? ' ' + head : '') + (d.player ? ' ' + voiceRefText(d.player) : '');
   if (d.type === 'goal') {
@@ -1123,6 +1147,12 @@ var VOICE_TEST_PHRASES = [
   ['sostituzione esce Gargaro entra Bignotti', 'Sostituzione: esce GARGARO, entra BIGNOTTI (tattica)'],
   ['cambio avversario esce sette entra tredici', 'Sostituzione Avversario: esce #7, entra #13 (tattica)'],
   ['annulla', 'Annulla l\'ultimo comando vocale'],
+  ['tiro in porta nello specchio', 'Tiro in porta Fiamma, nello specchio'],
+  ['Tiro in porta fuori dallo specchio', 'Tiro in porta Fiamma, fuori dallo specchio'],
+  ['tiro in porta fiamma nello specchio', 'Tiro in porta Fiamma, nello specchio'],
+  ['nello specchio', 'Tiro in porta Fiamma, nello specchio'],
+  ['tiro in porta', null],
+  ['tiro in porta avversario nello specchio', null],
   ['goal fiamma', null],
   ['ciao come stai', null],
   ['giallo fiamma Gargaro rosso fiamma Bignotti', null],

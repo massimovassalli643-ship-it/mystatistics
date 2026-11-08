@@ -26,6 +26,7 @@ Ordine: **evento · squadra · giocatrice · campi facoltativi**.
 | Rosso | `rosso fiamma Gargaro` | `rosso Brugherio 5` |
 | Sostituzione | `sostituzione fiamma esce Gargaro entra Bignotti` + facoltativo `tattica` / `infortunio` | `sostituzione Brugherio esce 7 entra 13` |
 | Rigore parato | `rigore parato fiamma Porta` | — |
+| Tiro in porta (v3.46, solo Fiamma, dato di squadra: niente giocatrice) | `tiro in porta nello specchio` · `tiro in porta fuori dallo specchio` | non previsto |
 | Cartellino allo staff (v3.39) | `giallo staff Redaelli` · `rosso fiamma staff Gaggiani` · `giallo Gaggiani` (senza "staff" vale solo se il nome non e' in rosa) | non previsto |
 | Annulla | `annulla`: toglie l'ultimo evento arrivato **da comando vocale** (quelli inseriti a mano non si toccano) | |
 

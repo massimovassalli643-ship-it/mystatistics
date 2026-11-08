@@ -1014,9 +1014,9 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.45';
+const APP_VERSION = '3.46';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
-const BACKEND_MIN_VERSION = '6.2';
+const BACKEND_MIN_VERSION = '6.3';
 const STORAGE_KEY = 'mystatistics_matches_v2';
 const PERIODS = ['1° tempo', '2° tempo', '1° supplementare', '2° supplementare', 'Partita conclusa'];
 const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
@@ -2776,6 +2776,15 @@ function runVoiceCommand(c) {
     voiceMarkCancelled(ev.voiceCmd, 'Annullato con "annulla" dal Watch');
     return { stato: 'applicato', messaggio: 'Annullato: ' + label };
   }
+  if (cmd.type === 'shot') {
+    // v3.46: tiro in porta, dato di squadra solo della Fiamma: niente squadra/giocatrice da risolvere
+    const periodMinute = Math.floor(currentElapsedMs() / 60000);
+    const ev = { type: 'shot', team: ourSideOf(m, VOICE_OUR_TEAM), periodMinute, period: state.timer.periodIndex,
+      shotResult: cmd.shotResult === 'fuori' ? 'fuori' : 'specchio', voiceCmd: c.id };
+    ev.minute = periodMinute + (PERIOD_OFFSETS[ev.period] || 0);
+    addMatchEvent(ev);
+    return { stato: 'applicato', messaggio: eventPlainLabel(ev) + ' al ' + ev.minute + "'", eventId: ev.id };
+  }
   if (cmd.type === 'yellow' || cmd.type === 'red') {
     const sev = runVoiceStaffCard(c, cmd);
     if (sev) return sev;
@@ -2956,6 +2965,7 @@ function eventPlainLabel(e) {
       (e.goalType && e.goalType !== 'azione' && e.goalType !== 'autogol' ? ' su ' + e.goalType : '') +
       (e.assist ? ' · assist ' + who(e.assist) : '');
   }
+  if (e.type === 'shot') return 'Tiro in porta ' + team + ' · ' + (e.shotResult === 'fuori' ? 'fuori dallo specchio' : 'nello specchio');
   if (e.type === 'sub') return 'Sostituzione ' + team + ' · esce ' + who(e.playerOut) + ', entra ' + who(e.playerIn);
   return ({ yellow: 'Ammonizione ', red: 'Espulsione ', penaltysave: 'Rigore parato ' }[e.type] || '') + team + ' · ' + who(e.player);
 }
