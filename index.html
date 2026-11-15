@@ -439,6 +439,12 @@
   .gs-pc { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; padding: 2px 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.06); color: #e8f0f7; white-space: nowrap; }
   .gs-pc.none { background: transparent; color: #93adc9; font-weight: 600; }
   .gs-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  /* v3.49: riquadri "Episodi ravvicinati" / "Chi era in campo" chiusi di default, si aprono col pulsante */
+  .gs-fold-btn { min-height: 44px; padding: 0 18px; margin-bottom: 4px; border-radius: 10px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: #e8f0f7; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .gs-fold.gs-open .gs-fold-btn { margin-bottom: 14px; }
+  .gs-fold:not(.gs-open) > *:not(.dash-card-title):not(.gs-fold-btn) { display: none; }
+  .gs-fold:not(.gs-open) .dash-card-title { margin-bottom: 10px; }
+  .report-capture .gs-fold-btn { display: none; }
   .gs-cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
   .gs-colhead { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; letter-spacing: 1px; padding-bottom: 8px; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.12); }
   .gs-frow { display: grid; grid-template-columns: 1fr auto; column-gap: 14px; row-gap: 8px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
@@ -1018,7 +1024,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.48';
+const APP_VERSION = '3.49';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '6.4';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -4083,6 +4089,18 @@ function gsBuild(matches, ourKey) {
 }
 
 /* ---------- pezzi di HTML ---------- */
+/* v3.49: riquadri a scomparsa, chiusi di default. Stato in gsOpenCards (sopravvive ai
+   ridisegni); la copia a tutto schermo e il Report PDF li mostrano sempre aperti */
+let gsOpenCards = { ep: false, field: false };
+function gsFoldCls(key) { return ' gs-fold' + (gsOpenCards[key] ? ' gs-open' : ''); }
+function gsFoldBtn(key) {
+  return '<button class="gs-fold-btn" data-fold-btn="' + key + '" onclick="toggleGsFold(\'' + key + '\')">' + (gsOpenCards[key] ? 'Chiudi ▴' : 'Apri ▾') + '</button>';
+}
+function toggleGsFold(key) {
+  gsOpenCards[key] = !gsOpenCards[key];
+  document.querySelectorAll('#dash-conceded .gs-fold[data-fold="' + key + '"]').forEach(c => c.classList.toggle('gs-open', gsOpenCards[key]));
+  document.querySelectorAll('#dash-conceded [data-fold-btn="' + key + '"]').forEach(b => { b.textContent = gsOpenCards[key] ? 'Chiudi ▴' : 'Apri ▾'; });
+}
 function gsVariants(fn) { return GS_WINDOWS.map(w => '<div class="gs-wc gs-wc-' + w + '">' + fn(w) + '</div>').join(''); }
 function gsEpCount(per, w) { return per.reduce((n, a) => n + gsClusters(a, w).length, 0); }
 function gsEpMatches(per, w) { return per.filter(a => gsClusters(a, w).length).length; }
@@ -4312,8 +4330,8 @@ function gsSeasonHtml(st) {
       + '<div class="gs-legend"><span><i class="gs-sw" style="background:' + GS_COLORS[0] + '"></i>gol nel 1° tempo</span><span><i class="gs-sw" style="background:' + GS_COLORS[1] + '"></i>gol nel 2° tempo</span><span><i class="gs-sw ln"></i>gol ravvicinati (minuti di distanza)</span></div>'
       + gsVariants(w => gsSeasonSvg(st, w)) + '</div>'
       + '<div class="gs-col">' + gsSplitCardHtml(st)
-      + '<div class="dash-card"><div class="dash-card-title">⚡ Episodi ravvicinati</div>' + gsVariants(w => gsEpisodesHtml(st, w)) + '</div></div></div>';
-    h += '<div class="dash-card"><div class="dash-card-title">👥 Chi era in campo quando subiamo</div>'
+      + '<div class="dash-card' + gsFoldCls('ep') + '" data-fold="ep"><div class="dash-card-title">⚡ Episodi ravvicinati</div>' + gsFoldBtn('ep') + gsVariants(w => gsEpisodesHtml(st, w)) + '</div></div></div>';
+    h += '<div class="dash-card' + gsFoldCls('field') + '" data-fold="field"><div class="dash-card-title">👥 Chi era in campo quando subiamo</div>' + gsFoldBtn('field')
       + '<div class="gs-tabs" role="group"><button class="gs-tab' + (gsTab === 'goals' ? ' on' : '') + '" data-tab="goals" onclick="setGsTab(\'goals\')">Gol per gol</button>'
       + '<button class="gs-tab' + (gsTab === 'forms' ? ' on' : '') + '" data-tab="forms" onclick="setGsTab(\'forms\')">Formazioni</button>'
       + '<button class="gs-tab' + (gsTab === 'players' ? ' on' : '') + '" data-tab="players" onclick="setGsTab(\'players\')">Singole calciatrici</button></div>';
@@ -4348,12 +4366,12 @@ function gsMatchHtml(st) {
     + (a.subs.length ? '<div class="gs-sublist">' + a.subs.map((sb, i) => '<span><b>' + (i + 1) + '</b>' + (sb.period === 1 && sb.pm === 0 ? 'Intervallo' : sb.clock + "'") + ' · ' + escapeHtml(sb.out) + ' › ' + escapeHtml(sb.inn) + '</span>').join('') + '</div>' : '')
     + '</div>';
   if (a.goals.length) {
-    h += '<div class="dash-card gs-card-gap"><div class="dash-card-title">🥅 Gol per gol: chi era in campo</div>'
+    h += '<div class="dash-card gs-card-gap' + gsFoldCls('field') + '" data-fold="field"><div class="dash-card-title">🥅 Gol per gol: chi era in campo</div>' + gsFoldBtn('field')
       + '<div class="gs-note top">Per ogni gol subito, le calciatrici che erano in campo in quel momento, ricostruite dai titolari e dai cambi registrati.</div>'
       + gsGoalsHtml(st, true) + '</div>';
   }
   if (a.hasLineup) {
-    h += '<div class="dash-card"><div class="dash-card-title">👥 Chi era in campo, tratto per tratto</div>'
+    h += '<div class="dash-card' + gsFoldCls('field') + '" data-fold="field"><div class="dash-card-title">👥 Chi era in campo, tratto per tratto</div>' + gsFoldBtn('field')
       + '<div class="gs-note top">Ogni tratto ha le stesse calciatrici in campo: cambia a ogni sostituzione (o espulsione). I minuti sono quelli dei cambi registrati durante la partita.</div><div class="gs-stints">'
       + a.stints.map((s, i) => {
         const nm = {}; s.xi.forEach(p => { nm[p.key] = p.name; });
@@ -4409,6 +4427,7 @@ function initCardZoom() {
 function openCardZoom(card) {
   const body = document.getElementById('card-zoom-body');
   const clone = card.cloneNode(true);
+  clone.classList.add('gs-open');   // a tutto schermo un riquadro a scomparsa si vede sempre aperto
   const liveSec = card.closest('.gs-sec');
   let content = clone;
   if (liveSec) {
@@ -4769,7 +4788,8 @@ async function buildGraphicReport(scope, sections) {
   await loadHtml2canvas();
   const screen = document.getElementById('dashboard-screen');
   const sel = document.getElementById('dash-match-select');
-  const prevScope = sel.value || '__all__', prevTab = gsTab;
+  const prevScope = sel.value || '__all__', prevTab = gsTab, prevOpen = Object.assign({}, gsOpenCards);
+  gsOpenCards = { ep: true, field: true };   // nel PDF i riquadri a scomparsa vanno aperti
   fillDashSelect(); // sempre: include anche le partite concluse dopo l'ultima apertura
   sel.value = scope;
   if (sel.value !== scope) throw new Error('Partita non trovata tra quelle concluse');
@@ -4884,6 +4904,7 @@ async function buildGraphicReport(scope, sections) {
     return { doc, fname };
   } finally {
     opened.forEach(d => { d.open = false; });
+    gsOpenCards = prevOpen;
     screen.classList.remove('report-capture');
     setGsTab(prevTab);
     sel.value = prevScope;

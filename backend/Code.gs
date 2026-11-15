@@ -1,5 +1,10 @@
 // ============================================
 // MY STATISTICS - Apps Script Backend
+// v6.5 (15/11/2026): FIX "Backend occupato" dal Watch. Il comando 'voice' (solo
+//   appendRow di una riga in coda) non dipende piu' dal blocco: prova ad averlo per
+//   2 s e, se non c'e', procede lo stesso. Poll/ack: 3 tentativi di blocco, errore
+//   reale registrato (console.error) e mostrato tra parentesi, righe lette 300 -> 60.
+//   Nessun nuovo scope: pubblicare su TUTTI e 4 i deployment.
 // v6.3 (08/11/2026): COMANDI VOCALI - tiro in porta (solo Fiamma, dato di squadra):
 //   "tiro in porta nello specchio" / "tiro in porta fuori dallo specchio" ->
 //   data { type:'shot', team:'fiamma'|'avversario' (v6.4), shotResult:'specchio'|'fuori' }. "tiro in porta"
@@ -93,7 +98,7 @@
 
 // Aggiornare ad OGNI modifica di questo file; il frontend la confronta con
 // BACKEND_MIN_VERSION di index.html.
-const BACKEND_VERSION = '6.4';
+const BACKEND_VERSION = '6.5';
 
 const SHEET_PARTITE = 'Partite';
 const SHEET_BACKUP = 'PartiteJSON';
@@ -734,7 +739,7 @@ function saveMatchBackup(ss, match, dataPartita, dataSalvataggio) {
 // lasciare vuoto il resto; al giro successivo l'iPad la tratta come dettata ora.
 const VOICE_MAX_AGE_MS = 2 * 60 * 1000;  // oltre: "scaduto", mai applicato in ritardo
 const VOICE_DUP_MS = 15 * 1000;          // stessa frase entro 15 s = invio doppio
-const VOICE_SCAN_ROWS = 300;             // righe recenti lette a ogni giro
+const VOICE_SCAN_ROWS = 60;              // righe recenti lette a ogni giro
 const VOICE_HEADERS = ['ID', 'Ricevuto', 'Testo dettato', 'Evento', 'Squadra', 'Maglia', 'Dettaglio', 'Stato', 'Messaggio', 'Dati'];
 const VOICE_COL = { id: 1, ts: 2, text: 3, evento: 4, squadra: 5, maglia: 6, dettaglio: 7, stato: 8, msg: 9, data: 10 };
 
@@ -746,19 +751,31 @@ function handleVoiceRequest(payload) {
   if (String(payload.token || '') !== expected) {
     return jsonResponse({ ok: false, error: 'Token comandi vocali non valido', message: '❌ Token non valido' });
   }
+  // v6.5: il comando del Watch aggiunge solo una riga in coda (appendRow e' atomico):
+  // il blocco e' un di piu', non una condizione. Se non c'e', si procede lo stesso.
+  var isWatch = payload.action === 'voice';
   var lock = LockService.getScriptLock();
-  try {
-    lock.waitLock(15000);
-  } catch (e) {
-    return jsonResponse({ ok: false, error: 'Backend occupato, riprova', message: '❌ Backend occupato, riprova' });
+  var locked = false, lastErr = '';
+  var attempts = isWatch ? 1 : 3;
+  for (var i = 0; i < attempts && !locked; i++) {
+    try {
+      lock.waitLock(isWatch ? 2000 : 4000);
+      locked = true;
+    } catch (e) {
+      lastErr = String(e && e.message || e).substring(0, 80);
+      console.error('voice lock (' + payload.action + ', tentativo ' + (i + 1) + '): ' + lastErr);
+    }
+  }
+  if (!locked && !isWatch) {
+    return jsonResponse({ ok: false, error: 'Backend occupato, riprova', message: '❌ Backend occupato, riprova (' + lastErr + ')' });
   }
   try {
     var sheet = getComandiSheet();
-    if (payload.action === 'voice') return handleVoiceCommand(sheet, payload);
+    if (isWatch) return handleVoiceCommand(sheet, payload);
     if (payload.action === 'voicePoll') return handleVoicePoll(sheet, payload);
     return handleVoiceAck(sheet, payload);
   } finally {
-    lock.releaseLock();
+    if (locked) lock.releaseLock();
   }
 }
 

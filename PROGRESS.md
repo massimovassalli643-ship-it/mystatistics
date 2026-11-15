@@ -20,7 +20,18 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Comandi vocali | Guida completa (scorciatoia Watch, frasi, checklist): `COMANDI_VOCALI.md`. Token in Script Property `VOICE_TOKEN` e nelle Impostazioni dell'iPad, **mai nel repository** |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.48 + backend v6.4 - Tiro in porta avversario da Apple Watch (15/11/2026)
+## Stato attuale: v3.49 - Dashboard: riquadri a scomparsa (15/11/2026)
+
+- **Dashboard › Analisi gol subiti**: i riquadri **"⚡ Episodi ravvicinati"** e **"👥 Chi era in campo quando subiamo"** sono chiusi di default e si aprono col pulsante "Apri ▾" / "Chiudi ▴" (44 px). Nella vista singola partita vale lo stesso per "🥅 Gol per gol: chi era in campo" e "👥 Chi era in campo, tratto per tratto" (stessa chiave `field`).
+- Implementazione: classe `gs-fold` / `gs-open`, stato in `gsOpenCards` (sopravvive ai ridisegni, si azzera al riavvio), `toggleGsFold(key)`. Il riquadro a tutto schermo (`openCardZoom`) e il **Report PDF** (`buildGraphicReport`, che imposta `gsOpenCards` a true e poi ripristina) li mostrano sempre aperti; il pulsante è nascosto nel PDF.
+
+## Stato precedente: backend v6.5 - Fix "Backend occupato" dal Watch (15/11/2026)
+
+- **Problema** (partita 15/11, 14:30-16:15): dal Watch compariva "❌ Backend occupato, riprova" dopo qualche secondo. Le esecuzioni `doPost` della giornata durano tutte 1-3,5 s e nessuna è fallita: non è l'attesa di 15 s del blocco (`waitLock`), ma un'eccezione immediata di `LockService`, che il vecchio `catch` nascondeva dietro lo stesso messaggio.
+- **Fix** (`handleVoiceRequest`): il comando `voice` del Watch (solo `appendRow` in coda) non dipende più dal blocco: lo prova per 2 s e, se non c'è, procede lo stesso. Poll e ack: 3 tentativi da 4 s, errore reale in `console.error` e nel messaggio ("Backend occupato, riprova (…)"), così la prossima volta la causa si legge. `VOICE_SCAN_ROWS` 300 → 60 (i comandi scadono dopo 2 minuti).
+- **Da pubblicare**: `Code.gs` v6.5 su **tutti** i deployment. `BACKEND_MIN_VERSION` resta 6.4 (l'app non cambia).
+
+## Stato precedente: v3.48 + backend v6.4 - Tiro in porta avversario da Apple Watch (15/11/2026)
 
 - **Comandi vocali**: "tiro in porta avversario nello specchio" / "tiro avversario fuori dallo specchio" registrano l'evento `shot` della squadra avversaria; senza squadra resta la Fiamma. Se si dicono sia fiamma sia avversario: errore "Squadra ambigua". Backend `parseVoiceCommand` (`team: 'fiamma'|'avversario'`), app: ramo `cmd.type === 'shot'` di `runVoiceCommand`. `VOICE_TEST_PHRASES`: 38 frasi, tutte ok.
 - **Da pubblicare**: `Code.gs` v6.4 su **tutti** i deployment (`BACKEND_MIN_VERSION = 6.4`).
@@ -1461,6 +1472,8 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | Data | Modifica |
 |------|----------|
 | 08/11/2026 | Backend v6.3 + frontend v3.46: comandi vocali "tiro in porta nello specchio" / "fuori dallo specchio" (solo Fiamma, minuto dal timer). Da pubblicare su tutti e 4 i deployment |
+| 15/11/2026 | Frontend v3.49: Dashboard, riquadri "Episodi ravvicinati" e "Chi era in campo quando subiamo" chiusi di default con pulsante Apri/Chiudi (aperti nel PDF e nello zoom) |
+| 15/11/2026 | Backend v6.5: fix "Backend occupato" dal Watch (comando voice senza blocco obbligatorio, poll più leggero, errore reale registrato). Da pubblicare su tutti i deployment |
 | 15/11/2026 | Backend v6.4 + frontend v3.48: comandi vocali tiro in porta avversario ("tiro in porta avversario nello specchio" / "fuori"). Da pubblicare su tutti i deployment |
 | 15/11/2026 | Frontend v3.47: tiro in porta anche per la squadra avversaria (scelta squadra nella modale, silo avversarie, statistiche/Excel/Dashboard per squadra). Backend invariato |
 | 08/11/2026 | Backend v6.2 + frontend v3.45: "Importa da Sheets" (foglio `PartiteJSON`, action `partiteFull`, `BACKEND_MIN_VERSION` 6.2); tiri in porta nel riepilogo partita, nella Dashboard e nel Report PDF; evento Tiro in porta nel foglio Eventi. Da pubblicare su tutti e 3 i deployment |
