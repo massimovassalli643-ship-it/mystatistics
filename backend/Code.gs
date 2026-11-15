@@ -2,7 +2,7 @@
 // MY STATISTICS - Apps Script Backend
 // v6.3 (08/11/2026): COMANDI VOCALI - tiro in porta (solo Fiamma, dato di squadra):
 //   "tiro in porta nello specchio" / "tiro in porta fuori dallo specchio" ->
-//   data { type:'shot', team:'fiamma', shotResult:'specchio'|'fuori' }. "tiro in porta"
+//   data { type:'shot', team:'fiamma'|'avversario' (v6.4), shotResult:'specchio'|'fuori' }. "tiro in porta"
 //   senza esito e con "avversario" sono rifiutati. Nessun nuovo scope: pubblicare su
 //   TUTTI e 4 i deployment.
 // v6.2 (08/11/2026): IMPORTA DA SHEETS. Ogni sync salva anche la partita completa
@@ -93,7 +93,7 @@
 
 // Aggiornare ad OGNI modifica di questo file; il frontend la confronta con
 // BACKEND_MIN_VERSION di index.html.
-const BACKEND_VERSION = '6.3';
+const BACKEND_VERSION = '6.4';
 
 const SHEET_PARTITE = 'Partite';
 const SHEET_BACKUP = 'PartiteJSON';
@@ -981,12 +981,14 @@ function parseVoiceCommand(text) {
   var hasFuori = tokens.indexOf('fuori') >= 0;
   if ((hasTiro || hasSpecchio) &&
       !(found.goal || found.owngoal || found.yellow || found.red || found.sub || found.save || found.inMark)) {
-    if (found.them) return { ok: false, message: 'Il tiro in porta si registra solo per la Fiamma' };
+    if (found.us && found.them) return { ok: false, message: 'Squadra ambigua: hai detto sia fiamma sia avversario' };
     if (!hasSpecchio && !hasFuori) {
       return { ok: false, message: 'Tiro in porta: di\' "nello specchio" oppure "fuori dallo specchio"' };
     }
     var shotResult = hasFuori ? 'fuori' : 'specchio';
-    return voiceResult({ type: 'shot', team: 'fiamma', shotResult: shotResult }, 'Tiro in porta', 'Fiamma', '',
+    // v6.4: senza squadra = Fiamma; "avversario" = tiro della squadra avversaria
+    var shotTeam = found.them ? 'avversario' : 'fiamma';
+    return voiceResult({ type: 'shot', team: shotTeam, shotResult: shotResult }, 'Tiro in porta', voiceTeamLabel(shotTeam), '',
       shotResult === 'fuori' ? 'fuori dallo specchio' : 'nello specchio');
   }
 
@@ -1112,7 +1114,7 @@ function voiceRefCell(ref) {
 }
 function describeVoiceCommand(d) {
   if (!d || d.type === 'undo') return 'Annulla l\'ultimo comando vocale';
-  if (d.type === 'shot') return 'Tiro in porta Fiamma, ' + (d.shotResult === 'fuori' ? 'fuori dallo specchio' : 'nello specchio');
+  if (d.type === 'shot') return 'Tiro in porta ' + (d.team === 'avversario' ? 'Avversario' : 'Fiamma') + ', ' + (d.shotResult === 'fuori' ? 'fuori dallo specchio' : 'nello specchio');
   var head = [voiceTeamLabel(d.team), d.lead].filter(function (x) { return x; }).join(' ');
   var who = (head ? ' ' + head : '') + (d.player ? ' ' + voiceRefText(d.player) : '');
   if (d.type === 'goal') {
@@ -1152,7 +1154,10 @@ var VOICE_TEST_PHRASES = [
   ['tiro in porta fiamma nello specchio', 'Tiro in porta Fiamma, nello specchio'],
   ['nello specchio', 'Tiro in porta Fiamma, nello specchio'],
   ['tiro in porta', null],
-  ['tiro in porta avversario nello specchio', null],
+  ['tiro in porta avversario nello specchio', 'Tiro in porta Avversario, nello specchio'],
+  ['tiro in porta avversario fuori dallo specchio', 'Tiro in porta Avversario, fuori dallo specchio'],
+  ['tiro avversario fuori', 'Tiro in porta Avversario, fuori dallo specchio'],
+  ['tiro in porta fiamma avversario nello specchio', null],
   ['goal fiamma', null],
   ['ciao come stai', null],
   ['giallo fiamma Gargaro rosso fiamma Bignotti', null],

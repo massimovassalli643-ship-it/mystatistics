@@ -20,7 +20,19 @@ del 25/05/2026, archiviato in OneDrive `MyStatistics/Docs/`.
 | Comandi vocali | Guida completa (scorciatoia Watch, frasi, checklist): `COMANDI_VOCALI.md`. Token in Script Property `VOICE_TOKEN` e nelle Impostazioni dell'iPad, **mai nel repository** |
 | Cartella distinte su Drive | `My Drive / From Dropbox / CI Fiamma monza prima squadra / Distinte` (letta dal backend, ID in Script Property `DISTINTE_FOLDER_ID`) |
 
-## Stato attuale: v3.46 - Tiro in porta da Apple Watch (08/11/2026)
+## Stato attuale: v3.48 + backend v6.4 - Tiro in porta avversario da Apple Watch (15/11/2026)
+
+- **Comandi vocali**: "tiro in porta avversario nello specchio" / "tiro avversario fuori dallo specchio" registrano l'evento `shot` della squadra avversaria; senza squadra resta la Fiamma. Se si dicono sia fiamma sia avversario: errore "Squadra ambigua". Backend `parseVoiceCommand` (`team: 'fiamma'|'avversario'`), app: ramo `cmd.type === 'shot'` di `runVoiceCommand`. `VOICE_TEST_PHRASES`: 38 frasi, tutte ok.
+- **Da pubblicare**: `Code.gs` v6.4 su **tutti** i deployment (`BACKEND_MIN_VERSION = 6.4`).
+
+## Stato precedente: v3.47 - Tiro in porta anche per la squadra avversaria (15/11/2026)
+
+- **Modale "Tiro in porta"**: torna il campo **Squadra** (default Fiamma, `ourSideOf`) oltre a minuto/tempo ed Esito (nello specchio / fuori). L'evento `shot` ha `team` = lato scelto; gli eventi vecchi (solo Fiamma) restano validi.
+- **Silos**: nuovo silo "Tiri in porta avversarie" accanto a quello Fiamma (griglia silos da 5 a 6 colonne, `SILOS` con `['shot','opp']`).
+- **`shotCounts(m, side)`**: conteggio per squadra (senza `side` somma entrambe). Riquadro di riepilogo partita con una riga per squadra; Excel Riepilogo con 4 righe (Casa/Ospite, specchio/fuori); Dashboard e Report con gruppi Fiamma/Avversarie e colonne avversarie nella tabella per partita (`oppShotsOn`/`oppShotsOff`).
+- **Non incluso**: comandi vocali da Watch (restano solo Fiamma, backend invariato v6.3).
+
+## Stato precedente: v3.46 - Tiro in porta da Apple Watch (08/11/2026)
 
 - **Comandi vocali**: "tiro in porta nello specchio" e "tiro in porta fuori dallo specchio" registrano l'evento `shot` della Fiamma con il minuto del timer (backend **v6.3**, parser `parseVoiceCommand`; app: ramo `cmd.type === 'shot'` in `runVoiceCommand`). Dato di squadra: niente giocatrice né squadra da risolvere. Accettate anche le varianti "nello specchio" da solo, "tiro fuori" e "tiro in porta fiamma nello specchio". Rifiutate: "tiro in porta" senza esito e con "avversario". "annulla" lo toglie come gli altri eventi da voce. 6 nuove frasi in `VOICE_TEST_PHRASES` (36 test, tutti ok in `testParserComandi()`).
 - **Da pubblicare**: `Code.gs` v6.3 sui **4** deployment (la v6.2 è già online; `BACKEND_MIN_VERSION = 6.3`, finché non è pubblicata "Verifica versioni" segnala il backend vecchio).
@@ -1449,6 +1461,8 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 | Data | Modifica |
 |------|----------|
 | 08/11/2026 | Backend v6.3 + frontend v3.46: comandi vocali "tiro in porta nello specchio" / "fuori dallo specchio" (solo Fiamma, minuto dal timer). Da pubblicare su tutti e 4 i deployment |
+| 15/11/2026 | Backend v6.4 + frontend v3.48: comandi vocali tiro in porta avversario ("tiro in porta avversario nello specchio" / "fuori"). Da pubblicare su tutti i deployment |
+| 15/11/2026 | Frontend v3.47: tiro in porta anche per la squadra avversaria (scelta squadra nella modale, silo avversarie, statistiche/Excel/Dashboard per squadra). Backend invariato |
 | 08/11/2026 | Backend v6.2 + frontend v3.45: "Importa da Sheets" (foglio `PartiteJSON`, action `partiteFull`, `BACKEND_MIN_VERSION` 6.2); tiri in porta nel riepilogo partita, nella Dashboard e nel Report PDF; evento Tiro in porta nel foglio Eventi. Da pubblicare su tutti e 3 i deployment |
 | 08/11/2026 | Frontend v3.45: pulsante "Tiro in porta" (nello specchio / fuori dallo specchio, solo Fiamma, dato di squadra, minuto dal timer) tra Goal e Giallo, con silo dedicato ed export Excel; fix menù "Vista" della Dashboard (voci invisibili). Solo frontend |
 | 05/11/2026 | Frontend v3.44: zoom dei riquadri con sfondo opaco e pannello fino a 1600 px; nomi delle squadre avversarie per intero nel grafico "Quando subiamo" (`gsShortTeam` toglie sigle e codici, colonna nomi più larga). Solo frontend |

@@ -225,7 +225,7 @@
   /* Silos (v3.33): sostituzioni e ammonizioni divise per squadra sotto i pulsanti,
      stesso aspetto della colonna "Eventi partita"; il colore del bordo alto e'
      quello del pulsante (blu sostituzioni, giallo ammonizioni) */
-  .silos { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+  .silos { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
   .silo.shot { border-top-color: #e67e22; }
   .silo { min-height: 0; display: flex; flex-direction: column; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-top: 3px solid #7fb8ff; border-radius: 12px; overflow: hidden; }
   .silo.sub { border-top-color: #3498db; }
@@ -811,6 +811,10 @@
           <div class="silo-head"><div class="silo-title">🎯 Tiri in porta Fiamma</div><div class="roster-count" id="silo-count-shot-ours">0</div></div>
           <div class="silo-list" id="silo-shot-ours"></div>
         </div>
+        <div class="silo shot">
+          <div class="silo-head"><div class="silo-title">🎯 Tiri in porta avversarie</div><div class="roster-count" id="silo-count-shot-opp">0</div></div>
+          <div class="silo-list" id="silo-shot-opp"></div>
+        </div>
         <div class="silo yellow">
           <div class="silo-head"><div class="silo-title">🟨 Giallo Fiamma</div><div class="roster-count" id="silo-count-yellow-ours">0</div></div>
           <div class="silo-list" id="silo-yellow-ours"></div>
@@ -1014,9 +1018,9 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.46';
+const APP_VERSION = '3.48';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
-const BACKEND_MIN_VERSION = '6.3';
+const BACKEND_MIN_VERSION = '6.4';
 const STORAGE_KEY = 'mystatistics_matches_v2';
 const PERIODS = ['1° tempo', '2° tempo', '1° supplementare', '2° supplementare', 'Partita conclusa'];
 const PERIOD_OFFSETS = [0, 45, 90, 105, 120];
@@ -2263,7 +2267,7 @@ let currentEventDraft = null;
 function openEventModal(type) {
   if (!state.currentMatch) return;
   const periodMinute = Math.floor(currentElapsedMs() / 60000);
-  // Il tiro in porta e' solo della Fiamma (dato di squadra): niente scelta squadra
+  // Il tiro in porta e' un dato di squadra (Fiamma o avversaria): default Fiamma, scelta squadra nella modale
   const team = type === 'shot' ? ourSideOf(state.currentMatch, OUR_TEAM_NAME) : 'home';
   currentEventDraft = { type, team, periodMinute, period: state.timer.periodIndex };
   showEventModal(type);
@@ -2348,8 +2352,8 @@ function renderEventModalBody() {
       </div>`;
   } else if (type === 'shot') {
     const res = currentEventDraft.shotResult || 'specchio';
-    // Solo Fiamma, senza tiratrice: si toglie il campo Squadra e restano minuto + esito
-    body = minuteField + `
+    // Dato di squadra (Fiamma o avversaria), senza tiratrice: squadra + minuto + esito
+    body += `
       <div class="modal-field">
         <label class="modal-label">Esito</label>
         <div class="modal-radio-group">
@@ -2588,7 +2592,7 @@ function removeEvent(id) {
 /* v3.33: colonna destra = goal, espulsioni, rigori parati; sostituzioni e
    ammonizioni nei 4 silos sotto i pulsanti, divise tra Fiamma (ourSideOf) e
    avversarie. Stesse schede evento (✏️ / ×) ovunque, piu' recenti in alto. */
-const SILOS = [['sub', 'ours'], ['sub', 'opp'], ['shot', 'ours'], ['yellow', 'ours'], ['yellow', 'opp']];
+const SILOS = [['sub', 'ours'], ['sub', 'opp'], ['shot', 'ours'], ['shot', 'opp'], ['yellow', 'ours'], ['yellow', 'opp']];
 function renderEvents() {
   const m = state.currentMatch;
   const events = [...m.events].sort((a, b) => b.minute - a.minute);
@@ -2777,9 +2781,11 @@ function runVoiceCommand(c) {
     return { stato: 'applicato', messaggio: 'Annullato: ' + label };
   }
   if (cmd.type === 'shot') {
-    // v3.46: tiro in porta, dato di squadra solo della Fiamma: niente squadra/giocatrice da risolvere
+    // v3.46: tiro in porta, dato di squadra: niente giocatrice da risolvere. v3.48: anche avversario
     const periodMinute = Math.floor(currentElapsedMs() / 60000);
-    const ev = { type: 'shot', team: ourSideOf(m, VOICE_OUR_TEAM), periodMinute, period: state.timer.periodIndex,
+    const oursSide = ourSideOf(m, VOICE_OUR_TEAM);
+    const shotSide = cmd.team === 'avversario' ? (oursSide === 'home' ? 'away' : 'home') : oursSide;
+    const ev = { type: 'shot', team: shotSide, periodMinute, period: state.timer.periodIndex,
       shotResult: cmd.shotResult === 'fuori' ? 'fuori' : 'specchio', voiceCmd: c.id };
     ev.minute = periodMinute + (PERIOD_OFFSETS[ev.period] || 0);
     addMatchEvent(ev);
@@ -3350,20 +3356,24 @@ function statsPanelHtml(teamName, stats, showSaves, side, staffStats) {
 
 /* Riquadro "Tiri in porta" del riepilogo di ogni partita (solo se ne sono stati registrati) */
 function shotsPanelHtml(m) {
-  const sc = shotCounts(m);
-  if (!sc.tot) return '';
-  const pct = Math.round(sc.on / sc.tot * 100);
-  return `
-    <div class="stats-panel" style="margin-top:8px;">
-      <div class="stats-panel-title">🎯 Tiri in porta · ${escapeHtml(OUR_TEAM_NAME)}</div>
-      <table class="stats-table">
-        <thead><tr><th>Totale</th><th style="text-align:center">Nello specchio</th><th style="text-align:center">Fuori dallo specchio</th><th style="text-align:center">Precisione</th></tr></thead>
-        <tbody><tr>
+  if (!shotCounts(m).tot) return '';
+  const rows = ['home', 'away'].map(side => {
+    const sc = shotCounts(m, side);
+    const pct = sc.tot ? Math.round(sc.on / sc.tot * 100) + '%' : '–';
+    return `<tr>
+          <td>${escapeHtml(m[side].name)}</td>
           <td class="num-cell">${sc.tot}</td>
           <td class="num-cell">${sc.on}</td>
           <td class="num-cell">${sc.off}</td>
-          <td class="num-cell">${pct}%</td>
-        </tr></tbody>
+          <td class="num-cell">${pct}</td>
+        </tr>`;
+  }).join('');
+  return `
+    <div class="stats-panel" style="margin-top:8px;">
+      <div class="stats-panel-title">🎯 Tiri in porta</div>
+      <table class="stats-table">
+        <thead><tr><th>Squadra</th><th style="text-align:center">Totale</th><th style="text-align:center">Nello specchio</th><th style="text-align:center">Fuori dallo specchio</th><th style="text-align:center">Precisione</th></tr></thead>
+        <tbody>${rows}</tbody>
       </table>
     </div>`;
 }
@@ -3617,8 +3627,10 @@ function exportMatchXlsx(match, asBase64) {
     ['Espulsioni', m.events.filter(e => e.type === 'red').length],
     ['Sostituzioni', m.events.filter(e => e.type === 'sub').length],
     ['Rigori parati', m.events.filter(e => e.type === 'penaltysave').length],
-    ['Tiri in porta (nello specchio)', m.events.filter(e => e.type === 'shot' && e.shotResult !== 'fuori').length],
-    ['Tiri in porta (fuori dallo specchio)', m.events.filter(e => e.type === 'shot' && e.shotResult === 'fuori').length],
+    ['Tiri in porta Casa (nello specchio)', m.events.filter(e => e.type === 'shot' && e.team === 'home' && e.shotResult !== 'fuori').length],
+    ['Tiri in porta Casa (fuori dallo specchio)', m.events.filter(e => e.type === 'shot' && e.team === 'home' && e.shotResult === 'fuori').length],
+    ['Tiri in porta Ospite (nello specchio)', m.events.filter(e => e.type === 'shot' && e.team === 'away' && e.shotResult !== 'fuori').length],
+    ['Tiri in porta Ospite (fuori dallo specchio)', m.events.filter(e => e.type === 'shot' && e.team === 'away' && e.shotResult === 'fuori').length],
   ];
   const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
   ws1['!cols'] = [{ wch: 25 }, { wch: 35 }];
@@ -3760,11 +3772,13 @@ function matchLabel(m) {
   return d.toLocaleDateString('it-IT') + ' · ' + (m.home.name || 'Casa') + ' – ' + (m.away.name || 'Ospiti');
 }
 
-/* Tiri in porta della Fiamma (dato di squadra, v3.45): nello specchio / fuori */
-function shotCounts(m) {
+/* Tiri in porta (dato di squadra, v3.45; dalla v3.47 anche avversari): nello specchio / fuori.
+   side = 'home' | 'away' per contare una sola squadra; senza side conta entrambe */
+function shotCounts(m, side) {
   let on = 0, off = 0;
   (m.events || []).forEach(e => {
     if (e.type !== 'shot') return;
+    if (side && e.team !== side) return;
     if (e.shotResult === 'fuori') off++; else on++;
   });
   return { on, off, tot: on + off };
@@ -3772,7 +3786,7 @@ function shotCounts(m) {
 
 /* Aggrega squadra e calciatrici su un insieme di partite */
 function buildDashboardStats(matches, ourKey) {
-  const team = { played: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, gfPen: 0, gaPen: 0, yellows: 0, reds: 0, saves: 0, shotsOn: 0, shotsOff: 0, shotMatches: [] };
+  const team = { played: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, gfPen: 0, gaPen: 0, yellows: 0, reds: 0, saves: 0, shotsOn: 0, shotsOff: 0, oppShotsOn: 0, oppShotsOff: 0, shotMatches: [] };
   const players = {};
   matches.forEach(m => {
     const side = ourSideOf(m, ourKey);
@@ -3780,11 +3794,14 @@ function buildDashboardStats(matches, ourKey) {
     const gf = m[side].score || 0;
     const ga = m[opp].score || 0;
     team.played++;
-    const sc = shotCounts(m);
-    if (sc.tot > 0) {   // le partite senza tiri registrati (prima della v3.45) non entrano
+    const sc = shotCounts(m, side);
+    const so = shotCounts(m, opp);
+    if (sc.tot + so.tot > 0) {   // le partite senza tiri registrati (prima della v3.45) non entrano
       team.shotsOn += sc.on;
       team.shotsOff += sc.off;
-      team.shotMatches.push({ label: matchLabel(m), on: sc.on, off: sc.off });
+      team.oppShotsOn += so.on;
+      team.oppShotsOff += so.off;
+      team.shotMatches.push({ label: matchLabel(m), on: sc.on, off: sc.off, oppOn: so.on, oppOff: so.off });
     }
     team.gf += gf;
     team.ga += ga;
@@ -3863,21 +3880,31 @@ function playersTableHtml(players) {
 /* KPI e riquadro "Tiri in porta" della dashboard: solo se almeno una partita ha tiri registrati */
 function shotsKpiHtml(t) {
   const tot = t.shotsOn + t.shotsOff;
-  if (!tot) return '';
-  return kpiHtml('Tiri in porta', tot, '🎯 ' + t.shotsOn + ' nello specchio · ' + t.shotsOff + ' fuori');
+  const oppTot = t.oppShotsOn + t.oppShotsOff;
+  if (!tot && !oppTot) return '';
+  return kpiHtml('Tiri in porta', tot, '🎯 ' + t.shotsOn + ' nello specchio · ' + t.shotsOff + ' fuori'
+    + (oppTot ? ' · avversarie ' + oppTot + ' (' + t.oppShotsOn + ' nello specchio)' : ''));
 }
 function shotsCardHtml(t, single) {
   const tot = t.shotsOn + t.shotsOff;
-  if (!tot) return '';
-  const pct = Math.round(t.shotsOn / tot * 100);
+  const oppTot = t.oppShotsOn + t.oppShotsOff;
+  if (!tot && !oppTot) return '';
+  const group = (title, on, off) => {
+    const n = on + off;
+    if (!n) return '';
+    const pct = Math.round(on / n * 100);
+    return '<div class="kpi-label" style="margin:8px 0 4px;">' + title + '</div>'
+      + barChartHtml([{ label: 'Nello specchio', value: on }, { label: 'Fuori dallo specchio', value: off }], '', 2, true)
+      + '<div class="kpi-sub" style="margin-top:8px;">' + pct + '% nello specchio · ' + gsPlural(n, 'tiro', 'tiri')
+      + (single ? '' : ' in ' + gsPlural(t.shotMatches.length, 'partita', 'partite')
+        + ' (' + (t.shotMatches.length ? (n / t.shotMatches.length).toFixed(1) : '0') + ' a partita)') + '</div>';
+  };
   let h = '<div class="dash-card"><div class="dash-card-title">🎯 Tiri in porta</div>'
-    + barChartHtml([{ label: 'Nello specchio', value: t.shotsOn }, { label: 'Fuori dallo specchio', value: t.shotsOff }], '', 2, true)
-    + '<div class="kpi-sub" style="margin-top:8px;">' + pct + '% nello specchio · ' + gsPlural(tot, 'tiro', 'tiri')
-    + (single ? '' : ' in ' + gsPlural(t.shotMatches.length, 'partita', 'partite')
-      + ' (' + (t.shotMatches.length ? (tot / t.shotMatches.length).toFixed(1) : '0') + ' a partita)') + '</div>';
+    + group(escapeHtml(OUR_TEAM_NAME), t.shotsOn, t.shotsOff)
+    + group('Avversarie', t.oppShotsOn, t.oppShotsOff);
   if (!single && t.shotMatches.length > 1) {
-    h += '<div class="dash-scroll"><table class="dash-table"><thead><tr><th>Partita</th><th>Nello specchio</th><th>Fuori</th><th>Totale</th></tr></thead><tbody>'
-      + t.shotMatches.map(r => '<tr><td>' + escapeHtml(r.label) + '</td><td class="n">' + r.on + '</td><td class="n">' + r.off + '</td><td class="n">' + (r.on + r.off) + '</td></tr>').join('')
+    h += '<div class="dash-scroll"><table class="dash-table"><thead><tr><th>Partita</th><th>Fiamma specchio</th><th>Fiamma fuori</th><th>Avv. specchio</th><th>Avv. fuori</th></tr></thead><tbody>'
+      + t.shotMatches.map(r => '<tr><td>' + escapeHtml(r.label) + '</td><td class="n">' + r.on + '</td><td class="n">' + r.off + '</td><td class="n">' + r.oppOn + '</td><td class="n">' + r.oppOff + '</td></tr>').join('')
       + '</tbody></table></div>';
   }
   return h + '</div>';
