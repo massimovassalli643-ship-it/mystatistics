@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+Informazioni comuni alle app del club (Apps Script, colori, modo di lavorare): vedi il file importato qui sotto.
+
+@../FIAMMA-COMUNE.md
+
 Guidance for Claude Code when working in this repository.
 
 ## Project
@@ -12,9 +16,9 @@ pushing `main` to GitHub Pages.
 Backend: Google Apps Script web app (proxy to Anthropic API for OCR + Google
 Sheets sync). The live code is in the Apps Script editor (project
 "MyStatisticsBackend"); `backend/Code.gs` is the reference copy kept in sync
-by hand. After ANY change to Code.gs: paste it in the editor, save, then
-Deploy → Gestisci deployment → (Modifica) → Nuova versione → Implementa —
-for EVERY active deployment (there are three; the iPad may use any of them).
+by hand. After ANY change to Code.gs: paste it in the editor, save, and publish
+a new version of EVERY active deployment (there are three; the iPad may use any
+of them) — procedure in `FIAMMA-COMUNE.md`.
 
 Since v4 the backend also reads Google Drive (`DriveApp`). Adding a new OAuth
 scope means the deployments must be re-authorized: run `testDriveDistinte()`
@@ -33,9 +37,9 @@ Full functional/technical documentation: PDF "MyStatistics_Documentazione"
 - Keep the logical module structure of `index.html` (Storage, Navigazione,
   Home, Setup, OCR, Lineup, Match, Eventi, Statistiche, Summary, Export, Sync,
   Impostazioni, Utility) — add code inside the matching block
-- Look (v3.35): dark theme in the club colors (navy `#0F1F4D`/`#12286a`, red `#D8232A` only as the top-bar line), Barlow / Barlow Condensed from Google Fonts, club logo `logo.png`. Same identity as `registro-presenze-fiamma-monza` and `convocazioni`, but kept dark on purpose (charts, PDF and report are tuned on a dark background). Keep tap targets >= 44 px and text >= 11 px
+- Look (v3.35): dark theme in the club colors (navy `#0F1F4D`/`#12286a`, red `#D8232A` only as the top-bar line), club logo `logo.png` (fonts as in `FIAMMA-COMUNE.md`). Same identity as `registro-presenze-fiamma-monza` and `convocazioni`, but kept dark on purpose (charts, PDF and report are tuned on a dark background). Keep tap targets >= 44 px and text >= 11 px
 - Frontend → backend requests use `Content-Type: text/plain;charset=utf-8`
-  (avoids CORS preflight, which Apps Script cannot answer)
+  (see `FIAMMA-COMUNE.md`: Apps Script cannot answer the CORS preflight)
 - Files in the repo are normalized to LF: edit with tools that read/modify/write
   the file (python, sed), never re-type it from tool output (truncation risk)
 
