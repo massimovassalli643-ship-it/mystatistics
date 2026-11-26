@@ -1471,6 +1471,7 @@ rowsCounted 20, 5 immagini ricevute, ~15 s, 8.7k token input.
 ## Changelog
 | Data | Modifica |
 |------|----------|
+| 26/11/2026 | Frontend v3.50: pulsante "Backup completo" rinominato "Esporta"; Esporta e "JSON" della partita aprono il pannello di condivisione (Mail, WhatsApp, AirDrop) con download come ripiego. Solo frontend |
 | 08/11/2026 | Backend v6.3 + frontend v3.46: comandi vocali "tiro in porta nello specchio" / "fuori dallo specchio" (solo Fiamma, minuto dal timer). Da pubblicare su tutti e 4 i deployment |
 | 15/11/2026 | Frontend v3.49: Dashboard, riquadri "Episodi ravvicinati" e "Chi era in campo quando subiamo" chiusi di default con pulsante Apri/Chiudi (aperti nel PDF e nello zoom) |
 | 15/11/2026 | Backend v6.5: fix "Backend occupato" dal Watch (comando voice senza blocco obbligatorio, poll più leggero, errore reale registrato). Da pubblicare su tutti i deployment |

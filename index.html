@@ -587,7 +587,7 @@
     <p class="home-subtitle">F.I.G.C. - Lega Nazionale Dilettanti • Calcio femminile a 11 • <span id="app-version"></span></p>
     <div class="home-actions">
       <button class="primary-btn" onclick="startNewMatch()">⚽ Nuova partita</button>
-      <button class="secondary-btn" onclick="exportAllData()">📤 Backup completo</button>
+      <button class="secondary-btn" onclick="exportAllData()">📤 Esporta</button>
       <button class="secondary-btn" onclick="importData()">📥 Importa</button>
       <button class="secondary-btn" id="import-sheets-btn" onclick="importFromSheets()">☁️ Importa da Sheets</button>
       <button class="secondary-btn" onclick="openSettingsModal()">⚙️ Impostazioni</button>
@@ -1024,7 +1024,7 @@
 /* ==================== CONFIG ==================== */
 // Versione del frontend: va aggiornata ad OGNI modifica di index.html (vedi PROGRESS.md).
 // checkVersions() la confronta con quella online leggendo questa stessa riga.
-const APP_VERSION = '3.49';
+const APP_VERSION = '3.50';
 // Versione minima del backend (BACKEND_VERSION in backend/Code.gs) richiesta da questo frontend
 const BACKEND_MIN_VERSION = '6.4';
 const STORAGE_KEY = 'mystatistics_matches_v2';
@@ -3494,13 +3494,27 @@ function initSummaryStatEditing() {
 
 function exportAllData() {
   const data = JSON.stringify(loadMatches(), null, 2);
-  downloadFile('mystatistics_backup_' + Date.now() + '.json', data, 'application/json');
+  shareOrDownloadFile('mystatistics_backup_' + Date.now() + '.json', data, 'application/json');
 }
 function exportCurrentMatch() {
   if (!state.currentMatch) return;
   const data = JSON.stringify(state.currentMatch, null, 2);
   const fname = `match_${state.currentMatch.home.name}_vs_${state.currentMatch.away.name}_${Date.now()}.json`.replace(/\s+/g, '_');
-  downloadFile(fname, data, 'application/json');
+  shareOrDownloadFile(fname, data, 'application/json');
+}
+/* Pannello di condivisione (Mail, WhatsApp, AirDrop...); dove non c'e', download. */
+async function shareOrDownloadFile(filename, content, mime) {
+  try {
+    const file = new File([content], filename, { type: mime });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: filename });
+      return 'shared';
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return 'cancelled';
+  }
+  downloadFile(filename, content, mime);
+  return 'saved';
 }
 function downloadFile(filename, content, mime) {
   const blob = new Blob([content], { type: mime });
